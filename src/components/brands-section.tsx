@@ -1,6 +1,6 @@
 import { Check, Droplet, HardHat, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { brands, contactHref, toneStyles } from "@/lib/content";
+import { brands, toneStyles } from "@/lib/content";
 
 const brandIcons: Record<string, LucideIcon> = {
   emoro: HardHat,
@@ -65,20 +65,14 @@ export function BrandsSection() {
                 </ul>
               </div>
 
-              <div className="mt-10 space-y-3">
-                <Link
-                  href={contactHref(brand.id)}
-                  className={`inline-flex w-full items-center justify-center rounded-xl py-4 font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${tone.button}`}
-                >
-                  Enquire with {brand.name}
-                </Link>
+              <p className="mt-10">
                 <a
                   href={`mailto:${brand.email}`}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
+                  className="text-sm font-semibold text-slate-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
                 >
-                  <span className="truncate">{brand.email}</span>
+                  {brand.email}
                 </a>
-              </div>
+              </p>
             </article>
           );
         })}

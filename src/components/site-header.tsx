@@ -47,15 +47,6 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-
-        <div className="hidden lg:block">
-          <Link
-            href="/contact"
-            className="inline-flex h-10 items-center rounded-lg border border-white/20 bg-white/10 px-5 text-sm font-semibold transition-all hover:bg-white hover:text-brand-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            Enquire
-          </Link>
-        </div>
       </div>
 
       <details className="group mobile-nav lg:hidden">
@@ -76,12 +67,6 @@ export function SiteHeader() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/contact"
-            className="mt-4 block rounded-lg bg-orange-700 py-3 text-center font-semibold text-white"
-          >
-            Enquire
-          </Link>
         </div>
       </details>
       <script dangerouslySetInnerHTML={{ __html: closeMenuScript }} />

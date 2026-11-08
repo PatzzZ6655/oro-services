@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SiteFrame } from "@/components/site-frame";
 import { InteriorHero } from "@/components/interior-hero";
 import { brands, corporateEmail } from "@/lib/content";
@@ -106,12 +105,6 @@ export default function PrivacyPage() {
           <h2 className="text-2xl font-bold text-slate-900">This website</h2>
           <p>
             The public pages do not use advertising cookies. The form includes a field that people should leave blank so we can ignore automated submissions.
-          </p>
-          <p>
-            <Link href="/contact" className="font-semibold text-brand-navy underline">
-              Go to the enquiry form
-            </Link>
-            .
           </p>
         </section>
       </article>
