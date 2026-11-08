@@ -1,5 +1,79 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+const onVercel = process.env.VERCEL === "1";
+// Preview deployments inject the Vercel Toolbar from vercel.live. The
+// production deployment (www.orosvc.com) does not, so those origins are
+// left out of the live policy. This is chosen at build time, not per
+// request, so the CDN can keep serving one cached header set per deployment.
+const allowVercelToolbar = process.env.VERCEL_ENV === "preview";
+
+// Enforcing CSP without a per-request nonce. Next.js only applies nonces
+// during dynamic rendering, which would turn off prerendering and the CDN
+// cache this site uses. The inline scripts are Next.js flight data plus one
+// first-party menu script. The inline styles are attributes (the hero
+// gradient and next/image), which a nonce cannot allow. script-src-attr
+// 'none' still blocks inline event handlers. Cross-Origin-Resource-Policy
+// is intentionally unset so mail clients can keep hotlinking /email/*.gif.
+function contentSecurityPolicy(): string {
+  const scriptSrc = ["'self'", "'unsafe-inline'"];
+  if (isDev) scriptSrc.push("'unsafe-eval'");
+  if (allowVercelToolbar) scriptSrc.push("https://vercel.live");
+
+  const styleSrc = ["'self'", "'unsafe-inline'"];
+  if (allowVercelToolbar) styleSrc.push("https://vercel.live");
+
+  const imgSrc = ["'self'", "blob:", "data:"];
+  if (allowVercelToolbar) imgSrc.push("https://vercel.live", "https://vercel.com");
+
+  const fontSrc = ["'self'"];
+  if (allowVercelToolbar) fontSrc.push("https://vercel.live", "https://assets.vercel.com");
+
+  const connectSrc = ["'self'"];
+  if (allowVercelToolbar) connectSrc.push("https://vercel.live", "wss://ws-us3.pusher.com");
+
+  const directives = [
+    "default-src 'self'",
+    `script-src ${scriptSrc.join(" ")}`,
+    "script-src-attr 'none'",
+    `style-src ${styleSrc.join(" ")}`,
+    `img-src ${imgSrc.join(" ")}`,
+    `font-src ${fontSrc.join(" ")}`,
+    `connect-src ${connectSrc.join(" ")}`,
+    `frame-src ${allowVercelToolbar ? "https://vercel.live" : "'none'"}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "worker-src 'none'",
+  ];
+
+  if (onVercel) directives.push("upgrade-insecure-requests");
+
+  return directives.join("; ");
+}
+
+const permissionsPolicy = [
+  "accelerometer=()",
+  "autoplay=()",
+  "camera=()",
+  "display-capture=()",
+  "encrypted-media=()",
+  "fullscreen=()",
+  "geolocation=()",
+  "gyroscope=()",
+  "magnetometer=()",
+  "microphone=()",
+  "midi=()",
+  "payment=()",
+  "picture-in-picture=()",
+  "publickey-credentials-get=()",
+  "screen-wake-lock=()",
+  "usb=()",
+  "xr-spatial-tracking=()",
+  "browsing-topics=()",
+].join(", ");
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   cacheComponents: true,
@@ -22,6 +96,20 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy() },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Permissions-Policy", value: permissionsPolicy },
+        ],
+      },
+    ];
   },
 };
 
