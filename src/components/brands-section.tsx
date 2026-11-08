@@ -27,7 +27,7 @@ export function BrandsSection() {
           return (
             <article
               key={brand.id}
-              className="group flex min-w-0 flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:border-slate-200/80 hover:shadow-xl sm:p-8 md:p-10"
+              className="group flex min-w-0 flex-col rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:border-slate-200/80 hover:shadow-xl sm:p-8 md:p-10"
             >
               <div>
                 <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
@@ -64,15 +64,6 @@ export function BrandsSection() {
                   ))}
                 </ul>
               </div>
-
-              <p className="mt-10">
-                <a
-                  href={`mailto:${brand.email}`}
-                  className="text-sm font-semibold text-slate-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
-                >
-                  {brand.email}
-                </a>
-              </p>
             </article>
           );
         })}
