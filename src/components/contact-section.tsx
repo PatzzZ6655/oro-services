@@ -1,19 +1,26 @@
+import Link from "next/link";
 import { LogoImage } from "@/components/logo-image";
 import { brands, corporateEmail } from "@/lib/content";
 
 export function ContactSection() {
   return (
     <section id="contact" className="mx-auto max-w-4xl scroll-mt-32 px-6 py-20 text-center md:py-24">
-      <span className="text-xs font-bold uppercase tracking-widest text-brand-orange">
-        Initiate Contact
+      <span className="text-xs font-bold uppercase tracking-widest text-orange-800">
+        Contact
       </span>
       <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-        Let&apos;s Discuss Your Project
+        Tell us the job
       </h2>
-      <p className="mx-auto mt-4 max-w-lg font-light leading-relaxed text-slate-500">
-        Reach out to the appropriate team below. We respond as soon as we review
-        your request.
+      <p className="mx-auto mt-4 max-w-lg font-light leading-relaxed text-slate-600">
+        Use the form and it goes to Emoro Building, Emporo Plumbing, or the ORO
+        Services inbox. You can also email the team directly.
       </p>
+      <Link
+        href="/contact"
+        className="mt-8 inline-flex rounded-xl bg-brand-navy px-8 py-4 font-semibold text-white transition-colors hover:bg-brand-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
+      >
+        Send an enquiry
+      </Link>
 
       <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 text-left md:grid-cols-2">
         {brands.map((brand) => (
@@ -26,11 +33,15 @@ export function ContactSection() {
               alt={brand.name}
               width={brand.logoWidth}
               height={brand.logoHeight}
+              sizes="192px"
               className="mb-4 h-auto max-h-12 w-auto max-w-full"
             />
+            <Link href={`/${brand.id}`} className="font-semibold text-brand-navy hover:underline">
+              {brand.name}
+            </Link>
             <a
               href={`mailto:${brand.email}`}
-              className="block break-all text-sm font-semibold text-brand-navy hover:underline"
+              className="mt-1 block break-all text-sm font-semibold text-slate-700 hover:underline"
             >
               {brand.email}
             </a>
@@ -38,11 +49,11 @@ export function ContactSection() {
         ))}
       </div>
 
-      <div className="mx-auto mt-10 max-w-md border-t border-slate-200/60 pt-8">
-        <span className="block text-xs text-slate-400">Corporate / Admin Inquiry</span>
+      <div className="mx-auto mt-10 max-w-md border-t border-slate-200 pt-8">
+        <span className="block text-xs text-slate-600">ORO Services</span>
         <a
           href={`mailto:${corporateEmail}`}
-          className="mt-1 inline-block text-sm font-semibold text-slate-600 transition-colors hover:text-brand-navy"
+          className="mt-1 inline-block text-sm font-semibold text-slate-700 transition-colors hover:text-brand-navy"
         >
           {corporateEmail}
         </a>

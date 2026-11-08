@@ -1,5 +1,6 @@
-import { Check, Droplet, HardHat, Mail, type LucideIcon } from "lucide-react";
-import { brands, toneStyles } from "@/lib/content";
+import { Check, Droplet, HardHat, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { brands, contactHref, toneStyles } from "@/lib/content";
 
 const brandIcons: Record<string, LucideIcon> = {
   emoro: HardHat,
@@ -11,10 +12,10 @@ export function BrandsSection() {
     <section id="brands" className="mx-auto max-w-6xl scroll-mt-32 px-6 py-20 md:py-28">
       <div className="mb-16 text-center md:mb-20">
         <h2 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-          Our Brands
+          Our brands
         </h2>
-        <p className="mx-auto mt-4 max-w-lg font-light text-slate-500">
-          Providing licensed, trade-compliant construction and plumbing services.
+        <p className="mx-auto mt-4 max-w-lg font-light text-slate-600">
+          Emoro Building for construction. Emporo Plumbing for plumbing.
         </p>
       </div>
 
@@ -42,31 +43,40 @@ export function BrandsSection() {
                   </span>
                 </div>
                 <h3 className="text-2xl font-extrabold tracking-tight text-brand-navy md:text-3xl">
-                  {brand.legalName}
-                  <span className="align-super text-xs font-normal text-slate-400">
-                    {brand.mark}
-                  </span>
+                  <Link href={`/${brand.id}`} className="hover:underline">
+                    {brand.name}
+                    <span className="align-super text-xs font-normal text-slate-500">
+                      {brand.mark}
+                    </span>
+                  </Link>
                 </h3>
-                <p className="mt-4 font-light leading-relaxed text-slate-500">
+                <p className="mt-4 font-light leading-relaxed text-slate-600">
                   {brand.description}
                 </p>
-                <ul className="mt-8 space-y-3.5 text-sm font-medium text-slate-600">
+                <ul className="mt-8 space-y-3.5 text-sm font-medium text-slate-700">
                   {brand.services.map((service) => (
-                    <li key={service} className="flex items-start gap-2.5">
+                    <li key={service.slug} className="flex items-start gap-2.5">
                       <Check className={`mt-0.5 h-5 w-5 shrink-0 ${tone.check}`} aria-hidden="true" />
-                      <span>{service}</span>
+                      <Link href={`/${brand.id}/${service.slug}`} className="hover:underline">
+                        {service.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="mt-10">
+              <div className="mt-10 space-y-3">
+                <Link
+                  href={contactHref(brand.id)}
+                  className={`inline-flex w-full items-center justify-center rounded-xl py-4 font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${tone.button}`}
+                >
+                  Enquire with {brand.name}
+                </Link>
                 <a
                   href={`mailto:${brand.email}`}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/60 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
                 >
-                  <span className="truncate">Email {brand.email}</span>
-                  <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{brand.email}</span>
                 </a>
               </div>
             </article>
