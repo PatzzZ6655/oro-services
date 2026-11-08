@@ -5,8 +5,9 @@ type LogoImageProps = {
   alt: string;
   width: number;
   height: number;
+  sizes: string;
   className?: string;
-  priority?: boolean;
+  preload?: boolean;
 };
 
 export function LogoImage({
@@ -14,8 +15,9 @@ export function LogoImage({
   alt,
   width,
   height,
+  sizes,
   className,
-  priority = false,
+  preload = false,
 }: LogoImageProps) {
   return (
     <Image
@@ -23,7 +25,8 @@ export function LogoImage({
       alt={alt}
       width={width}
       height={height}
-      priority={priority}
+      sizes={sizes}
+      preload={preload}
       className={className}
     />
   );

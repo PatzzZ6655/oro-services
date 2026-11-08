@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export function Hero() {
   return (
@@ -16,22 +17,28 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-brand-orange/5 to-transparent" />
 
       <div className="relative mx-auto max-w-5xl px-6 text-center">
-        <h1 className="mx-auto max-w-4xl bg-gradient-to-b from-white to-slate-300 bg-clip-text text-4xl font-black leading-tight tracking-tight text-transparent md:text-6xl md:leading-none">
-          One Group. Two Specialized Services.
+        <h1 className="mx-auto max-w-4xl text-4xl font-black leading-tight tracking-tight text-white md:text-6xl md:leading-none">
+          Building and plumbing, from one group.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-slate-400 md:text-xl">
-          ORO Services is the parent company of premium construction and
-          specialized plumbing services. Explore our brands for your next
-          project.
+        <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-slate-200 md:text-xl">
+          ORO Services is the parent of Emoro Building and Emporo Plumbing.
+          Emoro does construction, renovations, fit-outs, and project management.
+          Emporo does plumbing, leak detection, and drainage.
         </p>
         <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
           <a
             href="#brands"
             className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-4 font-semibold text-brand-navy shadow-lg shadow-white/5 transition-all hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            View Our Brands
+            View the brands
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </a>
+          <Link
+            href="/contact"
+            className="inline-flex items-center justify-center rounded-xl border border-white/25 px-8 py-4 font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            Send an enquiry
+          </Link>
         </div>
       </div>
     </section>
