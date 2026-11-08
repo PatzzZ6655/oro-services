@@ -28,16 +28,19 @@ export function ContactSection() {
             key={brand.id}
             className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:shadow-lg"
           >
-            <LogoImage
-              src={brand.logo}
-              alt={brand.name}
-              width={brand.logoWidth}
-              height={brand.logoHeight}
-              sizes="192px"
-              className="mb-4 h-auto max-h-12 w-auto max-w-full"
-            />
-            <Link href={`/${brand.id}`} className="font-semibold text-brand-navy hover:underline">
-              {brand.name}
+            <Link
+              href={`/${brand.id}`}
+              aria-label={`${brand.name} page`}
+              className="mb-4 inline-flex max-w-full cursor-pointer rounded-sm transition-opacity [&:hover]:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
+            >
+              <LogoImage
+                src={brand.logo}
+                alt={brand.name}
+                width={brand.logoWidth}
+                height={brand.logoHeight}
+                sizes="192px"
+                className="h-auto max-h-12 w-auto max-w-full"
+              />
             </Link>
             <a
               href={`mailto:${brand.email}`}
