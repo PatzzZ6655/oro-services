@@ -1,34 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { InteriorHero } from "@/components/interior-hero";
 import { JsonLd } from "@/components/json-ld";
 import { LogoImage } from "@/components/logo-image";
 import { SiteFrame } from "@/components/site-frame";
-import { brands, contactHref, getBrand, toneStyles } from "@/lib/content";
-import { pageMetadata } from "@/lib/seo";
+import { contactHref, toneStyles, type Brand } from "@/lib/content";
 import { brandJsonLd } from "@/lib/structured-data";
 
-type Props = { params: Promise<{ brand: string }> };
-
-export function generateStaticParams() {
-  return brands.map((brand) => ({ brand: brand.id }));
-}
-
-export async function generateMetadata({ params }: Props) {
-  const { brand: id } = await params;
-  const brand = getBrand(id);
-  if (!brand) return {};
-  return pageMetadata({
-    title: brand.name,
-    description: brand.description,
-    path: `/${brand.id}`,
-  });
-}
-
-export default async function BrandPage({ params }: Props) {
-  const { brand: id } = await params;
-  const brand = getBrand(id);
-  if (!brand) notFound();
+export function BrandView({ brand }: { brand: Brand }) {
   const tone = toneStyles[brand.tone];
 
   return (

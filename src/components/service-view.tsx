@@ -1,37 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { InteriorHero } from "@/components/interior-hero";
 import { JsonLd } from "@/components/json-ld";
 import { SiteFrame } from "@/components/site-frame";
-import { brands, contactHref, getBrand, getService, toneStyles } from "@/lib/content";
-import { pageMetadata } from "@/lib/seo";
+import { contactHref, toneStyles, type Brand, type Service } from "@/lib/content";
 import { serviceJsonLd } from "@/lib/structured-data";
 
-type Props = { params: Promise<{ brand: string; service: string }> };
-
-export function generateStaticParams() {
-  return brands.flatMap((brand) =>
-    brand.services.map((service) => ({ brand: brand.id, service: service.slug })),
-  );
-}
-
-export async function generateMetadata({ params }: Props) {
-  const { brand: brandId, service: serviceSlug } = await params;
-  const brand = getBrand(brandId);
-  const service = brand ? getService(brand, serviceSlug) : undefined;
-  if (!brand || !service) return {};
-  return pageMetadata({
-    title: `${service.name} — ${brand.name}`,
-    description: `${service.summary} ${brand.name} is part of ORO Services.`,
-    path: `/${brand.id}/${service.slug}`,
-  });
-}
-
-export default async function ServicePage({ params }: Props) {
-  const { brand: brandId, service: serviceSlug } = await params;
-  const brand = getBrand(brandId);
-  const service = brand ? getService(brand, serviceSlug) : undefined;
-  if (!brand || !service) notFound();
+export function ServiceView({ brand, service }: { brand: Brand; service: Service }) {
   const tone = toneStyles[brand.tone];
   const others = brand.services.filter((item) => item.slug !== service.slug);
 
