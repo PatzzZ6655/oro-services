@@ -23,7 +23,7 @@ export const oroLogo = {
 
 export const corporateEmail = "info@orosvc.com";
 
-export const internalLoginHref = "https://quant.orosvc.com";
+export const internalLoginHref = "https://stock-dashboard-oro-services.vercel.app/";
 
 export const brands: Brand[] = [
   {

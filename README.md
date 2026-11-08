@@ -21,4 +21,4 @@ Open [http://localhost:3000](http://localhost:3000).
 | Emporo Plumbing | info.emporo@orosvc.com |
 | ORO Services (parent / general) | info@orosvc.com |
 
-A discreet footer link points to the internal login at [quant.orosvc.com](https://quant.orosvc.com).
+A discreet footer link points to the internal login at [stock-dashboard-oro-services.vercel.app](https://stock-dashboard-oro-services.vercel.app/).
