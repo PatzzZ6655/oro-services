@@ -72,7 +72,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">Who else sees it</h2>
           <p>
-            The people who handle enquiries for that brand can read the message. If the form sends email for us, the email service that delivers it can process the message too. That service may store or transmit the message outside Australia, including in the United States. If you email us from your own email app, your email provider handles the message.
+            The people who handle enquiries for that brand can read the message. If the form sends the enquiry, it goes through Google Workspace (Gmail) to that inbox. Google handles the delivery and may process the message outside Australia. If you email us from your own email app, your email provider handles the message.
           </p>
           <p>We do not sell personal information.</p>
         </section>

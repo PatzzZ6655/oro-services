@@ -25,18 +25,23 @@ Business phone numbers are not published.
 
 The form sends an enquiry to the inbox that matches the brand. A photo is optional (JPEG, PNG, or WebP, up to 2 MB).
 
-## Enquiry email (Resend)
+## Enquiry email (Gmail)
 
-Set both variables on the Vercel project for Production and Preview. Do not commit them.
+The form sends through Google Workspace SMTP (`smtp.gmail.com`) when both required variables are set on the Vercel project for Production and Preview. Do not commit them.
 
-| Variable | Purpose |
-| --- | --- |
-| `RESEND_API_KEY` | API key from [Resend](https://resend.com) |
-| `RESEND_FROM_EMAIL` | Verified sender on the `orosvc.com` domain, for example `ORO Services <enquiries@orosvc.com>` |
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GMAIL_USER` | Yes | Workspace address that signs in, for example `pat.z@orosvc.com`. This is the From address. |
+| `GMAIL_APP_PASSWORD` | Yes | App password for that account. Spaces are ignored. |
+| `MAIL_FROM_NAME` | No | Display name. Defaults to `ORO Services`. |
 
-Verify the `orosvc.com` domain in Resend before sending. The From address has to be on that domain. `reply_to` is the person who filled in the form, so a reply goes back to them.
+The message is delivered to the brand inbox (`info.emoro@`, `info.emporo@`, or `info@`). Reply-To is the person who filled in the form. A photo up to 2 MB is attached when they add one.
 
-If either variable is missing, or Resend rejects the message, the form does not crash. It shows a `mailto:` link to the matching inbox with the enquiry filled in. A photo cannot be attached to that link. The person is told to attach it in their email app.
+Gmail only sends as `GMAIL_USER` (or an alias already set up on that account). The brand addresses stay the recipients.
+
+If either required variable is missing, or Gmail rejects the message, the form does not crash. It shows a `mailto:` link to the matching inbox with the enquiry filled in. A photo cannot be attached to that link. The person is told to attach it in their email app.
+
+Turn on 2-Step Verification for the sending account, then create an App Password. A Workspace admin may need to allow app passwords first. Redeploy after saving the variables.
 
 The form also uses a hidden honeypot field and a simple per-instance limit of 5 submissions in 10 minutes.
 
