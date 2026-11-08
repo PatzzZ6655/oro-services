@@ -12,8 +12,6 @@ export type Brand = {
   logoHeight: number;
   description: string;
   services: string[];
-  phoneDisplay: string;
-  phoneHref: string;
   email: string;
 };
 
@@ -45,8 +43,6 @@ export const brands: Brand[] = [
       "Renovations & Fit-Outs",
       "Subcontracting & Project Management",
     ],
-    phoneDisplay: "0489 181 188",
-    phoneHref: "tel:0489181188",
     email: "info.emoro@orosvc.com",
   },
   {
@@ -66,8 +62,6 @@ export const brands: Brand[] = [
       "Diagnostics & Leak Detection",
       "Drainage & Pipe Maintenance",
     ],
-    phoneDisplay: "0430 016 655",
-    phoneHref: "tel:0430016655",
     email: "info.emporo@orosvc.com",
   },
 ];
@@ -78,23 +72,17 @@ export const toneStyles: Record<
     iconWrap: string;
     badge: string;
     check: string;
-    call: string;
-    phoneHover: string;
   }
 > = {
   blue: {
     iconWrap: "bg-slate-100 text-brand-blue",
     badge: "border-slate-100 bg-slate-50 text-slate-400",
     check: "text-brand-blue",
-    call: "bg-brand-navy hover:bg-brand-blue",
-    phoneHover: "hover:text-brand-blue",
   },
   orange: {
     iconWrap: "bg-orange-50 text-brand-orange",
     badge: "border-orange-100 bg-orange-50 text-brand-orange/80",
     check: "text-brand-orange",
-    call: "bg-brand-orange hover:bg-orange-600",
-    phoneHover: "hover:text-brand-orange",
   },
 };
 
