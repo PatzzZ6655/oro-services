@@ -19,7 +19,7 @@ export function ContactSection() {
         href="/contact"
         className="mt-8 inline-flex rounded-xl bg-brand-navy px-8 py-4 font-semibold text-white transition-colors hover:bg-brand-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
       >
-        Send an enquiry
+        Contact us
       </Link>
 
       <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 text-left md:grid-cols-2">

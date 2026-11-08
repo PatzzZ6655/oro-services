@@ -1,5 +1,4 @@
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 
 export function Hero() {
   return (
@@ -25,7 +24,7 @@ export function Hero() {
           Emoro does construction, renovations, fit-outs, and project management.
           Emporo does plumbing, leak detection, and drainage.
         </p>
-        <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+        <div className="mt-10 flex justify-center">
           <a
             href="#brands"
             className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-4 font-semibold text-brand-navy shadow-lg shadow-white/5 transition-all hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -33,12 +32,6 @@ export function Hero() {
             View the brands
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </a>
-          <Link
-            href="/contact"
-            className="inline-flex items-center justify-center rounded-xl border border-white/25 px-8 py-4 font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            Send an enquiry
-          </Link>
         </div>
       </div>
     </section>

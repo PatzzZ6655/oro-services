@@ -16,7 +16,7 @@ export default function NotFound() {
           <p className="text-xs font-bold uppercase tracking-widest text-orange-200">404</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight text-white">This page is not on the site.</h1>
           <p className="mt-4 text-lg font-light text-slate-200">
-            That address does not match a page. Go back to ORO Services, or send an enquiry to Emoro Building or Emporo Plumbing.
+            That address does not match a page. Go back home, or contact Emoro Building or Emporo Plumbing.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link

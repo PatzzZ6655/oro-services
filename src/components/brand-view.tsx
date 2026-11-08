@@ -42,16 +42,16 @@ export function BrandView({ brand }: { brand: Brand }) {
             </li>
           ))}
         </ul>
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-10 flex flex-col items-start gap-3">
           <Link
             href={contactHref(brand.id)}
             className={`inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy ${tone.button}`}
           >
-            Enquire with {brand.name}
+            Contact us
           </Link>
           <a
             href={`mailto:${brand.email}`}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-800 hover:bg-white"
+            className="text-sm font-semibold text-slate-700 underline-offset-2 hover:underline"
           >
             {brand.email}
           </a>
