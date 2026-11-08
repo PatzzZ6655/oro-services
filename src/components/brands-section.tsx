@@ -1,4 +1,4 @@
-import { Check, Droplet, HardHat, Mail, Phone, type LucideIcon } from "lucide-react";
+import { Check, Droplet, HardHat, Mail, type LucideIcon } from "lucide-react";
 import { brands, toneStyles } from "@/lib/content";
 
 const brandIcons: Record<string, LucideIcon> = {
@@ -60,14 +60,7 @@ export function BrandsSection() {
                 </ul>
               </div>
 
-              <div className="mt-10 space-y-3">
-                <a
-                  href={brand.phoneHref}
-                  className={`group/call inline-flex w-full items-center justify-center gap-2 rounded-xl py-4 font-semibold text-white shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy ${tone.call}`}
-                >
-                  Call {brand.phoneDisplay}
-                  <Phone className="h-4 w-4 transition-transform group-hover/call:scale-110" aria-hidden="true" />
-                </a>
+              <div className="mt-10">
                 <a
                   href={`mailto:${brand.email}`}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/60 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"

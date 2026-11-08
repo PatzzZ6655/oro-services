@@ -1,5 +1,5 @@
 import { LogoImage } from "@/components/logo-image";
-import { brands, corporateEmail, toneStyles } from "@/lib/content";
+import { brands, corporateEmail } from "@/lib/content";
 
 export function ContactSection() {
   return (
@@ -16,38 +16,26 @@ export function ContactSection() {
       </p>
 
       <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 text-left md:grid-cols-2">
-        {brands.map((brand) => {
-          const tone = toneStyles[brand.tone];
-
-          return (
-            <div
-              key={brand.id}
-              className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:shadow-lg"
+        {brands.map((brand) => (
+          <div
+            key={brand.id}
+            className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:shadow-lg"
+          >
+            <LogoImage
+              src={brand.logo}
+              alt={brand.name}
+              width={brand.logoWidth}
+              height={brand.logoHeight}
+              className="mb-4 h-auto max-h-12 w-auto max-w-full"
+            />
+            <a
+              href={`mailto:${brand.email}`}
+              className="block break-all text-sm font-semibold text-brand-navy hover:underline"
             >
-              <LogoImage
-                src={brand.logo}
-                alt={brand.name}
-                width={brand.logoWidth}
-                height={brand.logoHeight}
-                className="mb-4 h-auto max-h-12 w-auto max-w-full"
-              />
-              <div className="min-w-0">
-                <a
-                  href={brand.phoneHref}
-                  className={`mt-1 block text-lg font-bold text-brand-navy transition-colors ${tone.phoneHover}`}
-                >
-                  {brand.phoneDisplay}
-                </a>
-                <a
-                  href={`mailto:${brand.email}`}
-                  className="mt-1 block truncate text-sm text-slate-500 hover:underline"
-                >
-                  {brand.email}
-                </a>
-              </div>
-            </div>
-          );
-        })}
+              {brand.email}
+            </a>
+          </div>
+        ))}
       </div>
 
       <div className="mx-auto mt-10 max-w-md border-t border-slate-200/60 pt-8">
