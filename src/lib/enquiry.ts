@@ -209,7 +209,9 @@ export function safePhotoName(name: string, type: string): string {
 }
 
 export function deliveryConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+  const user = process.env.GMAIL_USER?.trim() ?? "";
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "") ?? "";
+  return user.includes("@") && pass.length >= 16;
 }
 
 export function fallbackMessage(hasPhoto: boolean): string {

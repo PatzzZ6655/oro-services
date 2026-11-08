@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import nodemailer from "nodemailer";
 import {
   deliveryConfigured,
   enquiryMailto,
@@ -18,7 +19,8 @@ import { allowEnquiry, clientAddress } from "@/lib/rate-limit";
 
 type Attachment = {
   filename: string;
-  content: string;
+  content: Buffer;
+  contentType: string;
 };
 
 async function readPhoto(
@@ -41,34 +43,54 @@ async function readPhoto(
     attached: true,
     attachment: {
       filename: safePhotoName(photo.name, photo.type),
-      content: Buffer.from(bytes).toString("base64"),
+      content: Buffer.from(bytes),
+      contentType: photo.type,
     },
   };
 }
 
-async function sendWithResend(enquiry: ParsedEnquiry, attachment?: Attachment): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
+function gmailAuth(): { user: string; pass: string } | undefined {
+  const user = process.env.GMAIL_USER?.trim() ?? "";
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "") ?? "";
+  if (!user.includes("@") || pass.length < 16) return undefined;
+  return { user, pass };
+}
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [enquiry.inbox],
-      reply_to: enquiry.email,
-      subject: `${enquiry.serviceLabel} — ${enquiry.suburb}`,
-      text: enquiryText(enquiry, attachment?.filename),
-      attachments: attachment ? [attachment] : undefined,
-    }),
+async function sendWithGmail(enquiry: ParsedEnquiry, attachment?: Attachment): Promise<boolean> {
+  const auth = gmailAuth();
+  if (!auth) return false;
+
+  const fromName = process.env.MAIL_FROM_NAME?.replace(/[\r\n]+/g, " ").trim() || "ORO Services";
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth,
+    connectionTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
-  return response.ok;
+  try {
+    await transporter.sendMail({
+      from: { name: fromName, address: auth.user },
+      to: enquiry.inbox,
+      replyTo: enquiry.email,
+      subject: `${enquiry.serviceLabel} — ${enquiry.suburb}`,
+      text: enquiryText(enquiry, attachment?.filename),
+      attachments: attachment
+        ? [
+            {
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType,
+            },
+          ]
+        : undefined,
+    });
+    return true;
+  } finally {
+    transporter.close();
+  }
 }
 
 export async function sendEnquiry(
@@ -113,7 +135,7 @@ export async function sendEnquiry(
   }
 
   try {
-    const sent = await sendWithResend(parsed.value, photo.attachment);
+    const sent = await sendWithGmail(parsed.value, photo.attachment);
     if (!sent) {
       return {
         status: "fallback",
