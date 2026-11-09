@@ -22,11 +22,11 @@ export function ContactSection() {
         Contact us
       </Link>
 
-      <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 text-left md:grid-cols-2">
+      <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 text-center md:grid-cols-2">
         {brands.map((brand) => (
           <div
             key={brand.id}
-            className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:shadow-lg"
+            className="flex min-w-0 flex-col items-center rounded-2xl border border-slate-100 bg-white p-6 text-center transition-all hover:shadow-lg"
           >
             <Link
               href={`/${brand.id}`}
@@ -44,7 +44,7 @@ export function ContactSection() {
             </Link>
             <a
               href={`mailto:${brand.email}`}
-              className="mt-1 block break-all text-sm font-semibold text-slate-700 hover:underline"
+              className="mt-1 block w-full break-all text-center text-sm font-semibold text-slate-700 hover:underline"
             >
               {brand.email}
             </a>
