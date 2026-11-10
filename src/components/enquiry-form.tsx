@@ -4,6 +4,7 @@ import { startTransition, useActionState, useState, type ReactNode } from "react
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sendEnquiry } from "@/app/contact/actions";
+import { SuburbField } from "@/components/suburb-field";
 import {
   brandLabel,
   corporateEmail,
@@ -83,7 +84,7 @@ export function EnquiryForm() {
       </Field>
 
       <Field label="Suburb or area" name="suburb" error={errors.suburb}>
-        <input id="suburb" name="suburb" type="text" autoComplete="address-level2" required maxLength={80} aria-invalid={errors.suburb ? true : undefined} aria-describedby={errors.suburb ? "suburb-error" : undefined} className={fieldClass} />
+        <SuburbField invalid={Boolean(errors.suburb)} describedBy={errors.suburb ? "suburb-error" : undefined} />
       </Field>
 
       <Field label="Which brand?" name="brand" error={errors.brand}>
