@@ -4,7 +4,7 @@ export const siteName = "ORO Services";
 
 export const corporateEmail = "info@orosvc.com";
 
-export const internalLoginHref = "https://stock-dashboard-oro-services.vercel.app/";
+export const internalLoginHref = "https://tape.orosvc.com";
 
 export const photoMaxBytes = 2 * 1024 * 1024;
 
@@ -87,7 +87,7 @@ export const brands: Brand[] = [
     logoWidth: 734,
     logoHeight: 194,
     description:
-      "Commercial and residential plumbing, including installations, leak detection, and drainage and pipe maintenance.",
+      "Commercial and residential plumbing, including water and gas, taps and toilets, pipe relining, and drainage, including blocked drains.",
     email: "info.emporo@orosvc.com",
     schemaType: "Plumber",
     services: [
@@ -146,7 +146,7 @@ export const aboutPoints = [
   },
   {
     title: "On site",
-    body: "Builds, renovations, fit-outs, plumbing, leak detection, and drainage are carried out on site.",
+    body: "Builds, renovations, fit-outs, plumbing, water and gas, taps and toilets, pipe relining, and drainage are carried out on site.",
   },
   {
     title: "Subcontracting",

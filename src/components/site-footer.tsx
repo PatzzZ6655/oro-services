@@ -18,7 +18,7 @@ export function SiteFooter() {
         </Link>
 
         <div className="flex max-w-xl flex-col items-center gap-3 text-xs md:items-end">
-          <p>© 2026 ORO Services. Emoro Building® and Emporo Plumbing® are trademarks of ORO Services.</p>
+          <p>© 2026 ORO Services. Emoro Building® and Emporo Plumbing® are registered trademarks of ORO Services.</p>
           <p className="flex items-center gap-3">
             <Link href="/privacy" className="hover:text-white hover:underline">
               Privacy
