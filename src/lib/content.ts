@@ -98,7 +98,7 @@ export const brands: Brand[] = [
       },
       {
         slug: "hot-water-gas",
-        name: "Hot Water & Gas",
+        name: "Water & Gas",
         summary:
           "Hot water system installation and repair, and gas leak detection and repair.",
       },
