@@ -45,6 +45,18 @@ Turn on 2-Step Verification for the sending account, then create an App Password
 
 The form also uses a hidden honeypot field and a simple per-instance limit of 5 submissions in 10 minutes.
 
+## Address suggestions
+
+The suburb field can suggest Australian addresses. It stays a normal text input unless this variable is set at build time. Do not commit the key.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | No | Browser key for Maps JavaScript API and Places API (New). |
+
+The Maps script loads only after the person focuses the suburb field. A chosen place fills that same field with the formatted address. Results are limited to Australia and biased toward Melbourne and Victoria.
+
+Use a browser key restricted to the HTTP referrers `https://www.orosvc.com/*` and `https://orosvc.com/*`, plus the Vercel preview host if previews should show suggestions. Restrict the key to Maps JavaScript API and Places API (New).
+
 ## Internal login
 
 A small footer link points at the internal dashboard: [stock-dashboard-oro-services.vercel.app](https://stock-dashboard-oro-services.vercel.app/). It uses `rel="noopener noreferrer nofollow"` and is not listed in the sitemap.

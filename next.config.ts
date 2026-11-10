@@ -16,20 +16,25 @@ const allowVercelToolbar = process.env.VERCEL_ENV === "preview";
 // 'none' still blocks inline event handlers. Cross-Origin-Resource-Policy
 // is intentionally unset so mail clients can keep hotlinking /email/*.gif.
 function contentSecurityPolicy(): string {
-  const scriptSrc = ["'self'", "'unsafe-inline'"];
+  const scriptSrc = ["'self'", "'unsafe-inline'", "https://maps.googleapis.com", "https://maps.gstatic.com"];
   if (isDev) scriptSrc.push("'unsafe-eval'");
   if (allowVercelToolbar) scriptSrc.push("https://vercel.live");
 
-  const styleSrc = ["'self'", "'unsafe-inline'"];
+  const styleSrc = ["'self'", "'unsafe-inline'", "https://maps.googleapis.com", "https://maps.gstatic.com"];
   if (allowVercelToolbar) styleSrc.push("https://vercel.live");
 
-  const imgSrc = ["'self'", "blob:", "data:"];
+  const imgSrc = ["'self'", "blob:", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com"];
   if (allowVercelToolbar) imgSrc.push("https://vercel.live", "https://vercel.com");
 
   const fontSrc = ["'self'"];
   if (allowVercelToolbar) fontSrc.push("https://vercel.live", "https://assets.vercel.com");
 
-  const connectSrc = ["'self'"];
+  const connectSrc = [
+    "'self'",
+    "https://maps.googleapis.com",
+    "https://maps.gstatic.com",
+    "https://places.googleapis.com",
+  ];
   if (allowVercelToolbar) connectSrc.push("https://vercel.live", "wss://ws-us3.pusher.com");
 
   const directives = [

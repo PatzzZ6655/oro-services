@@ -6,6 +6,7 @@ import {
   photoMaxBytes,
   type EnquiryBrand,
 } from "@/lib/content";
+import { suburbFieldMaxLength } from "@/lib/places";
 
 export type FieldName =
   | "name"
@@ -78,7 +79,7 @@ export function parseEnquiry(formData: FormData):
   if (phone && (phone.length > 20 || phone.length < 6 || !phonePattern.test(phone))) {
     errors.phone = "Enter a phone number, or leave it blank.";
   }
-  if (suburb.length < 2 || suburb.length > 80) {
+  if (suburb.length < 2 || suburb.length > suburbFieldMaxLength) {
     errors.suburb = "Enter the suburb or area.";
   }
   if (!isEnquiryBrand(brandRaw)) {
