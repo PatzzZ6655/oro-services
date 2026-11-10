@@ -25,7 +25,7 @@ export type Service = {
 export type Brand = {
   id: BrandId;
   name: string;
-  mark: "™";
+  mark: "®";
   category: string;
   tone: BrandTone;
   logo: string;
@@ -48,7 +48,7 @@ export const brands: Brand[] = [
   {
     id: "emoro",
     name: "Emoro Building",
-    mark: "™",
+    mark: "®",
     category: "Construction and project management",
     tone: "orange",
     logo: "/logos/emoro-building.png",
@@ -80,7 +80,7 @@ export const brands: Brand[] = [
   {
     id: "emporo",
     name: "Emporo Plumbing",
-    mark: "™",
+    mark: "®",
     category: "Plumbing",
     tone: "blue",
     logo: "/logos/emporo-plumbing.png",
