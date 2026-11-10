@@ -7,6 +7,12 @@ import {
   type EnquiryBrand,
 } from "@/lib/content";
 import { suburbFieldMaxLength } from "@/lib/places";
+import {
+  preferredTimesText,
+  validateAppointments,
+  type AppointmentChoice,
+  type AppointmentFieldErrors,
+} from "@/lib/appointments";
 
 export type FieldName =
   | "name"
@@ -16,7 +22,8 @@ export type FieldName =
   | "brand"
   | "service"
   | "description"
-  | "photo";
+  | "photo"
+  | keyof AppointmentFieldErrors;
 
 export type FieldErrors = Partial<Record<FieldName, string>>;
 
@@ -44,6 +51,7 @@ export type ParsedEnquiry = {
   serviceLabel: string;
   description: string;
   inbox: string;
+  appointments?: AppointmentChoice[];
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -105,6 +113,18 @@ export function parseEnquiry(formData: FormData):
     errors.description = "Describe the job in a few sentences (10 to 2000 characters).";
   }
 
+  let appointments: AppointmentChoice[] | undefined;
+  if (brandRaw === "emporo") {
+    const arrival = validateAppointments(
+      [1, 2, 3].map((number) => ({
+        date: oneLine(readText(formData, `option${number}Date`)),
+        windowId: oneLine(readText(formData, `option${number}Window`)),
+      })),
+    );
+    if (!arrival.ok) Object.assign(errors, arrival.errors);
+    else appointments = arrival.value;
+  }
+
   if (Object.keys(errors).length > 0 || !isEnquiryBrand(brandRaw)) {
     return { ok: false, errors };
   }
@@ -121,8 +141,14 @@ export function parseEnquiry(formData: FormData):
       serviceLabel,
       description,
       inbox: inboxFor(brandRaw),
+      appointments,
     },
   };
+}
+
+function appointmentLines(enquiry: ParsedEnquiry): string[] {
+  if (!enquiry.appointments?.length) return [];
+  return ["", preferredTimesText(enquiry.appointments)];
 }
 
 export function enquiryMailto(enquiry: ParsedEnquiry, note?: string): string {
@@ -134,6 +160,7 @@ export function enquiryMailto(enquiry: ParsedEnquiry, note?: string): string {
     `Suburb / area: ${enquiry.suburb}`,
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
+    ...appointmentLines(enquiry),
     "",
     enquiry.description.length > 1200
       ? `${enquiry.description.slice(0, 1200)}…`
@@ -154,6 +181,7 @@ export function enquiryText(enquiry: ParsedEnquiry, photoName?: string): string 
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
     photoName ? `Photo: ${photoName}` : "Photo: none",
+    ...appointmentLines(enquiry),
     "",
     enquiry.description,
     "",
