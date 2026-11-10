@@ -4,7 +4,9 @@ import { startTransition, useActionState, useState, type ReactNode } from "react
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sendEnquiry } from "@/app/contact/actions";
+import { AppointmentFields } from "@/components/appointment-fields";
 import { SuburbField } from "@/components/suburb-field";
+import { validateAppointments, type AppointmentFieldErrors } from "@/lib/appointments";
 import {
   brandLabel,
   corporateEmail,
@@ -18,6 +20,11 @@ import {
 
 const fieldClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
+
+function readFormText(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
 
 function initialBrand(value: string | null): EnquiryBrand | "" {
   return value && isEnquiryBrand(value) ? value : "";
@@ -35,10 +42,14 @@ export function EnquiryForm() {
   const [brand, setBrand] = useState<EnquiryBrand | "">(() => initialBrand(params.get("brand")));
   const [service, setService] = useState(() => initialService(brand, params.get("service")));
   const [photoMessage, setPhotoMessage] = useState<string | undefined>();
+  const [appointmentErrors, setAppointmentErrors] = useState<AppointmentFieldErrors>({});
 
   const inbox = brand ? inboxFor(brand) : undefined;
   const services = brand && brand !== "general" ? getBrand(brand)?.services ?? [] : [];
-  const errors = state.status === "invalid" ? state.errors : {};
+  const errors = {
+    ...(state.status === "invalid" ? state.errors : {}),
+    ...appointmentErrors,
+  };
 
   function onBrandChange(next: string) {
     const parsed = isEnquiryBrand(next) ? next : "";
@@ -57,6 +68,19 @@ export function EnquiryForm() {
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        if (brand === "emporo") {
+          const arrival = validateAppointments(
+            [1, 2, 3].map((number) => ({
+              date: readFormText(data, `option${number}Date`),
+              windowId: readFormText(data, `option${number}Window`),
+            })),
+          );
+          if (!arrival.ok) {
+            setAppointmentErrors(arrival.errors);
+            return;
+          }
+        }
+        setAppointmentErrors({});
         startTransition(() => {
           action(data);
         });
@@ -124,6 +148,10 @@ export function EnquiryForm() {
           ))}
         </select>
       </Field>
+
+      {brand === "emporo" ? (
+        <AppointmentFields errors={appointmentErrors} onEdit={() => setAppointmentErrors({})} />
+      ) : null}
 
       <Field label="What do you need done?" name="description" error={errors.description}>
         <textarea id="description" name="description" required rows={5} maxLength={2000} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "description-error" : undefined} className={fieldClass} />
