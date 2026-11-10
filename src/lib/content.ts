@@ -97,14 +97,20 @@ export const brands: Brand[] = [
         summary: "Plumbing installations for homes and commercial sites.",
       },
       {
-        slug: "leak-detection",
-        name: "Diagnostics & Leak Detection",
-        summary: "Pipeline diagnostics and leak detection.",
+        slug: "hot-water-gas",
+        name: "Hot Water & Gas",
+        summary:
+          "Hot water system installation and repair, and gas leak detection and repair.",
+      },
+      {
+        slug: "taps-toilets-pipe-relining",
+        name: "Taps, Toilets & Pipe Relining",
+        summary: "Leaking taps and toilets, and pipe relining.",
       },
       {
         slug: "drainage",
         name: "Drainage & Pipe Maintenance",
-        summary: "Drainage and pipe maintenance.",
+        summary: "Drainage and pipe maintenance, including blocked drains.",
       },
     ],
   },
