@@ -25,7 +25,7 @@ export type Service = {
 export type Brand = {
   id: BrandId;
   name: string;
-  mark: "™";
+  mark: "®";
   category: string;
   tone: BrandTone;
   logo: string;
@@ -48,7 +48,7 @@ export const brands: Brand[] = [
   {
     id: "emoro",
     name: "Emoro Building",
-    mark: "™",
+    mark: "®",
     category: "Construction and project management",
     tone: "orange",
     logo: "/logos/emoro-building.png",
@@ -80,7 +80,7 @@ export const brands: Brand[] = [
   {
     id: "emporo",
     name: "Emporo Plumbing",
-    mark: "™",
+    mark: "®",
     category: "Plumbing",
     tone: "blue",
     logo: "/logos/emporo-plumbing.png",
@@ -97,14 +97,20 @@ export const brands: Brand[] = [
         summary: "Plumbing installations for homes and commercial sites.",
       },
       {
-        slug: "leak-detection",
-        name: "Diagnostics & Leak Detection",
-        summary: "Pipeline diagnostics and leak detection.",
+        slug: "hot-water-gas",
+        name: "Hot Water & Gas",
+        summary:
+          "Hot water system installation and repair, and gas leak detection and repair.",
+      },
+      {
+        slug: "taps-toilets-pipe-relining",
+        name: "Taps, Toilets & Pipe Relining",
+        summary: "Leaking taps and toilets, and pipe relining.",
       },
       {
         slug: "drainage",
         name: "Drainage & Pipe Maintenance",
-        summary: "Drainage and pipe maintenance.",
+        summary: "Drainage and pipe maintenance, including blocked drains.",
       },
     ],
   },
