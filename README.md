@@ -59,7 +59,7 @@ Use a browser key restricted to the HTTP referrers `https://www.orosvc.com/*` an
 
 ## Internal login
 
-A small footer link points at the internal dashboard: [stock-dashboard-oro-services.vercel.app](https://stock-dashboard-oro-services.vercel.app/). It uses `rel="noopener noreferrer nofollow"` and is not listed in the sitemap.
+A small footer link points at the internal dashboard: [tape.orosvc.com](https://tape.orosvc.com). It uses `rel="noopener noreferrer nofollow"` and is not listed in the sitemap.
 
 ## HTTP and the canonical host
 

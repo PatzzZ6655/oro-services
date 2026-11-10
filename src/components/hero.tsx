@@ -22,7 +22,7 @@ export function Hero() {
         <p className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-slate-200 md:text-xl">
           ORO Services is the parent of Emoro Building and Emporo Plumbing.
           Emoro does construction, renovations, fit-outs, and project management.
-          Emporo does plumbing, leak detection, and drainage.
+          Emporo does plumbing, water and gas, taps and toilets, pipe relining, and drainage.
         </p>
         <div className="mt-10 flex justify-center">
           <a

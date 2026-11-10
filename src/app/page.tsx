@@ -10,7 +10,7 @@ import { organizationJsonLd } from "@/lib/structured-data";
 export const metadata = pageMetadata({
   title: "ORO Services | Building and plumbing",
   description:
-    "ORO Services is the parent of Emoro Building and Emporo Plumbing. Construction, renovations, fit-outs, plumbing, leak detection, and drainage.",
+    "ORO Services is the parent of Emoro Building and Emporo Plumbing. Construction, renovations, fit-outs, plumbing, water and gas, taps and toilets, pipe relining, and drainage.",
   path: "/",
   absoluteTitle: true,
 });
