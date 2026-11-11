@@ -9,7 +9,7 @@ import {
 import { suburbFieldMaxLength } from "@/lib/places";
 import {
   preferredTimesText,
-  validateAppointments,
+  validateAppointmentForm,
   type AppointmentChoice,
   type AppointmentFieldErrors,
 } from "@/lib/appointments";
@@ -115,12 +115,7 @@ export function parseEnquiry(formData: FormData):
 
   let appointments: AppointmentChoice[] | undefined;
   if (brandRaw === "emporo") {
-    const arrival = validateAppointments(
-      [1, 2, 3].map((number) => ({
-        date: oneLine(readText(formData, `option${number}Date`)),
-        windowId: oneLine(readText(formData, `option${number}Window`)),
-      })),
-    );
+    const arrival = validateAppointmentForm(formData);
     if (!arrival.ok) Object.assign(errors, arrival.errors);
     else appointments = arrival.value;
   }
