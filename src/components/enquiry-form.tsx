@@ -6,7 +6,7 @@ import Link from "next/link";
 import { sendEnquiry } from "@/app/contact/actions";
 import { AppointmentFields } from "@/components/appointment-fields";
 import { SuburbField } from "@/components/suburb-field";
-import { validateAppointments, type AppointmentFieldErrors } from "@/lib/appointments";
+import { validateAppointmentForm, type AppointmentFieldErrors } from "@/lib/appointments";
 import {
   brandLabel,
   corporateEmail,
@@ -20,11 +20,6 @@ import {
 
 const fieldClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
-
-function readFormText(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-}
 
 function initialBrand(value: string | null): EnquiryBrand | "" {
   return value && isEnquiryBrand(value) ? value : "";
@@ -69,12 +64,7 @@ export function EnquiryForm() {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         if (brand === "emporo") {
-          const arrival = validateAppointments(
-            [1, 2, 3].map((number) => ({
-              date: readFormText(data, `option${number}Date`),
-              windowId: readFormText(data, `option${number}Window`),
-            })),
-          );
+          const arrival = validateAppointmentForm(data);
           if (!arrival.ok) {
             setAppointmentErrors(arrival.errors);
             return;

@@ -1,4 +1,11 @@
-export const appointmentCount = 3;
+export const appointmentCount = 2;
+
+export const preferredArrivalHelp =
+  "Choose two different days and an arrival window for each. We'll confirm one of them with you. Our plumber will arrive within the window you pick.";
+
+export const differentDatesMessage = "Choose two different dates.";
+
+export const tooManyAppointmentsMessage = "Choose two preferred options.";
 
 export const weekdayWindows = [
   { id: "8-10am", label: "8–10am" },
@@ -27,12 +34,12 @@ export type AppointmentFieldErrors = {
   option1Window?: string;
   option2Date?: string;
   option2Window?: string;
-  option3Date?: string;
-  option3Window?: string;
 };
 
-const dateFields = ["option1Date", "option2Date", "option3Date"] as const;
-const windowFields = ["option1Window", "option2Window", "option3Window"] as const;
+const dateFields = ["option1Date", "option2Date"] as const;
+const windowFields = ["option1Window", "option2Window"] as const;
+
+const optionField = /^option(\d+)(Date|Window)$/;
 
 export function melbourneToday(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -93,7 +100,7 @@ export function formatAppointmentDate(isoDate: string): string {
 
 export function duplicateDateMessage(dates: string[]): string | undefined {
   const filled = dates.map((date) => date.trim()).filter(Boolean);
-  if (new Set(filled).size !== filled.length) return "Choose three different dates.";
+  if (new Set(filled).size !== filled.length) return differentDatesMessage;
   return undefined;
 }
 
@@ -108,6 +115,10 @@ function windowById(isoDate: string, windowId: string): ArrivalWindow | undefine
   return windowsForDate(isoDate).find((window) => window.id === windowId);
 }
 
+function fieldText(value: string): string {
+  return value.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function validateAppointments(
   raw: Array<{ date: string; windowId: string }>,
   now = new Date(),
@@ -115,8 +126,10 @@ export function validateAppointments(
   const errors: AppointmentFieldErrors = {};
   const bounds = appointmentBounds(now);
   const choices: AppointmentChoice[] = [];
+  const overflow = raw.length > appointmentCount;
+  const slots = Array.from({ length: appointmentCount }, (_, index) => raw[index] ?? { date: "", windowId: "" });
 
-  raw.slice(0, appointmentCount).forEach((option, index) => {
+  slots.forEach((option, index) => {
     const date = option.date.trim();
     const windowId = option.windowId.trim();
     const dateField = dateFields[index];
@@ -141,12 +154,45 @@ export function validateAppointments(
     }
   });
 
-  const duplicate = duplicateDateMessage(raw.map((option) => option.date));
+  const duplicate = duplicateDateMessage(slots.map((option) => option.date));
   if (duplicate) errors.options = duplicate;
+  else if (overflow) errors.options = tooManyAppointmentsMessage;
 
   if (Object.keys(errors).length > 0 || choices.filter(Boolean).length !== appointmentCount) {
     return { ok: false, errors };
   }
 
   return { ok: true, value: choices };
+}
+
+export function validateAppointmentForm(
+  formData: Pick<FormData, "entries">,
+  now = new Date(),
+): { ok: true; value: AppointmentChoice[] } | { ok: false; errors: AppointmentFieldErrors } {
+  const values = new Map<string, string>();
+  let overflow = false;
+
+  for (const [key, raw] of formData.entries()) {
+    if (typeof raw !== "string") continue;
+    const match = optionField.exec(key);
+    if (!match) continue;
+    const number = Number(match[1]);
+    if (!Number.isInteger(number) || number < 1) continue;
+    const value = fieldText(raw);
+    if (number > appointmentCount) {
+      if (value) overflow = true;
+      continue;
+    }
+    values.set(`option${number}${match[2]}`, value);
+  }
+
+  const slots = Array.from({ length: appointmentCount }, (_, index) => {
+    const number = index + 1;
+    return {
+      date: values.get(`option${number}Date`) ?? "",
+      windowId: values.get(`option${number}Window`) ?? "",
+    };
+  });
+
+  return validateAppointments(overflow ? [...slots, { date: "", windowId: "" }] : slots, now);
 }

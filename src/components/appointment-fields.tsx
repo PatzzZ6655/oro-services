@@ -3,7 +3,9 @@
 import { useState } from "react";
 import {
   appointmentBounds,
+  appointmentCount,
   duplicateDateMessage,
+  preferredArrivalHelp,
   windowsForDate,
   type AppointmentFieldErrors,
 } from "@/lib/appointments";
@@ -13,11 +15,10 @@ const fieldClass =
 
 type Row = { date: string; windowId: string };
 
-const emptyRows: Row[] = [
-  { date: "", windowId: "" },
-  { date: "", windowId: "" },
-  { date: "", windowId: "" },
-];
+const emptyRows: Row[] = Array.from({ length: appointmentCount }, () => ({
+  date: "",
+  windowId: "",
+}));
 
 export function AppointmentFields({
   errors,
@@ -39,9 +40,7 @@ export function AppointmentFields({
   return (
     <fieldset className="space-y-4" aria-describedby={duplicateMessage ? "options-error" : undefined}>
       <legend className="text-sm font-semibold text-slate-800">Preferred arrival times</legend>
-      <p className="text-sm text-slate-600">
-        Choose three different days and an arrival window for each. We&apos;ll confirm one of them with you. Our plumber will arrive within the window you pick.
-      </p>
+      <p className="text-sm text-slate-600">{preferredArrivalHelp}</p>
       {duplicateMessage ? (
         <p id="options-error" className="text-sm font-medium text-red-700">
           {duplicateMessage}
