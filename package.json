@@ -7,14 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./test/register.mjs --test test/appointments.test.mts"
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./test/register.mjs --test test/*.test.mts"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "jose": "^6.2.17",
     "lucide-react": "^1.66.0",
     "next": "16.4.3",
     "nodemailer": "^10.4.0",
+    "pdf-lib": "^1.17.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

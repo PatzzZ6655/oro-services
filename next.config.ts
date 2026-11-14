@@ -8,6 +8,8 @@ const onVercel = process.env.VERCEL === "1";
 // request, so the CDN can keep serving one cached header set per deployment.
 const allowVercelToolbar = process.env.VERCEL_ENV === "preview";
 
+// Staff sign-in navigates to Google and back. Drive and email run on the server.
+// No Google script, frame, or connect origin is added for the staff portal.
 // Enforcing CSP without a per-request nonce. Next.js only applies nonces
 // during dynamic rendering, which would turn off prerendering and the CDN
 // cache this site uses. The inline scripts are Next.js flight data plus one
@@ -50,6 +52,9 @@ function contentSecurityPolicy(): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // The staff portal is installable from /internal without a service worker.
+    // worker-src stays 'none' so a worker cannot be registered. The manifest is
+    // same-origin, so default-src 'self' already allows it. manifest-src is not set.
     "worker-src 'none'",
   ];
 
@@ -101,6 +106,10 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  // Report PDFs read the Inter files and the brand logos from disk at runtime.
+  outputFileTracingIncludes: {
+    "/internal/**": ["./assets/fonts/**", "./public/logos/**"],
   },
   async headers() {
     return [

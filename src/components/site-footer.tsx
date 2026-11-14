@@ -27,14 +27,12 @@ export function SiteFooter() {
               Contact
             </Link>
           </p>
-          <a
+          <Link
             href={internalLoginHref}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
             className="text-[11px] font-normal text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
           >
             Internal Login
-          </a>
+          </Link>
         </div>
       </div>
     </footer>
