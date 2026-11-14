@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 export type FormDefaults = {
   name: string;
@@ -13,15 +13,26 @@ function subscribe(onStoreChange: () => void) {
   return () => window.removeEventListener("oro-prefill", onStoreChange);
 }
 
-export function useStored(key: string, initial = ""): [string, (value: string) => void] {
-  const value = useSyncExternalStore(
+export type JobPrefill = {
+  id: string;
+  company: "emoro" | "emporo";
+  jobNumber: string;
+  clientName: string;
+  address: string;
+};
+
+export function useStored(key: string, initial = "", preferInitial = false): [string, (value: string) => void] {
+  const stored = useSyncExternalStore(
     subscribe,
-    () => window.sessionStorage.getItem(key) ?? initial,
-    () => initial,
+    () => window.sessionStorage.getItem(key) ?? "",
+    () => "",
   );
+  const [edited, setEdited] = useState<string | null>(null);
+  const value = edited !== null ? edited : preferInitial && initial ? initial : stored || initial;
   return [
     value,
     (next) => {
+      setEdited(next);
       window.sessionStorage.setItem(key, next);
       window.dispatchEvent(new Event("oro-prefill"));
     },

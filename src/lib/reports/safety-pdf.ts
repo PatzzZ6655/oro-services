@@ -6,6 +6,7 @@ import { companies, type CompanyId } from "@/lib/reports/catalog";
 import { formatAuDate } from "@/lib/reports/dates";
 import type { ReportPhoto } from "@/lib/reports/pdf";
 import type { SafetyDocument } from "@/lib/reports/safety";
+import { summaryOrder, tally, type SummaryItem } from "@/lib/reports/summary";
 
 const pageWidth = 595.28;
 const pageHeight = 841.89;
@@ -94,6 +95,21 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
   if (document.note) {
     text(document.note, 9, regular, navy, 8);
   }
+  if (document.kind !== "swms") {
+    const items: SummaryItem[] = (document.checks ?? []).flatMap((group) =>
+      group.rows.map((row) => ({ label: row.label, result: row.result, comment: row.comment, photoKey: `${group.photoGroup ?? ""}.${row.id}` })),
+    );
+    if (items.length > 0) {
+      const counts = tally(items);
+      const yesNo = items.some((item) => item.result === "yes" || item.result === "no");
+      text(yesNo ? `Yes ${counts.pass}. No ${counts.fail}.` : `Pass ${counts.pass}. Fail ${counts.fail}. N/A ${counts.na}.`, 11, semibold, navy, 6);
+      const photoKeys = new Set(photos.map((photo) => photo.itemKey).filter((key): key is string => Boolean(key)));
+      for (const item of summaryOrder(items, photoKeys)) {
+        const mark = item.result === "fail" || item.result === "no" ? "Fail" : item.result === "yes" ? "Yes" : "Pass";
+        text(`${item.label}: ${mark}${item.comment ? ` — ${item.comment}` : ""}`, 10, regular, navy, 2);
+      }
+    }
+  }
   for (const field of document.fields) {
     if (!field.value || field.value === "Not recorded" || field.value === "None" || field.value === "Open") continue;
     text(field.label, 11, semibold, accent, 3);
@@ -121,6 +137,7 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
     }
     const rest = group.rows.filter((row) => (row.result === "pass" || row.result === "yes") && !row.comment);
     for (const [index, row] of group.rows.entries()) {
+      if (row.result === "na") continue;
       if ((row.result === "pass" || row.result === "yes") && !row.comment) continue;
       const mark = row.result === "pass" ? "Pass" : row.result === "fail" ? "Fail" : row.result === "yes" ? "Yes" : row.result === "no" ? "No" : "N/A";
       text(`${row.label}: ${mark}${row.comment ? ` — ${row.comment}` : ""}`, 10, regular, navy, 2);
@@ -158,6 +175,19 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
     text("Entry log", 11, semibold, accent, 4);
     for (const row of document.log) text(`${row.name} · in ${row.timeIn} · out ${row.timeOut}`, 10, regular, navy, 2);
     y -= 6;
+  }
+  const extras = photos.filter((photo) => !photo.itemKey);
+  if (extras.length > 0) {
+    text("Additional photos", 11, semibold, accent, 4);
+    for (const shot of extras) {
+      const image = shot.mime === "image/png" ? await doc.embedPng(shot.bytes) : await doc.embedJpg(shot.bytes);
+      const thumbW = 160;
+      const thumbH = Math.min(120, (image.height / image.width) * thumbW);
+      ensure(thumbH + 24);
+      page.drawImage(image, { x: margin, y: y - thumbH, width: thumbW, height: thumbH });
+      y -= thumbH + 12;
+      if (shot.caption?.trim()) text(shot.caption.trim(), 9, regular, slate, 4);
+    }
   }
   text(document.signLabel, 11, semibold, accent, 4);
   for (const sign of document.signs) {

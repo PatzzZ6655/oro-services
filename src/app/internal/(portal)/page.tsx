@@ -24,7 +24,12 @@ async function Hub({ searchParams }: { searchParams: Promise<{ tab?: string }> }
 
   return (
     <PortalFrame email={user.email} name={user.name}>
-      <h1 className="text-2xl font-semibold text-brand-navy">Staff portal</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-brand-navy">Staff portal</h1>
+        <Link href="/internal/jobs" className="text-sm font-semibold text-brand-navy underline">
+          Jobs
+        </Link>
+      </div>
       <nav className="mt-4 grid grid-cols-2 gap-2" aria-label="Portal">
         <Tab href="/internal" current={tab === "reports"}>
           Reports

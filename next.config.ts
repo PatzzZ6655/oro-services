@@ -109,7 +109,7 @@ const nextConfig: NextConfig = {
   },
   // Report PDFs read the Inter files and the brand logos from disk at runtime.
   outputFileTracingIncludes: {
-    "/internal/**": ["./assets/fonts/**", "./public/logos/**"],
+    "/internal/**": ["./assets/fonts/**", "./public/logos/**", "./db/migrations/**"],
   },
   async headers() {
     return [

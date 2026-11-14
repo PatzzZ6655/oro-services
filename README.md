@@ -76,6 +76,7 @@ Drive filing uses an OAuth refresh token for `pat.z@orosvc.com` with the `drive.
 | `GOOGLE_DRIVE_REFRESH_TOKEN` | Yes, to file reports | Offline token with scope `https://www.googleapis.com/auth/drive.file`. |
 | `REPORT_NOTIFY_EMAIL` | No | Office copy. Defaults to `pat.z@orosvc.com`. |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | No | Same mail path as the enquiry form. Reports still file when mail is unset. |
+| `DATABASE_URL` | No | Postgres connection string for jobs. When it is unset, forms still file to Drive and the Jobs screen says the database is not connected. |
 
 Redirect URI for staff sign-in: `https://www.orosvc.com/internal/auth/google/callback`. Local: `http://localhost:3000/internal/auth/google/callback`.
 

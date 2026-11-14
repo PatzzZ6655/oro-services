@@ -7,9 +7,12 @@ import { emailSafetyCopy } from "@/lib/reports/notify";
 import type { ReportPhoto } from "@/lib/reports/pdf";
 import { buildSafetyPdf } from "@/lib/reports/safety-pdf";
 import { isRealCalendarDate } from "@/lib/appointments";
-import { itemPhotoMax, type FieldErrors } from "@/lib/reports/catalog";
+import { itemPhotoMax, reportPhotoMax, type FieldErrors } from "@/lib/reports/catalog";
+import { validatePhotoBudget } from "@/lib/reports/validate";
 import { validateSafety } from "@/lib/reports/safety";
 import type { SubmitState } from "@/lib/reports/state";
+import { answersFromForm } from "@/lib/jobs/queries";
+import { databaseConfigured, recordJobReport } from "@/lib/jobs/db";
 
 function read(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -40,25 +43,65 @@ async function readItemPhotos(formData: FormData): Promise<{ files: ReportPhoto[
   return { files };
 }
 
+async function readMorePhotos(formData: FormData): Promise<{ files: ReportPhoto[]; error?: string }> {
+  const uploaded = formData.getAll("morePhotos").filter((item): item is File => item instanceof File && item.size > 0);
+  if (uploaded.length > reportPhotoMax) return { files: [], error: "Add up to 8 photos." };
+  const files: ReportPhoto[] = [];
+  for (const [index, file] of uploaded.entries()) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if ((file.type !== "image/jpeg" && file.type !== "image/png") || !looksLikeImage(bytes, file.type)) {
+      return { files: [], error: "Use a JPEG or PNG photo." };
+    }
+    const caption = read(formData, `moreCaption.${index}`).replace(/\s+/g, " ").trim().slice(0, 80);
+    const extra = caption.replace(/[^a-zA-Z0-9]+/g, " ").trim().slice(0, 40);
+    files.push({
+      name: extra ? `Additional ${index + 1} ${extra}.jpg` : `Additional ${index + 1}.jpg`,
+      bytes,
+      mime: file.type,
+      caption,
+    });
+  }
+  return { files };
+}
+
 export async function submitSafety(_previous: SubmitState, formData: FormData): Promise<SubmitState> {
-  await requireUser();
+  const user = await requireUser();
   const parsed = validateSafety(read(formData, "kind"), formData);
   const photos = await readItemPhotos(formData);
-  if (!parsed.ok || photos.error) {
-    return { status: "invalid", errors: { ...(parsed.ok ? {} : parsed.errors), ...(photos.error ? { photos: photos.error } : {}) } };
+  const morePhotos = await readMorePhotos(formData);
+  const budgetError = validatePhotoBudget([...photos.files, ...morePhotos.files].map((file) => ({ size: file.bytes.byteLength, type: file.mime })));
+  if (!parsed.ok || photos.error || morePhotos.error || budgetError) {
+    return { status: "invalid", errors: { ...(parsed.ok ? {} : parsed.errors), ...(photos.error || morePhotos.error || budgetError ? { photos: photos.error ?? morePhotos.error ?? budgetError ?? "" } : {}) } };
   }
   if (!driveConfigured()) {
     return { status: "error", message: "Google Drive isn't connected, so this report can't be filed." };
   }
   try {
-    const pdf = await buildSafetyPdf(parsed.value, photos.files);
+    const pdf = await buildSafetyPdf(parsed.value, [...photos.files, ...morePhotos.files]);
+    const jobId = read(formData, "jobId");
+    const jobNumber = read(formData, "jobNumber");
     const saved = await saveReportPackage({
       kind: parsed.value.kind,
       date: parsed.value.date,
       address: parsed.value.address,
+      jobNumber,
       pdf,
-      photos: photos.files,
+      photos: [...photos.files, ...morePhotos.files],
     });
+    if (jobId && databaseConfigured()) {
+      try {
+        await recordJobReport({
+          jobId,
+          formType: parsed.value.kind,
+          driveFileId: saved.fileId,
+          driveUrl: saved.url,
+          answers: JSON.stringify(answersFromForm(formData)),
+          submittedBy: user.email,
+        });
+      } catch {
+        console.error("job report record failed");
+      }
+    }
     const emailed = parsed.value.kind === "incident" ? false : await emailSafetyCopy({
       company: parsed.value.company,
       title: parsed.value.title,

@@ -170,14 +170,15 @@ export async function saveReportPackage(options: {
   kind: string;
   date: string;
   address: string;
+  jobNumber?: string;
   pdf: Uint8Array;
   photos: { name: string; bytes: Uint8Array; mime: string }[];
-}): Promise<{ url: string; folderId: string }> {
+}): Promise<{ url: string; folderId: string; fileId: string }> {
   const token = await accessToken();
   const rootId = await ensureFolder(token, "ORO Reports");
   const typeId = await ensureFolder(token, filingCard(options.kind).folder, rootId);
   const yearId = await ensureFolder(token, options.date.slice(0, 4), typeId);
-  const folderId = await ensureFolder(token, submissionFolderName(options.date, options.address), yearId);
+  const folderId = await ensureFolder(token, submissionFolderName(options.date, options.address, options.jobNumber), yearId);
   const card = filingCard(options.kind);
   const uploaded = await uploadFile(token, folderId, `${card.title}.pdf`, "application/pdf", options.pdf, {
     oroApp: driveAppProperty,
@@ -195,7 +196,7 @@ export async function saveReportPackage(options: {
   }
   const readers = [...(allowedEmails() ?? [])];
   await Promise.all(readers.map((email) => shareReader(token, folderId, email)));
-  return { url: uploaded.url, folderId };
+  return { url: uploaded.url, folderId, fileId: uploaded.id };
 }
 
 export async function listRecentReports(): Promise<StoredReport[]> {

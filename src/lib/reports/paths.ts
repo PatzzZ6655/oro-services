@@ -8,7 +8,8 @@ export function safeSegment(value: string, max = 80): string {
   return (cleaned.slice(0, max).trim() || "report").replace(/[. ]+$/g, "") || "report";
 }
 
-export function submissionFolderName(date: string, address: string): string {
+export function submissionFolderName(date: string, address: string, jobNumber?: string): string {
+  if (jobNumber?.trim()) return safeSegment(`${jobNumber} ${address}`, 96);
   return safeSegment(`${date} ${address}`, 96);
 }
 

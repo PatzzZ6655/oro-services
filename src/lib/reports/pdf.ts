@@ -13,6 +13,7 @@ import {
   type ReportValue,
 } from "@/lib/reports/catalog";
 import { formatAuDate } from "@/lib/reports/dates";
+import { summaryOrder, tally, type SummaryItem } from "@/lib/reports/summary";
 
 const pageWidth = 595.28;
 const pageHeight = 841.89;
@@ -87,6 +88,7 @@ export async function buildReportPdf(options: {
   photos: ReportPhoto[];
   itemPhotos?: ReportPhoto[];
   submittedBy: string;
+  jobNumber?: string;
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -193,61 +195,39 @@ export async function buildReportPdf(options: {
     y -= rowHeight + 10;
   };
 
-  const checks = async (items: CheckAnswer[], group: string) => {
-    const notable = [];
-    const passes: string[] = [];
-    const blanks: string[] = [];
-    for (const [index, item] of items.entries()) {
-      const shots = itemShots(`${group}.${item.id}`);
-      if (item.result === "fail" || item.comment || item.reading || shots.length > 0) notable.push({ index, item });
-      else if (item.result === "na") blanks.push(item.label);
-      else passes.push(item.label);
-    }
-    for (const { index, item } of notable) {
-      const detail = [item.reading, item.comment].filter(Boolean).join(" — ");
-      const labelLines = wrap(item.label, regular, 10, contentWidth - 64);
-      const detailLines = detail ? wrap(detail, regular, 9, contentWidth - 12) : [];
-      ensure(labelLines.length * 13 + detailLines.length * 12 + 10);
-      const result = item.result === "pass" ? "Pass" : item.result === "fail" ? "Fail" : "N/A";
-      const resultWidth = semibold.widthOfTextAtSize(result, 10);
-      labelLines.forEach((row, lineIndex) => {
-        page.drawText(row, { x: margin, y, size: 10, font: regular, color: ink });
-        if (lineIndex === 0) {
-          page.drawText(result, {
-            x: pageWidth - margin - resultWidth,
-            y,
-            size: 10,
-            font: semibold,
-            color: item.result === "fail" ? fail : navy,
-          });
-        }
-        y -= 13;
-      });
-      for (const row of detailLines) {
-        page.drawText(row, { x: margin + 8, y, size: 9, font: regular, color: slate });
-        y -= 12;
-      }
-      y -= 4;
-      await drawShots(`${group}.${item.id}`, `Item ${index + 1}: ${item.label}`);
-    }
-    if (notable.length === 0 && blanks.length === 0) text("All pass.", 10, regular, ink, 4);
-    else {
-      if (passes.length > 0) text("Other items: pass.", 10, regular, ink, 2);
-      if (blanks.length > 0) text(`N/A: ${blanks.join(", ")}.`, 10, regular, ink, 2);
-    }
-  };
-
   y = paintHeader(page, false);
   page.drawText(title, { x: margin, y, size: 18, font: semibold, color: navy });
   y -= 16;
   text(company.legalName, 9, regular, slate, 2);
   if (meta.note) text(meta.note, 9, regular, slate, 8);
+  if (options.jobNumber) pair("Job", options.jobNumber);
 
   for (const row of meta.rows) pair(row.label, row.value);
+  const summaryItems = summaryItemsFor(options.report);
+  if (summaryItems.length > 0) {
+    const counts = tally(summaryItems);
+    const yesNo = summaryItems.some((item) => item.result === "yes" || item.result === "no");
+    text(yesNo ? `Yes ${counts.pass}. No ${counts.fail}.` : `Pass ${counts.pass}. Fail ${counts.fail}. N/A ${counts.na}.`, 11, semibold, navy, 6);
+    const photoKeys = new Set((options.itemPhotos ?? []).map((photo) => photo.itemKey).filter((key): key is string => Boolean(key)));
+    const ordered = summaryOrder(summaryItems, photoKeys);
+    if (ordered.length > 0) {
+      heading(counts.fail > 0 ? "Failed items" : "Items with photos");
+      for (const item of ordered) {
+        const mark = item.result === "fail" || item.result === "no" ? "Fail" : item.result === "yes" ? "Yes" : "Pass";
+        text(`${item.label}: ${mark}${item.comment ? ` — ${item.comment}` : ""}`, 10, regular, item.result === "fail" || item.result === "no" ? fail : ink, 2);
+        if (item.photoKey) await drawShots(item.photoKey, item.label);
+      }
+    }
+  }
   for (const section of meta.sections) {
     heading(section.title);
     if (section.prose) text(section.prose, 10, regular, ink, 6);
-    if (section.checks) await checks(section.checks, section.group ?? "check");
+    if (section.checks) {
+      const passes = section.checks.filter((item) => item.result === "pass").length;
+      const fails = section.checks.filter((item) => item.result === "fail").length;
+      if (fails === 0 && passes > 0) text("All pass.", 10, regular, ink, 4);
+      else if (passes > 0) text("Other items: pass.", 10, regular, ink, 2);
+    }
     if (section.linked) {
       for (const row of section.linked) {
         text(row.text, 10, regular, ink, 2);
@@ -261,6 +241,22 @@ export async function buildReportPdf(options: {
     }
   }
 
+  if (photos.length > 0) {
+    heading("Additional photos");
+    for (const [index, photo] of photos.entries()) {
+      const maxWidth = 180;
+      const maxHeight = 140;
+      const scale = Math.min(maxWidth / photo.width, maxHeight / photo.height, 1);
+      const width = photo.width * scale;
+      const height = photo.height * scale;
+      ensure(height + 28);
+      page.drawImage(photo, { x: margin, y: y - height, width, height });
+      y -= height + 12;
+      const caption = options.photos[index]?.caption?.trim();
+      if (caption) text(caption, 9, regular, slate, 4);
+    }
+  }
+
   heading("Signature");
   ensure(80);
   const sigWidth = 180;
@@ -269,21 +265,6 @@ export async function buildReportPdf(options: {
   page.drawImage(signature, { x: margin + 6, y: y - sigHeight, width: sigWidth, height: sigHeight });
   y -= sigHeight + 20;
   text(`Signed for ${company.name}. Filed by ${options.submittedBy}.`, 8, regular, slate, 4);
-
-  if (photos.length > 0) {
-    heading("Photos");
-    photos.forEach((photo, index) => {
-      const maxWidth = contentWidth;
-      const maxHeight = 260;
-      const scale = Math.min(maxWidth / photo.width, maxHeight / photo.height, 1);
-      const width = photo.width * scale;
-      const height = photo.height * scale;
-      ensure(height + 16);
-      page.drawImage(photo, { x: margin, y: y - height, width, height });
-      y -= height + 14;
-      text(options.photos[index]?.name || `Photo ${index + 1}`, 8, regular, slate, 4);
-    });
-  }
 
   const pages = doc.getPages();
   pages.forEach((target, index) => {
@@ -309,6 +290,27 @@ function drawLogo(page: PDFPage, image: PDFImage, x: number, y: number, width: n
   const height = (image.height / image.width) * width;
   page.drawRectangle({ x: x - 4, y: y - 4, width: width + 8, height: height + 8, color: white });
   page.drawImage(image, { x, y, width, height });
+}
+
+function summaryItemsFor(report: ReportValue): SummaryItem[] {
+  if (report.kind === "gas-safety") {
+    return report.checks.map((item) => ({ label: item.label, result: item.result, comment: item.comment, photoKey: `check.${item.id}` }));
+  }
+  if (report.kind === "electrical-safety") {
+    return [
+      ...report.visual.map((item) => ({ label: item.label, result: item.result, comment: item.comment, photoKey: `visual.${item.id}` })),
+      ...report.polarity.map((item) => ({ label: item.label, result: item.result, comment: item.comment, photoKey: `polarity.${item.id}` })),
+      ...report.earth.map((item) => ({ label: item.label, result: item.result, comment: item.comment, photoKey: `earth.${item.id}` })),
+    ];
+  }
+  if (report.kind === "site-job-sheet") {
+    return report.safety.map((item) => ({
+      label: item.label,
+      result: item.answer,
+      photoKey: `safety.${report.company}.${item.id}`,
+    }));
+  }
+  return [];
 }
 
 function resultLabel(items: CheckAnswer[]): string {
@@ -394,7 +396,6 @@ function gasMeta(report: GasReport): { note: string; rows: { label: string; valu
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Gasfitter", value: report.gasfitterName },
       { label: "Licence / registration", value: report.licence },
-      { label: "Licence type", value: report.licenceType === "servicing" ? "Type A gas servicing" : "Type A gasfitting" },
       ...(report.servicingRecord ? [{ label: "Gas Servicing Record", value: "Completed" }] : []),
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
     ],

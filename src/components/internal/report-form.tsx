@@ -3,41 +3,48 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { submitReport } from "@/app/internal/actions";
+import { copyLastAnswers } from "@/app/internal/job-actions";
+import { applyAnswers } from "@/components/internal/draft-store";
+import { useFormDraft } from "@/components/internal/use-draft";
 import { reportPhotoMax, reportPhotoTotalBytes, type FieldErrors, type ReportKind } from "@/lib/reports/catalog";
 import { initialSubmitState } from "@/lib/reports/state";
-import { parseSignature, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
+import { parseSignature, validatePhotoBudget, validateReport } from "@/lib/reports/validate";
 
-async function compressPhoto(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file);
-  const maxEdge = 1600;
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("photo");
-  context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-  let quality = 0.72;
-  let blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  while (blob && blob.size > 350_000 && quality > 0.42) {
-    quality -= 0.12;
-    blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  }
-  if (!blob) throw new Error("photo");
-  const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 40) || "photo";
-  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-}
-
-export function ReportForm({ kind, children }: { kind: ReportKind; children: (errors: FieldErrors) => ReactNode }) {
+export function ReportForm({
+  kind,
+  jobId = "",
+  jobNumber = "",
+  hasJobField = false,
+  children,
+}: {
+  kind: ReportKind;
+  jobId?: string;
+  jobNumber?: string;
+  hasJobField?: boolean;
+  children: (errors: FieldErrors) => ReactNode;
+}) {
   const [state, action, pending] = useActionState(submitReport, initialSubmitState);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
+  const [offline, setOffline] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLElement>(null);
   const errors = { ...(state.status === "invalid" ? state.errors : {}), ...clientErrors };
   const errorCount = Object.keys(errors).length;
+  const draftKey = `${kind}:${jobId || "loose"}`;
+  useFormDraft(draftKey, formRef, state.status === "sent");
+
+  useEffect(() => {
+    const retry = () => {
+      if (!offline || !formRef.current) return;
+      setOffline(false);
+      const data = new FormData(formRef.current);
+      startTransition(() => {
+        void Promise.resolve(action(data)).catch(() => setOffline(true));
+      });
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [action, offline]);
 
   useEffect(() => {
     if (state.status === "idle" && errorCount === 0) return;
@@ -47,20 +54,8 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const originals = data.getAll("photos").filter((item): item is File => item instanceof File && item.size > 0);
-    data.delete("photos");
-    if (originals.length > reportPhotoMax) {
-      setClientErrors({ photos: "Add up to 8 photos." });
-      return;
-    }
-    try {
-      for (const file of originals) data.append("photos", await compressPhoto(file));
-    } catch {
-      setClientErrors({ photos: "Use a JPEG or PNG photo." });
-      return;
-    }
-    const photos = data.getAll("photos").filter((item): item is File => item instanceof File);
-    const photoError = validatePhotoFiles(photos.map((file) => ({ size: file.size, type: file.type })));
+    const more = data.getAll("morePhotos").filter((item): item is File => item instanceof File && item.size > 0);
+    const photoError = more.length > reportPhotoMax ? "Add up to 8 photos." : null;
     const everyFile = [...data.values()].filter((item): item is File => item instanceof File && item.size > 0);
     const budgetError = validatePhotoBudget(everyFile.map((file) => ({ size: file.size, type: file.type })));
     if (photoError || budgetError) {
@@ -74,17 +69,26 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
     const parsed = validateReport(kind, data);
     const signature = parseSignature(String(data.get("signature") ?? ""));
     if (!parsed.ok || !signature.ok || photoError) {
-      setClientErrors({
-        ...(parsed.ok ? {} : parsed.errors),
-        ...(signature.ok ? {} : { signature: signature.error }),
-        ...(photoError ? { photos: photoError } : {}),
-      });
+      const next: FieldErrors = parsed.ok ? {} : { ...parsed.errors };
+      if (!signature.ok) next.signature = signature.error;
+      if (photoError) next.photos = photoError;
+      setClientErrors(next);
       return;
     }
     setClientErrors({});
+    if (!navigator.onLine) {
+      setOffline(true);
+      return;
+    }
     startTransition(() => {
-      action(data);
+      void Promise.resolve(action(data)).catch(() => setOffline(true));
     });
+  }
+
+  async function copyLast() {
+    if (!jobId || !formRef.current) return;
+    const answers = await copyLastAnswers(jobId, kind, String(new FormData(formRef.current).get("address") ?? ""));
+    if (answers) applyAnswers(formRef.current, answers);
   }
 
   if (state.status === "sent") {
@@ -118,6 +122,14 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
   return (
     <form ref={formRef} onSubmit={onSubmit} className="space-y-5" noValidate>
       <input type="hidden" name="kind" value={kind} />
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
+      {jobNumber && !hasJobField ? <input type="hidden" name="jobNumber" value={jobNumber} /> : null}
+      {offline ? <p className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">Saved on this phone. It will file when the connection is back.</p> : null}
+      {jobId ? (
+        <button type="button" className="min-h-11 text-sm font-semibold text-brand-navy" onClick={() => void copyLast()}>
+          Copy last
+        </button>
+      ) : null}
       {state.status === "error" ? (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {state.message}
@@ -129,20 +141,6 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
         </p>
       ) : null}
       {children(errors)}
-      <div>
-        <label htmlFor="photos" className="block text-sm font-medium text-slate-800">
-          Overall photos (optional)
-        </label>
-        <input
-          id="photos"
-          name="photos"
-          type="file"
-          accept="image/*"
-          multiple
-          className="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold file:text-slate-800"
-        />
-        {errors.photos ? <p className="mt-1 text-sm text-red-800">{errors.photos}</p> : null}
-      </div>
       <button
         type="submit"
         disabled={pending}
