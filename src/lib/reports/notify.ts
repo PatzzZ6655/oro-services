@@ -1,5 +1,5 @@
-import { sendGmailMessage } from "@/lib/gmail";
-import { reportCard, type ReportValue } from "@/lib/reports/catalog";
+import { sendCompanyReport } from "@/lib/gmail";
+import { companies, companyFor, reportCard, reportMailIdentity, type ReportValue } from "@/lib/reports/catalog";
 import { formatAuDate } from "@/lib/reports/dates";
 
 export function staffInbox(): string {
@@ -11,9 +11,10 @@ export async function emailReport(options: {
   report: ReportValue;
   pdf: Uint8Array;
   driveUrl: string;
-  replyTo: string;
 }): Promise<{ staff: boolean; client: boolean; clientRequested: boolean }> {
   const card = reportCard(options.report.kind);
+  const company = companies[companyFor(options.report)];
+  const mail = reportMailIdentity(options.report);
   const filename = `${card.title}.pdf`;
   const attachment = {
     filename,
@@ -24,15 +25,19 @@ export async function emailReport(options: {
   const subject = `${card.title} — ${address}`.slice(0, 180);
   const staff = staffInbox();
   const client = options.report.kind === "job-sign-off" ? options.report.clientEmail : undefined;
+  const identity = { fromName: mail.fromName, alias: mail.alias };
   let staffSent = false;
   let clientSent = false;
   try {
-    staffSent = await sendGmailMessage({
+    staffSent = await sendCompanyReport({
+      ...identity,
       to: staff,
-      replyTo: options.replyTo,
+      replyTo: mail.replyTo,
       subject,
       text: [
         card.title,
+        company.legalName,
+        `ABN ${company.abn}`,
         formatAuDate(options.report.date),
         address,
         "",
@@ -48,11 +53,21 @@ export async function emailReport(options: {
   }
   if (client && client !== staff) {
     try {
-      clientSent = await sendGmailMessage({
+      clientSent = await sendCompanyReport({
+        ...identity,
         to: client,
-        replyTo: options.replyTo,
+        replyTo: mail.replyTo,
         subject,
-        text: [card.title, formatAuDate(options.report.date), address, "", "A copy of the sign-off is attached."].join("\n"),
+        text: [
+          card.title,
+          formatAuDate(options.report.date),
+          address,
+          "",
+          "A copy of the report is attached.",
+          "",
+          company.legalName,
+          `ABN ${company.abn}`,
+        ].join("\n"),
         attachments: [attachment],
       });
     } catch {

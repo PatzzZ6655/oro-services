@@ -318,14 +318,12 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
   const providerEmail = readEmail(errors, "providerEmail", text(formData, "providerEmail").toLowerCase(), true);
   const date = readJobDate(formData, errors, now);
   const gasfitterName = text(formData, "gasfitterName");
-  const business = text(formData, "business");
   const licence = text(formData, "licence");
   const faults = optionalBlock(errors, "faults", block(formData, "faults"), 2000);
   if (text(formData, "endorsement") !== "yes") errors.endorsement = "Confirm the Type A servicing endorsement.";
   requireLine(errors, "address", address, 5, 200, "Enter the property address.");
   requireLine(errors, "providerName", providerName, 2, 80, "Enter the rental provider or agent.");
   requireLine(errors, "gasfitterName", gasfitterName, 2, 80, "Enter the gasfitter's full name.");
-  requireLine(errors, "business", business, 2, 80, "Enter the business name.");
   requireLine(errors, "licence", licence, 2, 40, "Enter the licence or registration number.");
 
   const checks = readChecks(formData, errors, "check", gasChecks);
@@ -344,7 +342,6 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
     date,
     nextDue,
     gasfitterName,
-    business,
     licence,
     checks,
     appliances,
@@ -427,7 +424,6 @@ function validateElectrical(formData: FormData, errors: FieldErrors, now: Date):
   const date = readJobDate(formData, errors, now);
   const previousDate = text(formData, "previousDate");
   const electricianName = text(formData, "electricianName");
-  const business = text(formData, "business");
   const licence = text(formData, "licence");
   const rec = text(formData, "rec");
   const limitations = optionalBlock(errors, "limitations", block(formData, "limitations"), 500);
@@ -438,7 +434,6 @@ function validateElectrical(formData: FormData, errors: FieldErrors, now: Date):
   requireLine(errors, "address", address, 5, 200, "Enter the property address.");
   requireLine(errors, "providerName", providerName, 2, 80, "Enter the rental provider or agent.");
   requireLine(errors, "electricianName", electricianName, 2, 80, "Enter the electrician's full name.");
-  requireLine(errors, "business", business, 2, 80, "Enter the business name.");
   requireLine(errors, "licence", licence, 2, 40, "Enter the licence number.");
   if (rec && rec.length > 40) errors.rec = "Use 40 characters or fewer.";
   if (previousDate) {
@@ -483,7 +478,6 @@ function validateElectrical(formData: FormData, errors: FieldErrors, now: Date):
     nextDue,
     smokeNextDue,
     electricianName,
-    business,
     licence,
     rec: rec || undefined,
     extent,

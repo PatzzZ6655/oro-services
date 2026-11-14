@@ -3,10 +3,11 @@ import { join } from "node:path";
 import { PDFDocument, rgb, type PDFFont, type PDFImage, type PDFPage, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import {
-  accentFor,
-  companyName,
+  companies,
+  companyFor,
   reportCard,
   type CheckAnswer,
+  type CompanyId,
   type ElectricalReport,
   type GasReport,
   type ReportValue,
@@ -33,10 +34,10 @@ export type ReportPhoto = {
   mime: "image/jpeg" | "image/png";
 };
 
-function readAsset(file: "regular" | "semibold" | "oro" | "emporo"): Uint8Array {
+function readAsset(file: "regular" | "semibold" | CompanyId): Uint8Array {
   if (file === "regular") return new Uint8Array(readFileSync(join(process.cwd(), "assets/fonts/Inter-Regular.ttf")));
   if (file === "semibold") return new Uint8Array(readFileSync(join(process.cwd(), "assets/fonts/Inter-SemiBold.ttf")));
-  if (file === "oro") return new Uint8Array(readFileSync(join(process.cwd(), "public/logos/oro-services.png")));
+  if (file === "emoro") return new Uint8Array(readFileSync(join(process.cwd(), "public/logos/emoro-building.png")));
   return new Uint8Array(readFileSync(join(process.cwd(), "public/logos/emporo-plumbing.png")));
 }
 
@@ -86,18 +87,18 @@ export async function buildReportPdf(options: {
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
+  const companyId = companyFor(options.report);
+  const company = companies[companyId];
   const regular = await doc.embedFont(readAsset("regular"), { subset: true });
   const semibold = await doc.embedFont(readAsset("semibold"), { subset: true });
-  const oro = await doc.embedPng(readAsset("oro"));
-  const emporo = options.report.kind === "gas-safety" ? await doc.embedPng(readAsset("emporo")) : undefined;
+  const logo = await doc.embedPng(readAsset(companyId));
   const signature = await doc.embedPng(options.signature);
   const photos: PDFImage[] = [];
   for (const photo of options.photos) {
     photos.push(photo.mime === "image/png" ? await doc.embedPng(photo.bytes) : await doc.embedJpg(photo.bytes));
   }
 
-  const accent = accentFor(options.report);
-  const accentColor = accent === "orange" ? orange : accent === "blue" ? blue : navy;
+  const accentColor = company.accent === "orange" ? orange : blue;
   const title = reportCard(options.report.kind).title;
   const meta = docMeta(options.report);
 
@@ -106,13 +107,12 @@ export async function buildReportPdf(options: {
 
   const paintHeader = (target: PDFPage, compact: boolean) => {
     const bar = compact ? 36 : 78;
-    target.drawRectangle({ x: 0, y: pageHeight - bar, width: pageWidth, height: bar, color: navy });
+    target.drawRectangle({ x: 0, y: pageHeight - bar, width: pageWidth, height: bar, color: accentColor });
     if (compact) {
-      target.drawText(title, { x: margin, y: pageHeight - 24, size: 11, font: semibold, color: white });
+      target.drawText(company.name, { x: margin, y: pageHeight - 24, size: 11, font: semibold, color: white });
       return;
     }
-    drawLogo(target, oro, margin, pageHeight - 68, 96);
-    if (emporo) drawLogo(target, emporo, pageWidth - margin - 150, pageHeight - 58, 150);
+    drawLogo(target, logo, margin, pageHeight - 66, companyId === "emoro" ? 150 : 168);
   };
 
   const newPage = () => {
@@ -186,9 +186,11 @@ export async function buildReportPdf(options: {
   };
 
   paintHeader(page, false);
+  y = pageHeight - 108;
   page.drawText(title, { x: margin, y, size: 18, font: semibold, color: navy });
   y -= 16;
-  text(meta.note, 9, regular, slate, 8);
+  text(`${company.legalName}  ·  ABN ${company.abn}`, 9, regular, slate, 2);
+  if (meta.note) text(meta.note, 9, regular, slate, 8);
 
   for (const row of meta.rows) pair(row.label, row.value);
   for (const section of meta.sections) {
@@ -208,7 +210,7 @@ export async function buildReportPdf(options: {
   page.drawRectangle({ x: margin, y: y - sigHeight - 6, width: sigWidth + 12, height: sigHeight + 12, color: white, borderColor: line, borderWidth: 1 });
   page.drawImage(signature, { x: margin + 6, y: y - sigHeight, width: sigWidth, height: sigHeight });
   y -= sigHeight + 20;
-  text(`Signed electronically. Submitted by ${options.submittedBy}.`, 8, regular, slate, 4);
+  text(`Signed for ${company.name}. Filed by ${options.submittedBy}.`, 8, regular, slate, 4);
 
   if (photos.length > 0) {
     heading("Photos");
@@ -227,7 +229,7 @@ export async function buildReportPdf(options: {
 
   const pages = doc.getPages();
   pages.forEach((target, index) => {
-    target.drawText("ORO Services", { x: margin, y: 28, size: 8, font: regular, color: slate });
+    target.drawText(`${company.name} · ABN ${company.abn}`, { x: margin, y: 28, size: 8, font: regular, color: slate });
     const pager = `Page ${index + 1} of ${pages.length}`;
     target.drawText(pager, {
       x: pageWidth - margin - regular.widthOfTextAtSize(pager, 8),
@@ -238,9 +240,9 @@ export async function buildReportPdf(options: {
     });
   });
 
-  doc.setTitle(title);
-  doc.setAuthor("ORO Services");
-  doc.setCreator("ORO Services staff portal");
+  doc.setTitle(`${title} · ${company.name}`);
+  doc.setAuthor(company.name);
+  doc.setCreator(company.legalName);
   doc.setSubject(options.report.address);
   return doc.save();
 }
@@ -267,7 +269,7 @@ type Section = {
 function docMeta(report: ReportValue): { note: string; rows: { label: string; value: string }[]; sections: Section[] } {
   if (report.kind === "site-job-sheet") {
     return {
-      note: companyName(report.company),
+      note: "",
       rows: [
         { label: "Worker", value: report.workerName },
         { label: "Date", value: formatAuDate(report.date) },
@@ -289,7 +291,7 @@ function docMeta(report: ReportValue): { note: string; rows: { label: string; va
 
   if (report.kind === "job-sign-off") {
     return {
-      note: companyName(report.company),
+      note: "",
       rows: [
         { label: "Client", value: report.clientName },
         { label: "Completion date", value: formatAuDate(report.date) },
@@ -321,7 +323,6 @@ function gasMeta(report: GasReport): { note: string; rows: { label: string; valu
       { label: "Check date", value: formatAuDate(report.date) },
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Gasfitter", value: report.gasfitterName },
-      { label: "Business", value: report.business },
       { label: "Licence / registration", value: report.licence },
       { label: "Type A servicing endorsement", value: "Confirmed" },
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
@@ -360,7 +361,6 @@ function electricalMeta(report: ElectricalReport): { note: string; rows: { label
       { label: "Previous check", value: report.previousDate ? formatAuDate(report.previousDate) : "Not recorded" },
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Electrician", value: report.electricianName },
-      { label: "Business", value: report.business },
       { label: "Licence", value: report.licence },
       { label: "REC", value: report.rec || "Not recorded" },
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },

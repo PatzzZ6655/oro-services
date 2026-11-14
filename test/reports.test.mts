@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
+import { PDFDocument } from "pdf-lib";
 import { internalLoginHref, stockDashboardHref } from "@/lib/content";
 import {
   allowedEmails,
@@ -11,11 +12,14 @@ import {
 } from "@/lib/auth/session";
 import { verifyGoogleIdToken } from "@/lib/auth/google-identity";
 import {
+  companies,
+  companyFor,
   electricalEarth,
   electricalExtent,
   electricalPolarity,
   electricalVisual,
   gasChecks,
+  reportMailIdentity,
 } from "@/lib/reports/catalog";
 import { addYears } from "@/lib/reports/dates";
 import { buildReportPdf } from "@/lib/reports/pdf";
@@ -419,4 +423,29 @@ test("a site job sheet becomes a pdf", async () => {
   const pdf = await buildReportPdf({ report: parsed.value, signature: signature.bytes, photos: [], submittedBy: "pat.z@orosvc.com" });
   assert.equal(Buffer.from(pdf.subarray(0, 5)).toString(), "%PDF-");
   assert.ok(pdf.byteLength > 1000);
+  const document = await PDFDocument.load(pdf);
+  assert.equal(document.getAuthor(), "Emporo Plumbing");
+  assert.equal(document.getCreator(), "Emporo Plumbing Pty Ltd");
+});
+
+test("safety reports use the company identity, not a typed business name", () => {
+  const gas = validateReport("gas-safety", gasForm(), now);
+  assert.equal(gas.ok, true);
+  if (gas.ok) {
+    assert.equal(companyFor(gas.value), "emporo");
+    assert.deepEqual(reportMailIdentity(gas.value), {
+      fromName: "Emporo Plumbing",
+      alias: "info.emporo@orosvc.com",
+      replyTo: "info.emporo@orosvc.com",
+    });
+  }
+  const electrical = validateReport("electrical-safety", electricalForm(), now);
+  assert.equal(electrical.ok, true);
+  if (electrical.ok) {
+    assert.equal(companyFor(electrical.value), "emoro");
+    assert.equal(reportMailIdentity(electrical.value).fromName, "Emoro Building");
+    assert.equal(reportMailIdentity(electrical.value).replyTo, "info.emoro@orosvc.com");
+  }
+  assert.equal(companies.emoro.abn, "36 695 596 019");
+  assert.equal(companies.emporo.abn, "63 695 532 944");
 });

@@ -14,7 +14,32 @@ export type ExtentStatus = "included" | "excluded" | "na";
 
 export type NamedItem = { id: string; label: string };
 
-export const emporoBusinessName = "Emporo Plumbing";
+export const companies = {
+  emoro: {
+    id: "emoro" as const,
+    name: "Emoro Building",
+    legalName: "Emoro Building Pty Ltd",
+    abn: "36 695 596 019",
+    email: "info.emoro@orosvc.com",
+    logo: "/logos/emoro-building.png",
+    logoWidth: 923,
+    logoHeight: 295,
+    accent: "orange" as const,
+  },
+  emporo: {
+    id: "emporo" as const,
+    name: "Emporo Plumbing",
+    legalName: "Emporo Plumbing Pty Ltd",
+    abn: "63 695 532 944",
+    email: "info.emporo@orosvc.com",
+    logo: "/logos/emporo-plumbing.png",
+    logoWidth: 734,
+    logoHeight: 194,
+    accent: "blue" as const,
+  },
+};
+
+export type CompanyProfile = (typeof companies)[CompanyId];
 
 export const reportCards: { kind: ReportKind; title: string; summary: string; folder: string }[] = [
   {
@@ -242,7 +267,6 @@ export type GasReport = {
   date: string;
   nextDue: string;
   gasfitterName: string;
-  business: string;
   licence: string;
   checks: CheckAnswer[];
   appliances: GasAppliance[];
@@ -262,7 +286,6 @@ export type ElectricalReport = {
   nextDue: string;
   smokeNextDue: string;
   electricianName: string;
-  business: string;
   licence: string;
   rec?: string;
   extent: ExtentAnswer[];
@@ -284,11 +307,20 @@ export type ReportValue = SiteJobSheet | JobSignOff | GasReport | ElectricalRepo
 export type FieldErrors = Record<string, string>;
 
 export function companyName(company: CompanyId): string {
-  return company === "emoro" ? "Emoro Building" : "Emporo Plumbing";
+  return companies[company].name;
 }
 
-export function accentFor(report: ReportValue): "orange" | "blue" | "navy" {
-  if (report.kind === "gas-safety") return "blue";
-  if (report.kind === "electrical-safety") return "navy";
-  return report.company === "emoro" ? "orange" : "blue";
+export function companyFor(report: ReportValue): CompanyId {
+  if (report.kind === "gas-safety") return "emporo";
+  if (report.kind === "electrical-safety") return "emoro";
+  return report.company;
+}
+
+export function reportMailIdentity(report: ReportValue): { fromName: string; alias: string; replyTo: string } {
+  const company = companies[companyFor(report)];
+  return { fromName: company.name, alias: company.email, replyTo: company.email };
+}
+
+export function accentFor(report: ReportValue): "orange" | "blue" {
+  return companies[companyFor(report)].accent;
 }

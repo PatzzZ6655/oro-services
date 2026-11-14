@@ -67,7 +67,6 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
       report: parsed.value,
       pdf,
       driveUrl: saved.url,
-      replyTo: user.email,
     });
     return {
       status: "sent",

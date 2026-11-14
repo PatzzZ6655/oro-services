@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { LogoImage } from "@/components/logo-image";
 import {
+  companies,
   electricalEarth,
   electricalExtent,
   electricalPolarity,
   electricalVisual,
-  emporoBusinessName,
   gasChecks,
   jobSafety,
   signOffConfirmations,
+  type CompanyId,
   type FieldErrors,
 } from "@/lib/reports/catalog";
 import {
@@ -25,35 +26,57 @@ import {
 } from "@/components/internal/form-controls";
 import { ReportForm } from "@/components/internal/report-form";
 
-function BackLink() {
+function BrandHeading({
+  company,
+  title,
+  detail,
+}: {
+  company: CompanyId | "";
+  title: string;
+  detail: string;
+}) {
+  const profile = company ? companies[company] : null;
+  const bar = profile?.accent === "orange" ? "bg-brand-orange" : profile ? "bg-brand-blue" : "bg-slate-300";
   return (
-    <Link href="/internal" className="text-sm font-semibold text-slate-600 underline">
-      All reports
-    </Link>
-  );
-}
-
-function Heading({ title, detail, accent }: { title: string; detail: string; accent: string }) {
-  return (
-    <div>
-      <div className={`h-1.5 w-16 rounded-full ${accent}`} />
-      <h1 className="mt-3 text-2xl font-semibold text-brand-navy">{title}</h1>
-      <p className="mt-1 text-sm text-slate-600">{detail}</p>
-    </div>
+    <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className={`h-2 ${bar}`} />
+      <div className="px-4 pt-3">
+        {profile ? (
+          <LogoImage
+            src={profile.logo}
+            alt={profile.name}
+            width={profile.logoWidth}
+            height={profile.logoHeight}
+            sizes="180px"
+            className="h-9 w-auto"
+          />
+        ) : (
+          <p className="text-sm font-semibold text-slate-700">Choose the company</p>
+        )}
+        {profile ? (
+          <p className="mt-2 text-sm font-semibold text-brand-navy">
+            {profile.legalName}
+            <span className="mt-0.5 block text-xs font-normal text-slate-500">ABN {profile.abn}</span>
+          </p>
+        ) : null}
+      </div>
+      <div className="px-4 pb-4">
+        <h1 className="text-2xl font-semibold text-brand-navy">{title}</h1>
+        <p className="mt-1 text-sm text-slate-600">{detail}</p>
+      </div>
+    </header>
   );
 }
 
 export function SiteJobSheetForm() {
-  const [company, setCompany] = useState<"" | "emoro" | "emporo">("");
-  const accent = company === "emoro" ? "bg-brand-orange" : company === "emporo" ? "bg-brand-blue" : "bg-brand-navy";
+  const [company, setCompany] = useState<"" | CompanyId>("");
   return (
     <div className="space-y-5">
-      <BackLink />
       <ReportForm kind="site-job-sheet">
         {(errors) => (
           <>
-            <Heading title="Site job sheet" detail="ORO Services. Safety items follow the company." accent={accent} />
             <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
+            <BrandHeading company={company} title="Site job sheet" detail="Hours, work, and the site checks." />
             <TextInput label="Worker name" name="workerName" error={errors.workerName} autoComplete="name" maxLength={80} />
             <TextInput label="Date" name="date" type="date" error={errors.date} />
             <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} />
@@ -83,16 +106,14 @@ export function SiteJobSheetForm() {
 }
 
 export function JobSignOffForm() {
-  const [company, setCompany] = useState<"" | "emoro" | "emporo">("");
-  const accent = company === "emoro" ? "bg-brand-orange" : company === "emporo" ? "bg-brand-blue" : "bg-brand-navy";
+  const [company, setCompany] = useState<"" | CompanyId>("");
   return (
     <div className="space-y-5">
-      <BackLink />
       <ReportForm kind="job-sign-off">
         {(errors) => (
           <>
-            <Heading title="Job completion sign-off" detail="The client confirms the three items below." accent={accent} />
             <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
+            <BrandHeading company={company} title="Job completion sign-off" detail="The client confirms the finished work." />
             <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} />
             <TextInput label="Client name" name="clientName" error={errors.clientName} autoComplete="name" maxLength={80} />
             <TextInput label="Site address" name="address" error={errors.address} maxLength={200} />
@@ -114,14 +135,13 @@ export function JobSignOffForm() {
 export function GasSafetyForm() {
   return (
     <div className="space-y-5">
-      <BackLink />
       <ReportForm kind="gas-safety">
         {(errors) => (
           <>
-            <Heading
+            <BrandHeading
+              company="emporo"
               title="Gas safety check"
-              detail="Emporo Plumbing. Victorian rental check. Next due date is two years from the check date."
-              accent="bg-brand-blue"
+              detail="Victorian rental check. AS/NZS 5601.1. AS 4575. Next due is two years from the check date."
             />
             <TextInput label="Property address" name="address" error={errors.address} maxLength={200} />
             <TextInput label="Rental provider / agent" name="providerName" error={errors.providerName} maxLength={80} />
@@ -129,7 +149,6 @@ export function GasSafetyForm() {
             <CheckDate />
             {errors.date ? <p className="text-sm text-red-800">{errors.date}</p> : null}
             <TextInput label="Gasfitter full name" name="gasfitterName" error={errors.gasfitterName} autoComplete="name" maxLength={80} />
-            <TextInput label="Business" name="business" error={errors.business} maxLength={80} defaultValue={emporoBusinessName} />
             <TextInput label="Licence / registration no." name="licence" error={errors.licence} maxLength={40} />
             <label className="flex min-h-12 items-start gap-3 text-sm text-slate-800">
               <input name="endorsement" type="checkbox" value="yes" className="mt-1 size-5" />
@@ -163,14 +182,13 @@ export function GasSafetyForm() {
 export function ElectricalSafetyForm() {
   return (
     <div className="space-y-5">
-      <BackLink />
       <ReportForm kind="electrical-safety">
         {(errors) => (
           <>
-            <Heading
+            <BrandHeading
+              company="emoro"
               title="Electrical safety check"
-              detail="AS/NZS 3019:2022 section 4. Next check due is two years from the check date. Smoke alarms are due again in 12 months."
-              accent="bg-brand-navy"
+              detail="AS/NZS 3019:2022 section 4. Next due is two years from the check date. Smoke alarms are due again in 12 months."
             />
             <TextInput label="Property address" name="address" error={errors.address} maxLength={200} />
             <TextInput label="Rental provider / agent" name="providerName" error={errors.providerName} maxLength={80} />
@@ -179,7 +197,6 @@ export function ElectricalSafetyForm() {
             {errors.date ? <p className="text-sm text-red-800">{errors.date}</p> : null}
             <TextInput label="Previous check date" name="previousDate" type="date" error={errors.previousDate} optional />
             <TextInput label="Electrician full name" name="electricianName" error={errors.electricianName} autoComplete="name" maxLength={80} />
-            <TextInput label="Business" name="business" error={errors.business} maxLength={80} />
             <TextInput label="Licence no." name="licence" error={errors.licence} maxLength={40} />
             <TextInput label="REC no." name="rec" error={errors.rec} optional maxLength={40} />
             <section className="space-y-3">

@@ -32,7 +32,7 @@ async function ReportPage({ params }: { params: Promise<{ kind: string }> }) {
   if (!isReportKind(kind)) notFound();
   const Form = forms[kind];
   return (
-    <PortalFrame email={user.email} name={user.name}>
+    <PortalFrame email={user.email} name={user.name} showLogo={false}>
       <Form />
     </PortalFrame>
   );
