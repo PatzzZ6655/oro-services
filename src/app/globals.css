@@ -3,7 +3,12 @@
 @theme inline {
   --color-brand-navy: #0f172a;
   --color-brand-blue: #1e40af;
-  --color-brand-orange: #ea580c;
+  --color-brand-orange: #ca3500;
+  --color-brand-orange-hover: #992800;
+  --color-brand-orange-ink: #8f2500;
+  --color-brand-orange-mist: #eb9f84;
+  --color-brand-orange-soft: #faf2ef;
+  --color-brand-orange-line: #f1d8d0;
   --color-brand-dark: #0b0f19;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }

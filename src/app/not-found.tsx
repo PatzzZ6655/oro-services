@@ -13,7 +13,7 @@ export default function NotFound() {
     <SiteFrame>
       <section className="bg-brand-dark px-6 pb-24 pt-40 text-white md:pt-52">
         <div className="mx-auto max-w-xl text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-200">404</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-orange-mist">404</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight text-white">This page is not on the site.</h1>
           <p className="mt-4 text-lg font-light text-slate-200">
             That address does not match a page. Go back home, or contact Emoro Building or Emporo Plumbing.

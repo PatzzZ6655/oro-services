@@ -134,10 +134,10 @@ export const toneStyles: Record<
     button: "bg-brand-navy hover:bg-brand-blue",
   },
   orange: {
-    iconWrap: "bg-orange-50 text-orange-800",
-    badge: "border-orange-200 bg-orange-50 text-orange-800",
-    check: "text-orange-700",
-    button: "bg-orange-700 hover:bg-orange-800",
+    iconWrap: "bg-brand-orange-soft text-brand-orange-ink",
+    badge: "border-brand-orange-line bg-brand-orange-soft text-brand-orange-ink",
+    check: "text-brand-orange",
+    button: "bg-brand-orange hover:bg-brand-orange-hover",
   },
 };
 
