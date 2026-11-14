@@ -3,11 +3,12 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { LogoImage } from "@/components/logo-image";
 import { submitSafety } from "@/app/internal/safety-actions";
-import { companies, type CompanyId, type FieldErrors } from "@/lib/reports/catalog";
+import { companies, reportPhotoMax, reportPhotoTotalBytes, type CompanyId, type FieldErrors } from "@/lib/reports/catalog";
 import { heightChecks, hrcwItems, plantChecks, safetyCard, swmsPresets, take5Checks, type SafetyKind } from "@/lib/reports/safety";
 import { initialSubmitState } from "@/lib/reports/state";
 import { validateSafety } from "@/lib/reports/safety";
-import { AddMore, AreaInput, CompanyChoice, ResultList, SignaturePad, TextInput, YesNoGroup } from "@/components/internal/form-controls";
+import { validatePhotoBudget } from "@/lib/reports/validate";
+import { AddMore, AreaInput, CompanyChoice, MorePhotos, ResultList, SignaturePad, TextInput, YesNoGroup } from "@/components/internal/form-controls";
 import { useStored, type FormDefaults, type JobPrefill } from "@/components/internal/prefill";
 import { copyLastAnswers } from "@/app/internal/job-actions";
 import { applyAnswers } from "@/components/internal/draft-store";
@@ -138,6 +139,13 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const more = data.getAll("morePhotos").filter((item): item is File => item instanceof File && item.size > 0);
+    const everyFile = [...data.values()].filter((item): item is File => item instanceof File && item.size > 0);
+    const photoError = more.length > reportPhotoMax ? "Add up to 8 photos." : validatePhotoBudget(everyFile.map((file) => ({ size: file.size, type: file.type })));
+    if (photoError || everyFile.reduce((total, file) => total + file.size, 0) > reportPhotoTotalBytes) {
+      setClientErrors({ photos: photoError ?? "Photos are too large together. Use fewer photos." });
+      return;
+    }
     const parsed = validateSafety(kind, data);
     if (!parsed.ok) {
       setClientErrors(parsed.errors);
@@ -232,6 +240,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
               Reviewed for this site today
             </label>
             {errors.reviewedToday ? <p className="text-sm text-red-800">{errors.reviewedToday}</p> : null}
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Workers signed on" defaults={defaults} remember multiple />
           </>
         ) : null}
@@ -244,6 +253,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
             <AddMore label="Notes">
               <AreaInput label="Notes" name="notes" optional />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Signed" defaults={defaults} remember />
           </>
         ) : null}
@@ -256,6 +266,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
             <Rows name="air" errors={errors} columns={[{ key: "time", label: "Time" }, { key: "oxygen", label: "Oxygen %" }, { key: "lel", label: "LEL %" }, { key: "co", label: "CO" }, { key: "result", label: "Result" }]} />
             <Rows name="log" errors={errors} columns={[{ key: "name", label: "Name" }, { key: "in", label: "Time in" }, { key: "out", label: "Time out" }]} />
             <YesNoGroup legend="Permit closed" name="closed" error={errors.closed} />
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Permit signed" defaults={defaults} remember />
           </>
         ) : null}
@@ -269,12 +280,14 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
               Extinguisher is at the work
             </label>
             {errors.extinguisher ? <p className="text-sm text-red-800">{errors.extinguisher}</p> : null}
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Permit signed" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "heights" ? (
           <>
             <ResultList group="height" items={heightChecks} errors={errors} />
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Checked by" defaults={defaults} remember />
           </>
         ) : null}
@@ -291,6 +304,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
               Site rules acknowledged
             </label>
             {errors.rules ? <p className="text-sm text-red-800">{errors.rules}</p> : null}
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="workerSign" errors={errors} label="Signature" defaults={defaults} named={false} />
           </>
         ) : null}
@@ -298,6 +312,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
           <>
             <TextInput label="Topic" name="topic" error={errors.topic} />
             <AreaInput label="Notes" name="notes" error={errors.notes} />
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Attendees" defaults={defaults} multiple />
           </>
         ) : null}
@@ -325,6 +340,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
               <TextInput label="People involved" name="people" optional />
               <AreaInput label="Actions taken" name="actions" optional />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Reported by" defaults={defaults} remember />
           </>
         ) : null}
@@ -347,6 +363,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
             <AddMore label="Close-out">
               <TextInput label="Close-out date" name="close" type="date" optional error={errors.close} />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Reported by" defaults={defaults} remember />
           </>
         ) : null}
@@ -357,6 +374,7 @@ export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; d
               <TextInput label="ID / serial" name="asset" optional />
             </AddMore>
             <ResultList group="plant" items={plantChecks} errors={errors} />
+            <MorePhotos error={errors.photos} />
             <SignOns prefix="worker" errors={errors} label="Checked by" defaults={defaults} remember />
           </>
         ) : null}

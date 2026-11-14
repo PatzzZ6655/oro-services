@@ -23,6 +23,7 @@ import {
   ChoiceGroup,
   CompanyChoice,
   OptionalPhoto,
+  MorePhotos,
   ResultList,
   SignaturePad,
   TextInput,
@@ -130,6 +131,7 @@ export function SiteJobSheetForm({ defaults, job = null }: { defaults: FormDefau
               <AreaInput label="Materials used" name="materials" error={errors.materials} optional maxLength={1000} />
               <AreaInput label="Issues" name="issues" error={errors.issues} optional maxLength={1000} />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignaturePad error={errors.signature} />
           </>
         )}
@@ -186,35 +188,12 @@ export function JobSignOffForm({ defaults, job = null }: { defaults: FormDefault
               <AreaInput label="Comments" name="comments" error={errors.comments} optional maxLength={1000} />
               <TextInput label="Client email for a copy" name="clientEmail" type="email" error={errors.clientEmail} optional autoComplete="email" maxLength={254} />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignaturePad error={errors.signature} />
           </>
         )}
       </ReportForm>
     </div>
-  );
-}
-
-function LicenceType({ error }: { error?: string }) {
-  const [type, setType] = useState("");
-  return (
-    <>
-      <ChoiceGroup
-        legend="Licence type"
-        name="licenceType"
-        error={error}
-        onValue={setType}
-        options={[
-          { value: "gasfitting", label: "Type A gasfitting" },
-          { value: "servicing", label: "Type A gas servicing" },
-        ]}
-      />
-      {type === "servicing" ? (
-        <label className="flex min-h-12 items-start gap-3 text-sm text-slate-800">
-          <input name="servicingRecord" type="checkbox" value="yes" className="mt-1 size-5" />
-          Gas Servicing Record completed
-        </label>
-      ) : null}
-    </>
   );
 }
 
@@ -234,17 +213,21 @@ export function GasSafetyForm({ defaults, job = null }: { defaults: FormDefaults
             {errors.date ? <p className="text-sm text-red-800">{errors.date}</p> : null}
             <TextInput label="Gasfitter full name" name="gasfitterName" error={errors.gasfitterName} autoComplete="name" maxLength={80} value={worker} onValue={setWorker} />
             <TextInput label="Licence / registration no." name="licence" error={errors.licence} maxLength={40} value={licence} onValue={setLicence} />
-            <LicenceType error={errors.licenceType} />
             <section className="space-y-3">
               <h2 className="text-base font-semibold text-brand-navy">Installation checks</h2>
               <ResultList group="check" items={gasChecks} errors={errors} />
             </section>
-            <AddMore label="Appliances, email, or faults">
+            <AddMore label="Servicing record, appliances, or faults">
+              <label className="flex min-h-12 items-start gap-3 text-sm text-slate-800">
+                <input name="servicingRecord" type="checkbox" value="yes" className="mt-1 size-5" />
+                Gas Servicing Record completed
+              </label>
               <TextInput label="Provider / agent email" name="providerEmail" type="email" error={errors.providerEmail} optional autoComplete="email" maxLength={254} />
               <ApplianceRows errors={errors} />
               <AreaInput label="Faults and recommendations" name="faults" error={errors.faults} optional maxLength={2000} />
               <UrgentBlock legend="Urgent or disconnected appliance" error={errors.urgent} detailsError={errors.urgentDetails} />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignaturePad error={errors.signature} />
           </>
         )}
@@ -321,6 +304,7 @@ export function ElectricalSafetyForm({ defaults, job = null }: { defaults: FormD
               <AreaInput label="Faults and recommendations" name="faults" error={errors.faults} optional maxLength={2000} />
               <UrgentBlock legend="Urgent hazard" error={errors.urgent} detailsError={errors.urgentDetails} />
             </AddMore>
+            <MorePhotos error={errors.photos} />
             <SignaturePad error={errors.signature} />
           </>
         )}

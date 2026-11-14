@@ -84,7 +84,11 @@ export function applyDraft(form: HTMLFormElement, draft: Draft): void {
     const transfer = new DataTransfer();
     for (const file of files) transfer.items.add(file);
     input.files = transfer.files;
-    input.dispatchEvent(new Event("oro-files"));
+    const captions = Object.keys(draft.fields)
+      .filter((name) => name.startsWith("moreCaption."))
+      .sort((a, b) => Number(a.slice("moreCaption.".length)) - Number(b.slice("moreCaption.".length)))
+      .map((name) => draft.fields[name] ?? "");
+    input.dispatchEvent(new CustomEvent("oro-files", { detail: field === "morePhotos" ? { captions } : undefined }));
   }
 }
 

@@ -374,6 +374,103 @@ export function CheckDate({ smoke = false, defaultDate = "" }: { smoke?: boolean
   );
 }
 
+type MoreShot = { id: string; url: string; file: File; caption: string };
+
+export function MorePhotos({ error }: { error?: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [shots, setShots] = useState<MoreShot[]>([]);
+
+  function writeFiles(next: MoreShot[]) {
+    const transfer = new DataTransfer();
+    for (const shot of next) transfer.items.add(shot.file);
+    if (inputRef.current) inputRef.current.files = transfer.files;
+    setShots(next);
+  }
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const restore = (event: Event) => {
+      const files = Array.from(input.files ?? []);
+      const captions = (event as CustomEvent<{ captions?: string[] }>).detail?.captions ?? [];
+      setShots(
+        files.map((file, index) => ({
+          id: crypto.randomUUID(),
+          url: URL.createObjectURL(file),
+          file,
+          caption: captions[index] ?? "",
+        })),
+      );
+    };
+    input.addEventListener("oro-files", restore);
+    return () => input.removeEventListener("oro-files", restore);
+  }, []);
+
+  async function addPhotos(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const next = [...shots];
+    for (const file of Array.from(list)) {
+      if (next.length >= 8) break;
+      try {
+        const compressed = await compressItemPhoto(file);
+        next.push({ id: crypto.randomUUID(), url: URL.createObjectURL(compressed), file: compressed, caption: "" });
+      } catch {
+        // A file the browser cannot read is skipped.
+      }
+    }
+    writeFiles(next);
+  }
+
+  return (
+    <div>
+      <p className="text-sm font-medium text-slate-800">More photos (optional)</p>
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        name="morePhotos"
+        accept="image/*"
+        multiple
+        onChange={(event) => {
+          void addPhotos(event.target.files);
+          event.target.value = "";
+        }}
+      />
+      <button type="button" className="mt-2 min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700" onClick={() => inputRef.current?.click()}>
+        Add photo
+      </button>
+      {shots.length > 0 ? (
+        <ul className="mt-3 space-y-3">
+          {shots.map((shot, index) => (
+            <li key={shot.id} className="flex items-center gap-3">
+              {/* Blob previews are created in the browser, so next/image cannot optimise them. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={shot.url} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+              <input
+                name={`moreCaption.${index}`}
+                value={shot.caption}
+                maxLength={80}
+                placeholder="Caption (optional)"
+                aria-label={`Caption for photo ${index + 1}`}
+                className={fieldClass}
+                onChange={(event) => setShots((current) => current.map((item) => (item.id === shot.id ? { ...item, caption: event.target.value } : item)))}
+              />
+              <button
+                type="button"
+                className="min-h-11 shrink-0 text-sm font-semibold text-slate-600"
+                onClick={() => writeFiles(shots.filter((item) => item.id !== shot.id))}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {error ? <p className="mt-1 text-sm text-red-800">{error}</p> : null}
+    </div>
+  );
+}
+
 export function SignaturePad({ error, name = "signature" }: { error?: string; name?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

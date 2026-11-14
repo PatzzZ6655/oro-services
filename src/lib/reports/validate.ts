@@ -335,9 +335,7 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
   const date = readJobDate(formData, errors, now);
   const gasfitterName = text(formData, "gasfitterName");
   const licence = text(formData, "licence");
-  const licenceType = text(formData, "licenceType");
   const faults = optionalBlock(errors, "faults", block(formData, "faults"), 2000);
-  if (licenceType !== "gasfitting" && licenceType !== "servicing") errors.licenceType = "Choose the licence type.";
   requireLine(errors, "address", address, 5, 200, "Enter the property address.");
   requireLine(errors, "providerName", providerName, 2, 80, "Enter the rental provider or agent.");
   requireLine(errors, "gasfitterName", gasfitterName, 2, 80, "Enter the gasfitter's full name.");
@@ -350,7 +348,7 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
   if (!errors.date && !nextDue) errors.date = "Enter a date.";
   const overall = anyFail(checks) || urgent?.urgent === "yes" ? "non-compliant" : "compliant";
 
-  if (Object.keys(errors).length > 0 || !urgent || !nextDue || (licenceType !== "gasfitting" && licenceType !== "servicing")) return null;
+  if (Object.keys(errors).length > 0 || !urgent || !nextDue) return null;
   return {
     kind: "gas-safety",
     address,
@@ -360,7 +358,6 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
     nextDue,
     gasfitterName,
     licence,
-    licenceType,
     servicingRecord: text(formData, "servicingRecord") === "yes",
     checks,
     appliances,

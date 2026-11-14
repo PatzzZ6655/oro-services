@@ -176,6 +176,19 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
     for (const row of document.log) text(`${row.name} · in ${row.timeIn} · out ${row.timeOut}`, 10, regular, navy, 2);
     y -= 6;
   }
+  const extras = photos.filter((photo) => !photo.itemKey);
+  if (extras.length > 0) {
+    text("Additional photos", 11, semibold, accent, 4);
+    for (const shot of extras) {
+      const image = shot.mime === "image/png" ? await doc.embedPng(shot.bytes) : await doc.embedJpg(shot.bytes);
+      const thumbW = 160;
+      const thumbH = Math.min(120, (image.height / image.width) * thumbW);
+      ensure(thumbH + 24);
+      page.drawImage(image, { x: margin, y: y - thumbH, width: thumbW, height: thumbH });
+      y -= thumbH + 12;
+      if (shot.caption?.trim()) text(shot.caption.trim(), 9, regular, slate, 4);
+    }
+  }
   text(document.signLabel, 11, semibold, accent, 4);
   for (const sign of document.signs) {
     text(`${sign.name} · ${formatAuDate(sign.date)}`, 10, regular, navy, 2);

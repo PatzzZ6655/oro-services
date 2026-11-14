@@ -263,8 +263,6 @@ export type JobSignOff = {
   vbaLodged?: string;
 };
 
-export type GasLicenceType = "gasfitting" | "servicing";
-
 export type GasReport = {
   kind: "gas-safety";
   address: string;
@@ -274,7 +272,6 @@ export type GasReport = {
   nextDue: string;
   gasfitterName: string;
   licence: string;
-  licenceType: GasLicenceType;
   servicingRecord: boolean;
   checks: CheckAnswer[];
   appliances: GasAppliance[];

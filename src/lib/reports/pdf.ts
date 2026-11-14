@@ -242,18 +242,19 @@ export async function buildReportPdf(options: {
   }
 
   if (photos.length > 0) {
-    heading("Photos");
-    photos.forEach((photo, index) => {
-      const maxWidth = contentWidth;
-      const maxHeight = 260;
+    heading("Additional photos");
+    for (const [index, photo] of photos.entries()) {
+      const maxWidth = 180;
+      const maxHeight = 140;
       const scale = Math.min(maxWidth / photo.width, maxHeight / photo.height, 1);
       const width = photo.width * scale;
       const height = photo.height * scale;
-      ensure(height + 16);
+      ensure(height + 28);
       page.drawImage(photo, { x: margin, y: y - height, width, height });
-      y -= height + 14;
-      text(options.photos[index]?.name || `Photo ${index + 1}`, 8, regular, slate, 4);
-    });
+      y -= height + 12;
+      const caption = options.photos[index]?.caption?.trim();
+      if (caption) text(caption, 9, regular, slate, 4);
+    }
   }
 
   heading("Signature");
@@ -395,7 +396,6 @@ function gasMeta(report: GasReport): { note: string; rows: { label: string; valu
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Gasfitter", value: report.gasfitterName },
       { label: "Licence / registration", value: report.licence },
-      { label: "Licence type", value: report.licenceType === "servicing" ? "Type A gas servicing" : "Type A gasfitting" },
       ...(report.servicingRecord ? [{ label: "Gas Servicing Record", value: "Completed" }] : []),
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
     ],

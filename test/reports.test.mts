@@ -89,7 +89,6 @@ function gasForm(extra?: Record<string, string>) {
     gasfitterName: "Pat Zee",
     business: "Emporo Plumbing",
     licence: "12345",
-    licenceType: "servicing",
     urgent: "no",
     ...extra,
   };
@@ -267,12 +266,6 @@ test("gas checks require a comment only on fail, and the next check is two years
   const withAppliance = validateReport("gas-safety", appliance, now);
   assert.equal(withAppliance.ok, true);
   if (withAppliance.ok && withAppliance.value.kind === "gas-safety") assert.equal(withAppliance.value.appliances.length, 1);
-
-  const noEndorsement = gasForm();
-  noEndorsement.delete("licenceType");
-  const endorsement = validateReport("gas-safety", noEndorsement, now);
-  assert.equal(endorsement.ok, false);
-  if (!endorsement.ok) assert.match(endorsement.errors.licenceType, /licence type/);
 
   const record = gasForm({ servicingRecord: "yes" });
   const recorded = validateReport("gas-safety", record, now);
