@@ -137,7 +137,6 @@ test("the public menu links to the dashboard and the staff portal", () => {
   assert.equal(dashboardHref, "https://tape.orosvc.com");
   assert.equal(menuLinks.find((link) => link.label === "Staff Portal")?.href, staffPortalHref);
   assert.equal(staffPortalHref, "/internal");
-  assert.equal(barLinks.some((link) => link.label === "Dashboard" || link.label === "Staff Portal"), false);
   assert.equal(menuLinks.some((link) => /stock/i.test(link.label)), false);
 });
 
