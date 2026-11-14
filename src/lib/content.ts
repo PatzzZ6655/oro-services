@@ -156,10 +156,14 @@ export const aboutPoints = [
   },
 ];
 
-export const navLinks = [
+export const barLinks = [
   { href: "/emoro", label: "Emoro Building" },
   { href: "/emporo", label: "Emporo Plumbing" },
   { href: "/contact", label: "Contact" },
+] as const;
+
+export const menuLinks = [
+  ...barLinks,
   { href: dashboardHref, label: "Dashboard" },
   { href: staffPortalHref, label: "Staff Portal" },
 ] as const;

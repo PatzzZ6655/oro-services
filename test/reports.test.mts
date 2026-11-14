@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { PDFDocument } from "pdf-lib";
-import { dashboardHref, navLinks, staffPortalHref } from "@/lib/content";
+import { barLinks, dashboardHref, menuLinks, staffPortalHref } from "@/lib/content";
 import {
   allowlist,
   allowedEmails,
@@ -126,14 +126,19 @@ function electricalForm(extra?: Record<string, string>) {
 
 test("the public menu links to the dashboard and the staff portal", () => {
   assert.deepEqual(
-    navLinks.map((link) => link.label),
+    barLinks.map((link) => link.label),
+    ["Emoro Building", "Emporo Plumbing", "Contact"],
+  );
+  assert.deepEqual(
+    menuLinks.map((link) => link.label),
     ["Emoro Building", "Emporo Plumbing", "Contact", "Dashboard", "Staff Portal"],
   );
-  assert.equal(navLinks.find((link) => link.label === "Dashboard")?.href, dashboardHref);
+  assert.equal(menuLinks.find((link) => link.label === "Dashboard")?.href, dashboardHref);
   assert.equal(dashboardHref, "https://tape.orosvc.com");
-  assert.equal(navLinks.find((link) => link.label === "Staff Portal")?.href, staffPortalHref);
+  assert.equal(menuLinks.find((link) => link.label === "Staff Portal")?.href, staffPortalHref);
   assert.equal(staffPortalHref, "/internal");
-  assert.equal(navLinks.some((link) => /stock/i.test(link.label)), false);
+  assert.equal(barLinks.some((link) => link.label === "Dashboard" || link.label === "Staff Portal"), false);
+  assert.equal(menuLinks.some((link) => /stock/i.test(link.label)), false);
 });
 
 test("site job safety items follow the company", () => {
