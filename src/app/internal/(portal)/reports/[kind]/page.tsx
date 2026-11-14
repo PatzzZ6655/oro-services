@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth/current";
 import { PortalFallback, PortalFrame } from "@/components/internal/portal-frame";
 import { ElectricalSafetyForm, GasSafetyForm, JobSignOffForm, SiteJobSheetForm } from "@/components/internal/report-forms";
 import { isReportKind, reportCard, type ReportKind } from "@/lib/reports/catalog";
+import { melbourneClock } from "@/lib/reports/dates";
+import { melbourneToday } from "@/lib/appointments";
 
 const forms: Record<ReportKind, typeof SiteJobSheetForm> = {
   "site-job-sheet": SiteJobSheetForm,
@@ -33,7 +35,7 @@ async function ReportPage({ params }: { params: Promise<{ kind: string }> }) {
   const Form = forms[kind];
   return (
     <PortalFrame email={user.email} name={user.name} showLogo={false}>
-      <Form />
+      <Form defaults={{ name: user.name, date: melbourneToday(), time: melbourneClock() }} />
     </PortalFrame>
   );
 }

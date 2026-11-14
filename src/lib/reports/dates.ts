@@ -38,6 +38,18 @@ export function formatAuDate(isoDate: string): string {
   return `${day} ${months[month - 1]} ${year}`;
 }
 
+export function melbourneClock(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Australia/Melbourne",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hour}:${minute}`;
+}
+
 export function dateError(isoDate: string, now = new Date()): string | undefined {
   if (!isRealCalendarDate(isoDate)) return "Enter a date.";
   if (isoDate < "2020-01-01") return "Use a date from 2020 onwards.";

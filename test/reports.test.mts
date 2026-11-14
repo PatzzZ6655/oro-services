@@ -70,9 +70,7 @@ function signOffForm(extra?: Record<string, string>, omit: string[] = []) {
     address: "12 Smith Street, Richmond",
     date: "2026-11-14",
     work: "Finished the bathroom fit-off.",
-    "confirm.completed": "yes",
-    "confirm.tidy": "yes",
-    "confirm.walkthrough": "yes",
+    "confirm.accepted": "yes",
     ...extra,
   };
   for (const [key, value] of Object.entries(fields)) {
@@ -91,9 +89,8 @@ function gasForm(extra?: Record<string, string>) {
     gasfitterName: "Pat Zee",
     business: "Emporo Plumbing",
     licence: "12345",
-    endorsement: "yes",
+    licenceType: "servicing",
     urgent: "no",
-    overall: "compliant",
     ...extra,
   };
   for (const item of gasChecks) fields[`check.${item.id}`] = fields[`check.${item.id}`] ?? "pass";
@@ -171,11 +168,22 @@ test("site job safety items follow the company", () => {
   }
 });
 
-test("sign-off needs all three yes answers and treats client email as optional", () => {
+test("sign-off needs the confirmation and treats client email as optional", () => {
   assert.equal(validateReport("job-sign-off", signOffForm(), now).ok, true);
-  const refused = validateReport("job-sign-off", signOffForm({ "confirm.tidy": "no" }), now);
+  const refused = validateReport("job-sign-off", signOffForm({ "confirm.accepted": "no" }), now);
   assert.equal(refused.ok, false);
-  if (!refused.ok) assert.equal(refused.errors["confirm.tidy"], "This sign-off needs a yes.");
+  if (!refused.ok) assert.equal(refused.errors["confirm.accepted"], "This sign-off needs a yes.");
+
+  const plumbing = signOffForm({ company: "emporo" });
+  const missingCertificate = validateReport("job-sign-off", plumbing, now);
+  assert.equal(missingCertificate.ok, false);
+  if (!missingCertificate.ok) assert.equal(missingCertificate.errors.vba, "Choose yes or no.");
+  plumbing.set("vba", "yes");
+  plumbing.set("vbaNumber", "C-100");
+  plumbing.set("vbaLodged", "2026-11-14");
+  const lodged = validateReport("job-sign-off", plumbing, now);
+  assert.equal(lodged.ok, true);
+  if (lodged.ok && lodged.value.kind === "job-sign-off") assert.equal(lodged.value.vbaNumber, "C-100");
 
   const blankEmail = validateReport("job-sign-off", signOffForm(), now);
   assert.equal(blankEmail.ok, true);
@@ -216,12 +224,11 @@ test("gas checks require a comment only on fail, and the next check is two years
   const stillCompliant = gasForm({
     "check.leakage": "fail",
     "check.leakage.comment": "Drop at the cooker bayonet.",
-    overall: "compliant",
   });
   failPhoto(stillCompliant, "itemPhoto.check.leakage");
   const compliant = validateReport("gas-safety", stillCompliant, now);
-  assert.equal(compliant.ok, false);
-  if (!compliant.ok) assert.match(compliant.errors.overall, /non-compliant/);
+  assert.equal(compliant.ok, true);
+  if (compliant.ok && compliant.value.kind === "gas-safety") assert.equal(compliant.value.overall, "non-compliant");
 
   const notApplicable = gasForm({ "check.lpg": "na" });
   assert.equal(validateReport("gas-safety", notApplicable, now).ok, true);
@@ -262,10 +269,15 @@ test("gas checks require a comment only on fail, and the next check is two years
   if (withAppliance.ok && withAppliance.value.kind === "gas-safety") assert.equal(withAppliance.value.appliances.length, 1);
 
   const noEndorsement = gasForm();
-  noEndorsement.delete("endorsement");
+  noEndorsement.delete("licenceType");
   const endorsement = validateReport("gas-safety", noEndorsement, now);
   assert.equal(endorsement.ok, false);
-  if (!endorsement.ok) assert.match(endorsement.errors.endorsement, /Type A/);
+  if (!endorsement.ok) assert.match(endorsement.errors.licenceType, /licence type/);
+
+  const record = gasForm({ servicingRecord: "yes" });
+  const recorded = validateReport("gas-safety", record, now);
+  assert.equal(recorded.ok, true);
+  if (recorded.ok && recorded.value.kind === "gas-safety") assert.equal(recorded.value.servicingRecord, true);
 });
 
 test("electrical fail comments, RCD rows, smoke alarms, and due dates", () => {

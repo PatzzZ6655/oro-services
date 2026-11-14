@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { itemPhotoField, itemPhotoMax, type FieldErrors, type NamedItem } from "@/lib/reports/catalog";
 import { addYears, formatAuDate } from "@/lib/reports/dates";
 
@@ -45,6 +45,8 @@ export function TextInput({
   maxLength,
   autoComplete,
   defaultValue,
+  value,
+  onValue,
 }: {
   label: string;
   name: string;
@@ -54,6 +56,8 @@ export function TextInput({
   maxLength?: number;
   autoComplete?: string;
   defaultValue?: string;
+  value?: string;
+  onValue?: (value: string) => void;
 }) {
   return (
     <Field label={optional ? `${label} (optional)` : label} name={name} error={error}>
@@ -63,7 +67,7 @@ export function TextInput({
         type={type}
         maxLength={maxLength}
         autoComplete={autoComplete}
-        defaultValue={defaultValue}
+        {...(value === undefined ? { defaultValue } : { value, onChange: (event: ChangeEvent<HTMLInputElement>) => onValue?.(event.target.value) })}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${name}-error` : undefined}
         className={fieldClass}
@@ -105,11 +109,13 @@ export function ChoiceGroup({
   name,
   options,
   error,
+  onValue,
 }: {
   legend: string;
   name: string;
   options: { value: string; label: string }[];
   error?: string;
+  onValue?: (value: string) => void;
 }) {
   return (
     <fieldset>
@@ -117,7 +123,7 @@ export function ChoiceGroup({
       <div className={`mt-2 grid gap-2 ${options.length > 2 ? "grid-cols-3" : "grid-cols-2"}`}>
         {options.map((option) => (
           <label key={option.value} className={choiceClass}>
-            <input className="sr-only" type="radio" name={name} value={option.value} />
+            <input className="sr-only" type="radio" name={name} value={option.value} onChange={() => onValue?.(option.value)} />
             {option.label}
           </label>
         ))}
@@ -138,6 +144,31 @@ const yesNo = [
   { value: "no", label: "No" },
 ];
 
+export function AddMore({ label = "Add more", children }: { label?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button type="button" className="min-h-12 text-sm font-semibold text-brand-navy" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {open ? "Hide extra" : label}
+      </button>
+      {open ? <div className="mt-3 space-y-4">{children}</div> : null}
+    </div>
+  );
+}
+
+export function OptionalPhoto({ name, error, open = false }: { name: string; error?: string; open?: boolean }) {
+  const [opened, setOpened] = useState(false);
+  const shown = open || opened;
+  if (!shown) {
+    return (
+      <button type="button" className="min-h-10 text-sm font-semibold text-slate-600" onClick={() => setOpened(true)}>
+        Add photo
+      </button>
+    );
+  }
+  return <ItemPhotoField name={name} error={error} required={open} />;
+}
+
 export function ResultList({
   group,
   items,
@@ -149,12 +180,20 @@ export function ResultList({
   errors: FieldErrors;
   withReading?: boolean;
 }) {
-  const [fails, setFails] = useState<Record<string, boolean>>({});
+  const [results, setResults] = useState<Record<string, string>>({});
+  const [readings, setReadings] = useState<Record<string, boolean>>({});
   return (
     <div className="space-y-4">
+      <button
+        type="button"
+        className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+        onClick={() => setResults(Object.fromEntries(items.map((item) => [item.id, "pass"])))}
+      >
+        All pass
+      </button>
       {items.map((item) => {
         const name = `${group}.${item.id}`;
-        const showComment = fails[item.id] || Boolean(errors[`${name}.comment`]);
+        const failed = results[item.id] === "fail" || Boolean(errors[`${name}.comment`]) || Boolean(errors[`${name}.photos`]);
         return (
           <fieldset key={item.id} className="border-b border-slate-200 pb-4">
             <legend className="text-sm font-medium text-slate-800">{item.label}</legend>
@@ -166,28 +205,34 @@ export function ResultList({
                     type="radio"
                     name={name}
                     value={option.value}
-                    onChange={() => setFails((current) => ({ ...current, [item.id]: option.value === "fail" }))}
+                    checked={results[item.id] === option.value}
+                    onChange={() => setResults((current) => ({ ...current, [item.id]: option.value }))}
                   />
                   {option.label}
                 </label>
               ))}
             </div>
             {errors[name] ? <p className="mt-1 text-sm text-red-800">{errors[name]}</p> : null}
-            {withReading ? (
+            {withReading && (readings[item.id] || errors[`${name}.reading`]) ? (
               <label className="mt-2 block text-xs text-slate-600">
-                Reading (optional)
+                Reading
                 <input name={`${name}.reading`} maxLength={24} aria-label={`${item.label} reading`} className={fieldClass} />
               </label>
             ) : null}
+            {withReading && !readings[item.id] && !errors[`${name}.reading`] ? (
+              <button type="button" className="mt-2 min-h-10 text-sm font-semibold text-slate-600" onClick={() => setReadings((current) => ({ ...current, [item.id]: true }))}>
+                Add reading
+              </button>
+            ) : null}
             {errors[`${name}.reading`] ? <p className="mt-1 text-sm text-red-800">{errors[`${name}.reading`]}</p> : null}
-            {showComment ? (
+            {failed ? (
               <label className="mt-2 block text-sm font-medium text-slate-800">
                 Comment
                 <textarea name={`${name}.comment`} rows={2} maxLength={500} className={fieldClass} />
               </label>
             ) : null}
             {errors[`${name}.comment`] ? <p className="mt-1 text-sm text-red-800">{errors[`${name}.comment`]}</p> : null}
-            <ItemPhotoField name={itemPhotoField(name)} error={errors[`${name}.photos`]} required={Boolean(fails[item.id])} />
+            <OptionalPhoto name={itemPhotoField(name)} error={errors[`${name}.photos`]} open={failed} />
           </fieldset>
         );
       })}
@@ -298,8 +343,8 @@ export function YesNoGroup({ legend, name, error }: { legend: string; name: stri
   return <ChoiceGroup legend={legend} name={name} options={yesNo} error={error} />;
 }
 
-export function CheckDate({ smoke = false }: { smoke?: boolean }) {
-  const [date, setDate] = useState("");
+export function CheckDate({ smoke = false, defaultDate = "" }: { smoke?: boolean; defaultDate?: string }) {
+  const [date, setDate] = useState(defaultDate);
   const next = date ? addYears(date, 2) : null;
   const smokeDue = date ? addYears(date, 1) : null;
   return (

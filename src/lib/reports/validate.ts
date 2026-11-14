@@ -27,7 +27,6 @@ import {
   type GasReport,
   type JobSignOff,
   type NamedItem,
-  type OverallResult,
   type RcdRow,
   type ReportValue,
   type SafetyAnswer,
@@ -142,7 +141,8 @@ function anyFail(checks: CheckAnswer[]): boolean {
 }
 
 function readUrgent(formData: FormData, errors: FieldErrors): { urgent: YesNo; urgentDetails?: string } | null {
-  const urgent = yesNo(text(formData, "urgent"));
+  const raw = text(formData, "urgent");
+  const urgent = raw === "" ? "no" : yesNo(raw);
   const details = block(formData, "urgentDetails");
   if (!urgent) {
     errors.urgent = "Choose yes or no.";
@@ -156,19 +156,6 @@ function readUrgent(formData: FormData, errors: FieldErrors): { urgent: YesNo; u
   }
   if (errors.urgent || errors.urgentDetails) return null;
   return { urgent, urgentDetails: urgent === "yes" ? details : undefined };
-}
-
-function readOverall(formData: FormData, errors: FieldErrors, blocked: boolean): OverallResult | null {
-  const overall = text(formData, "overall");
-  if (overall !== "compliant" && overall !== "non-compliant") {
-    errors.overall = "Choose the overall result.";
-    return null;
-  }
-  if (overall === "compliant" && blocked) {
-    errors.overall = "A failed item or an urgent issue means the result is non-compliant.";
-    return null;
-  }
-  return overall;
 }
 
 function readEmail(errors: FieldErrors, key: string, value: string, required: boolean): string | undefined {
@@ -263,6 +250,27 @@ function validateSignOff(formData: FormData, errors: FieldErrors, now: Date): Jo
     else confirmations.push({ id: item.id, label: item.label, answer: "yes" });
   }
 
+  let vbaRequired: YesNo | undefined;
+  let vbaNumber: string | undefined;
+  let vbaLodged: string | undefined;
+  if (company === "emporo") {
+    const answer = yesNo(text(formData, "vba"));
+    if (!answer) errors.vba = "Choose yes or no.";
+    else {
+      vbaRequired = answer;
+      if (answer === "yes") {
+        const number = text(formData, "vbaNumber");
+        const lodged = text(formData, "vbaLodged");
+        if (!requireLine(errors, "vbaNumber", number, 2, 40, "Enter the certificate number.")) {
+          // The number stays off the record until it is valid.
+        } else vbaNumber = number;
+        const lodgedProblem = dateError(lodged, now);
+        if (lodgedProblem) errors.vbaLodged = "Enter the date it was lodged.";
+        else vbaLodged = lodged;
+      }
+    }
+  }
+
   if (Object.keys(errors).length > 0 || !company) return null;
   return {
     kind: "job-sign-off",
@@ -275,6 +283,9 @@ function validateSignOff(formData: FormData, errors: FieldErrors, now: Date): Jo
     confirmations,
     comments,
     clientEmail,
+    vbaRequired,
+    vbaNumber,
+    vbaLodged,
   };
 }
 
@@ -320,12 +331,13 @@ function readAppliances(formData: FormData, errors: FieldErrors): GasAppliance[]
 function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasReport | null {
   const address = text(formData, "address");
   const providerName = text(formData, "providerName");
-  const providerEmail = readEmail(errors, "providerEmail", text(formData, "providerEmail").toLowerCase(), true);
+  const providerEmail = readEmail(errors, "providerEmail", text(formData, "providerEmail").toLowerCase(), false);
   const date = readJobDate(formData, errors, now);
   const gasfitterName = text(formData, "gasfitterName");
   const licence = text(formData, "licence");
+  const licenceType = text(formData, "licenceType");
   const faults = optionalBlock(errors, "faults", block(formData, "faults"), 2000);
-  if (text(formData, "endorsement") !== "yes") errors.endorsement = "Confirm the Type A servicing endorsement.";
+  if (licenceType !== "gasfitting" && licenceType !== "servicing") errors.licenceType = "Choose the licence type.";
   requireLine(errors, "address", address, 5, 200, "Enter the property address.");
   requireLine(errors, "providerName", providerName, 2, 80, "Enter the rental provider or agent.");
   requireLine(errors, "gasfitterName", gasfitterName, 2, 80, "Enter the gasfitter's full name.");
@@ -336,9 +348,9 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
   const urgent = readUrgent(formData, errors);
   const nextDue = errors.date ? null : addYears(date, 2);
   if (!errors.date && !nextDue) errors.date = "Enter a date.";
-  const overall = readOverall(formData, errors, anyFail(checks) || urgent?.urgent === "yes");
+  const overall = anyFail(checks) || urgent?.urgent === "yes" ? "non-compliant" : "compliant";
 
-  if (Object.keys(errors).length > 0 || !providerEmail || !urgent || !overall || !nextDue) return null;
+  if (Object.keys(errors).length > 0 || !urgent || !nextDue || (licenceType !== "gasfitting" && licenceType !== "servicing")) return null;
   return {
     kind: "gas-safety",
     address,
@@ -348,6 +360,8 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
     nextDue,
     gasfitterName,
     licence,
+    licenceType,
+    servicingRecord: text(formData, "servicingRecord") === "yes",
     checks,
     appliances,
     faults,
@@ -425,7 +439,7 @@ function readRcds(formData: FormData, errors: FieldErrors): RcdRow[] {
 function validateElectrical(formData: FormData, errors: FieldErrors, now: Date): ElectricalReport | null {
   const address = text(formData, "address");
   const providerName = text(formData, "providerName");
-  const providerEmail = readEmail(errors, "providerEmail", text(formData, "providerEmail").toLowerCase(), true);
+  const providerEmail = readEmail(errors, "providerEmail", text(formData, "providerEmail").toLowerCase(), false);
   const date = readJobDate(formData, errors, now);
   const previousDate = text(formData, "previousDate");
   const electricianName = text(formData, "electricianName");
@@ -458,18 +472,9 @@ function validateElectrical(formData: FormData, errors: FieldErrors, now: Date):
   const nextDue = errors.date ? null : addYears(date, 2);
   const smokeNextDue = errors.date ? null : addYears(date, 1);
   const rcdFail = rcds.some((row) => row.pushButton === "fail" || row.timeTest === "fail");
-  const blocked = anyFail(visual) || anyFail(polarity) || anyFail(earth) || rcdFail || smoke === "no" || urgent?.urgent === "yes";
-  const overall = readOverall(formData, errors, blocked);
+  const overall = anyFail(visual) || anyFail(polarity) || anyFail(earth) || rcdFail || smoke === "no" || urgent?.urgent === "yes" ? "non-compliant" : "compliant";
 
-  if (
-    Object.keys(errors).length > 0 ||
-    !providerEmail ||
-    !smoke ||
-    !urgent ||
-    !overall ||
-    !nextDue ||
-    !smokeNextDue
-  ) {
+  if (Object.keys(errors).length > 0 || !smoke || !urgent || !nextDue || !smokeNextDue) {
     return null;
   }
 

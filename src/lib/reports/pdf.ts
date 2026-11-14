@@ -194,16 +194,25 @@ export async function buildReportPdf(options: {
   };
 
   const checks = async (items: CheckAnswer[], group: string) => {
+    const notable = [];
+    const passes: string[] = [];
+    const blanks: string[] = [];
     for (const [index, item] of items.entries()) {
+      const shots = itemShots(`${group}.${item.id}`);
+      if (item.result === "fail" || item.comment || item.reading || shots.length > 0) notable.push({ index, item });
+      else if (item.result === "na") blanks.push(item.label);
+      else passes.push(item.label);
+    }
+    for (const { index, item } of notable) {
       const detail = [item.reading, item.comment].filter(Boolean).join(" — ");
       const labelLines = wrap(item.label, regular, 10, contentWidth - 64);
       const detailLines = detail ? wrap(detail, regular, 9, contentWidth - 12) : [];
       ensure(labelLines.length * 13 + detailLines.length * 12 + 10);
       const result = item.result === "pass" ? "Pass" : item.result === "fail" ? "Fail" : "N/A";
       const resultWidth = semibold.widthOfTextAtSize(result, 10);
-      labelLines.forEach((row, index) => {
+      labelLines.forEach((row, lineIndex) => {
         page.drawText(row, { x: margin, y, size: 10, font: regular, color: ink });
-        if (index === 0) {
+        if (lineIndex === 0) {
           page.drawText(result, {
             x: pageWidth - margin - resultWidth,
             y,
@@ -218,14 +227,13 @@ export async function buildReportPdf(options: {
         page.drawText(row, { x: margin + 8, y, size: 9, font: regular, color: slate });
         y -= 12;
       }
-      page.drawLine({
-        start: { x: margin, y: y + 4 },
-        end: { x: pageWidth - margin, y: y + 4 },
-        thickness: 0.4,
-        color: line,
-      });
-      y -= 8;
+      y -= 4;
       await drawShots(`${group}.${item.id}`, `Item ${index + 1}: ${item.label}`);
+    }
+    if (notable.length === 0 && blanks.length === 0) text("All pass.", 10, regular, ink, 4);
+    else {
+      if (passes.length > 0) text("Other items: pass.", 10, regular, ink, 2);
+      if (blanks.length > 0) text(`N/A: ${blanks.join(", ")}.`, 10, regular, ink, 2);
     }
   };
 
@@ -331,7 +339,7 @@ function docMeta(report: ReportValue): { note: string; rows: { label: string; va
       ],
       sections: [
         { title: "Work performed", prose: report.work },
-        { title: "Materials", prose: report.materials || "None recorded." },
+        ...(report.materials ? [{ title: "Materials", prose: report.materials }] : []),
         {
           title: "Safety",
           linked: report.safety.map((item, index) => ({
@@ -340,7 +348,7 @@ function docMeta(report: ReportValue): { note: string; rows: { label: string; va
             caption: `Item ${index + 1}: ${item.label}`,
           })),
         },
-        { title: "Issues", prose: report.issues || "None recorded." },
+        ...(report.issues ? [{ title: "Issues", prose: report.issues }] : []),
       ],
     };
   }
@@ -353,15 +361,21 @@ function docMeta(report: ReportValue): { note: string; rows: { label: string; va
         { label: "Completion date", value: formatAuDate(report.date) },
         { label: "Job / invoice", value: report.jobNumber },
         { label: "Site", value: report.address },
-        { label: "Copy sent to", value: report.clientEmail || "No client email" },
+        ...(report.clientEmail ? [{ label: "Copy sent to", value: report.clientEmail }] : []),
+        ...(report.vbaRequired
+          ? [{
+              label: "VBA compliance certificate",
+              value: report.vbaRequired === "yes" ? `${report.vbaNumber}. Lodged ${formatAuDate(report.vbaLodged ?? "")}.` : "Not required",
+            }]
+          : []),
       ],
       sections: [
         { title: "Work completed", prose: report.work },
         {
-          title: "Confirmations",
+          title: "Confirmation",
           lines: report.confirmations.map((item) => `${item.label}: Yes`),
         },
-        { title: "Comments", prose: report.comments || "None recorded." },
+        ...(report.comments ? [{ title: "Comments", prose: report.comments }] : []),
       ],
     };
   }
@@ -375,73 +389,78 @@ function gasMeta(report: GasReport): { note: string; rows: { label: string; valu
     note: "Victorian rental gas safety check. Residential Tenancies Regulations 2021. AS/NZS 5601.1. AS 4575.",
     rows: [
       { label: "Property", value: report.address },
-      { label: "Rental provider / agent", value: `${report.providerName} · ${report.providerEmail}` },
+      { label: "Rental provider / agent", value: report.providerEmail ? `${report.providerName} · ${report.providerEmail}` : report.providerName },
       { label: "Check date", value: formatAuDate(report.date) },
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Gasfitter", value: report.gasfitterName },
       { label: "Licence / registration", value: report.licence },
-      { label: "Type A servicing endorsement", value: "Confirmed" },
+      { label: "Licence type", value: report.licenceType === "servicing" ? "Type A gas servicing" : "Type A gasfitting" },
+      ...(report.servicingRecord ? [{ label: "Gas Servicing Record", value: "Completed" }] : []),
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
     ],
     sections: [
       { title: `Installation checks · ${resultLabel(report.checks)}`, checks: report.checks, group: "check" },
-      {
-        title: "Type A appliances",
-        lines:
-          report.appliances.length > 0
-            ? report.appliances.map(
-                (item, index) =>
-                  `${index + 1}. ${item.type}, ${item.location}. ${item.makeModel}. Serviced to AS 4575: ${item.serviced === "yes" ? "Yes" : "No"}. CO / spillage: ${item.coSpillage}.${item.recordNo ? ` Record ${item.recordNo}.` : ""}`,
-              )
-            : ["No Type A appliances recorded."],
-      },
-      { title: "Faults and recommendations", prose: report.faults || "None recorded." },
-      {
-        title: "Urgent or disconnected appliance",
-        prose: report.urgent === "yes" ? `Yes. ${report.urgentDetails}` : "No.",
-      },
+      ...(report.appliances.length > 0
+        ? [{
+            title: "Type A appliances",
+            lines: report.appliances.map(
+              (item, index) =>
+                `${index + 1}. ${item.type}, ${item.location}. ${item.makeModel}. Serviced to AS 4575: ${item.serviced === "yes" ? "Yes" : "No"}. CO / spillage: ${item.coSpillage}.${item.recordNo ? ` Record ${item.recordNo}.` : ""}`,
+            ),
+          }]
+        : []),
+      ...(report.faults ? [{ title: "Faults and recommendations", prose: report.faults }] : []),
+      ...(report.urgent === "yes" ? [{ title: "Urgent or disconnected appliance", prose: report.urgentDetails || "Yes." }] : []),
     ],
   };
 }
 
-function electricalMeta(report: ElectricalReport): { note: string; rows: { label: string; value: string }[]; sections: Section[] } {
-  const extent = report.extent
-    .map((item) => `${item.label}: ${item.status === "included" ? "Included" : item.status === "excluded" ? "Not included" : "N/A"}`)
+function groupedExtent(report: ElectricalReport): string {
+  const included = report.extent.filter((item) => item.status === "included").map((item) => item.label);
+  const excluded = report.extent.filter((item) => item.status === "excluded").map((item) => item.label);
+  const blanks = report.extent.filter((item) => item.status === "na").map((item) => item.label);
+  return [
+    included.length > 0 ? `Included: ${included.join(", ")}.` : "",
+    excluded.length > 0 ? `Not included: ${excluded.join(", ")}.` : "",
+    blanks.length > 0 ? `N/A: ${blanks.join(", ")}.` : "",
+    report.limitations ? `Limitations: ${report.limitations}` : "",
+  ]
+    .filter(Boolean)
     .join("\n");
+}
+
+function electricalMeta(report: ElectricalReport): { note: string; rows: { label: string; value: string }[]; sections: Section[] } {
   return {
     note: "Electrical safety check for a Victorian rental. AS/NZS 3019:2022 section 4. Layout follows the Energy Safe Victoria report.",
     rows: [
       { label: "Property", value: report.address },
-      { label: "Rental provider / agent", value: `${report.providerName} · ${report.providerEmail}` },
+      { label: "Rental provider / agent", value: report.providerEmail ? `${report.providerName} · ${report.providerEmail}` : report.providerName },
       { label: "Check date", value: formatAuDate(report.date) },
-      { label: "Previous check", value: report.previousDate ? formatAuDate(report.previousDate) : "Not recorded" },
+      ...(report.previousDate ? [{ label: "Previous check", value: formatAuDate(report.previousDate) }] : []),
       { label: "Next check due", value: formatAuDate(report.nextDue) },
       { label: "Electrician", value: report.electricianName },
       { label: "Licence", value: report.licence },
-      { label: "REC", value: report.rec || "Not recorded" },
+      ...(report.rec ? [{ label: "REC", value: report.rec }] : []),
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
     ],
     sections: [
-      { title: "Extent of the check", prose: report.limitations ? `${extent}\n\nLimitations: ${report.limitations}` : extent },
+      { title: "Extent of the check", prose: groupedExtent(report) },
       { title: `Visual inspection · ${resultLabel(report.visual)}`, checks: report.visual, group: "visual" },
       { title: `Polarity and correct connections · ${resultLabel(report.polarity)}`, checks: report.polarity, group: "polarity" },
       { title: `Earth continuity · ${resultLabel(report.earth)}`, checks: report.earth, group: "earth" },
       {
         title: "RCD tests",
         lines: report.rcds.map((row) => {
-          const time = row.timeTest ? `${row.timeTest === "pass" ? "Pass" : "Fail"}${row.timeMs ? ` ${row.timeMs} ms` : ""}` : "Not timed";
-          return `${row.circuit}. Push-button ${row.pushButton === "pass" ? "Pass" : "Fail"}. Time test ${time}.`;
+          const time = row.timeTest ? `. Time test ${row.timeTest === "pass" ? "Pass" : "Fail"}${row.timeMs ? ` ${row.timeMs} ms` : ""}` : "";
+          return `${row.circuit}. Push-button ${row.pushButton === "pass" ? "Pass" : "Fail"}${time}.`;
         }),
       },
       {
         title: "Smoke alarms",
-        prose: `Correctly installed, working, and tested to the manufacturer's instructions: ${report.smokeAlarms === "yes" ? "Yes" : "No"}. Next smoke alarm check due ${formatAuDate(report.smokeNextDue)}.${report.smokeComment ? ` ${report.smokeComment}` : ""}`,
+        prose: `${report.smokeAlarms === "yes" ? "Yes" : "No"}. Next smoke alarm check due ${formatAuDate(report.smokeNextDue)}.${report.smokeComment ? ` ${report.smokeComment}` : ""}`,
       },
-      { title: "Faults and recommendations", prose: report.faults || "None recorded." },
-      {
-        title: "Urgent hazards",
-        prose: report.urgent === "yes" ? `Yes. ${report.urgentDetails}` : "No.",
-      },
+      ...(report.faults ? [{ title: "Faults and recommendations", prose: report.faults }] : []),
+      ...(report.urgent === "yes" ? [{ title: "Urgent hazards", prose: report.urgentDetails || "Yes." }] : []),
     ],
   };
 }

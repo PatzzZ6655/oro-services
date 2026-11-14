@@ -90,9 +90,7 @@ export const jobSafety: Record<CompanyId, readonly NamedItem[]> = {
 };
 
 export const signOffConfirmations: readonly NamedItem[] = [
-  { id: "completed", label: "Work completed as described" },
-  { id: "tidy", label: "Site left clean and tidy" },
-  { id: "walkthrough", label: "Client walked through the work" },
+  { id: "accepted", label: "Work is complete, the site is tidy, and the client walked through it" },
 ];
 
 export const gasChecks: readonly NamedItem[] = [
@@ -260,17 +258,24 @@ export type JobSignOff = {
   confirmations: ConfirmationAnswer[];
   comments?: string;
   clientEmail?: string;
+  vbaRequired?: YesNo;
+  vbaNumber?: string;
+  vbaLodged?: string;
 };
+
+export type GasLicenceType = "gasfitting" | "servicing";
 
 export type GasReport = {
   kind: "gas-safety";
   address: string;
   providerName: string;
-  providerEmail: string;
+  providerEmail?: string;
   date: string;
   nextDue: string;
   gasfitterName: string;
   licence: string;
+  licenceType: GasLicenceType;
+  servicingRecord: boolean;
   checks: CheckAnswer[];
   appliances: GasAppliance[];
   faults?: string;
@@ -283,7 +288,7 @@ export type ElectricalReport = {
   kind: "electrical-safety";
   address: string;
   providerName: string;
-  providerEmail: string;
+  providerEmail?: string;
   date: string;
   previousDate?: string;
   nextDue: string;
