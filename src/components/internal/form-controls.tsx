@@ -240,7 +240,19 @@ export function ResultList({
   );
 }
 
-export function ItemPhotoField({ name, error, required = false }: { name: string; error?: string; required?: boolean }) {
+export function ItemPhotoField({
+  name,
+  error,
+  required = false,
+  max = itemPhotoMax,
+  buttonLabel,
+}: {
+  name: string;
+  error?: string;
+  required?: boolean;
+  max?: number;
+  buttonLabel?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<{ id: string; url: string; file: File }[]>([]);
 
@@ -263,15 +275,20 @@ export function ItemPhotoField({ name, error, required = false }: { name: string
 
   async function addPhotos(list: FileList | null) {
     if (!list || list.length === 0) return;
-    const next = [...photos];
+    const added: { id: string; url: string; file: File }[] = [];
     for (const file of Array.from(list)) {
-      if (next.length >= itemPhotoMax) break;
+      if ((max === 1 ? added.length : photos.length + added.length) >= max) break;
       try {
         const compressed = await compressItemPhoto(file);
-        next.push({ id: crypto.randomUUID(), url: URL.createObjectURL(compressed), file: compressed });
+        added.push({ id: crypto.randomUUID(), url: URL.createObjectURL(compressed), file: compressed });
       } catch {
         // Skip a file the browser cannot decode. The field error covers a failed item.
       }
+    }
+    if (added.length === 0) return;
+    const next = max === 1 ? added : [...photos, ...added];
+    if (max === 1) {
+      for (const photo of photos) URL.revokeObjectURL(photo.url);
     }
     setPhotos(next);
     writeFiles(next);
@@ -293,7 +310,7 @@ export function ItemPhotoField({ name, error, required = false }: { name: string
         type="file"
         name={name}
         accept="image/*"
-        multiple
+        multiple={max > 1}
         onChange={(event) => {
           void addPhotos(event.target.files);
           event.target.value = "";
@@ -302,6 +319,7 @@ export function ItemPhotoField({ name, error, required = false }: { name: string
       <button
         type="button"
         className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+        aria-label={buttonLabel ? `Add photo, ${buttonLabel}` : undefined}
         onClick={() => inputRef.current?.click()}
       >
         Add photo
@@ -327,6 +345,28 @@ export function ItemPhotoField({ name, error, required = false }: { name: string
         </ul>
       ) : null}
       {error ? <p className="mt-1 text-sm text-red-800">{error}</p> : null}
+    </div>
+  );
+}
+
+export function KeyPhoto({
+  name,
+  label,
+  hint,
+  error,
+  max = 1,
+}: {
+  name: string;
+  label: string;
+  hint?: string;
+  error?: string;
+  max?: number;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-slate-800">{label}</p>
+      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      <ItemPhotoField name={name} error={error} max={max} buttonLabel={label} />
     </div>
   );
 }

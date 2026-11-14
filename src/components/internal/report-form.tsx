@@ -136,9 +136,14 @@ export function ReportForm({
         </p>
       ) : null}
       {errorCount > 0 ? (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-          Some answers need a look.
-        </p>
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+          <p>Some answers need a look.</p>
+          {[...new Set(Object.entries(errors).filter(([key]) => key.startsWith("keyPhoto.")).map(([, message]) => message))].map((message) => (
+            <p key={message} className="mt-1">
+              {message}
+            </p>
+          ))}
+        </div>
       ) : null}
       {children(errors)}
       <button

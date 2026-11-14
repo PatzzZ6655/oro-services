@@ -10,6 +10,8 @@ import {
   electricalVisual,
   gasChecks,
   itemPhotoField,
+  keyPhotoField,
+  smokePhotoMax,
   jobSafety,
   signOffConfirmations,
   type CompanyId,
@@ -22,6 +24,7 @@ import {
   CheckDate,
   ChoiceGroup,
   CompanyChoice,
+  KeyPhoto,
   OptionalPhoto,
   MorePhotos,
   ResultList,
@@ -217,6 +220,15 @@ export function GasSafetyForm({ defaults, job = null }: { defaults: FormDefaults
               <h2 className="text-base font-semibold text-brand-navy">Installation checks</h2>
               <ResultList group="check" items={gasChecks} errors={errors} />
             </section>
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold text-brand-navy">Key photos</h2>
+              <KeyPhoto
+                name={keyPhotoField("readings")}
+                label="Test readings"
+                hint="One photo of the CO, flue, or pressure reading."
+                error={errors[keyPhotoField("readings")]}
+              />
+            </section>
             <AddMore label="Servicing record, appliances, or faults">
               <label className="flex min-h-12 items-start gap-3 text-sm text-slate-800">
                 <input name="servicingRecord" type="checkbox" value="yes" className="mt-1 size-5" />
@@ -296,6 +308,22 @@ export function ElectricalSafetyForm({ defaults, job = null }: { defaults: FormD
             </section>
             <RcdRows errors={errors} />
             <SmokeBlock errors={errors} />
+            <section className="space-y-4">
+              <h2 className="text-base font-semibold text-brand-navy">Key photos</h2>
+              <KeyPhoto
+                name={keyPhotoField("switchboard")}
+                label="Switchboard, cover open"
+                error={errors[keyPhotoField("switchboard")]}
+              />
+              <KeyPhoto name={keyPhotoField("rcd")} label="RCD test reading" error={errors[keyPhotoField("rcd")]} />
+              <KeyPhoto
+                name={keyPhotoField("smoke")}
+                label="Smoke alarm, expiry date"
+                hint="Add another photo if there is more than one alarm."
+                error={errors[keyPhotoField("smoke")]}
+                max={smokePhotoMax}
+              />
+            </section>
             <AddMore label="Agent email, earlier check, or faults">
               <TextInput label="Provider / agent email" name="providerEmail" type="email" error={errors.providerEmail} optional autoComplete="email" maxLength={254} />
               <TextInput label="Previous check date" name="previousDate" type="date" error={errors.previousDate} optional />
@@ -403,6 +431,11 @@ function ApplianceRows({ errors }: { errors: FieldErrors }) {
           <YesNoGroup legend="Serviced to AS 4575" name={`appliance.${index}.serviced`} error={errors[`appliance.${index}.serviced`]} />
           <TextInput label="CO / spillage result" name={`appliance.${index}.co`} error={errors[`appliance.${index}.co`]} maxLength={80} />
           <TextInput label="Compliance record no." name={`appliance.${index}.record`} error={errors[`appliance.${index}.record`]} optional maxLength={40} />
+          <KeyPhoto
+            name={keyPhotoField(`appliance.${index}`)}
+            label="Appliance or data plate"
+            error={errors[keyPhotoField(`appliance.${index}`)]}
+          />
         </div>
       ))}
     </section>

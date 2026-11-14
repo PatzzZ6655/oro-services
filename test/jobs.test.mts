@@ -62,10 +62,12 @@ test("saved answers drop signatures, photos, and the daily SWMS review", () => {
   data.set("reviewedToday", "yes");
   data.set("worker.0.signature", "data:image/png;base64,abc");
   data.append("photos", new File([Uint8Array.of(1)], "a.jpg", { type: "image/jpeg" }));
+  data.set("keyPhoto.readings", "not-a-photo");
   const answers = answersFromForm(data);
   assert.equal(answers.work, "Roof");
   assert.equal(answers.reviewedToday, undefined);
   assert.equal("worker.0.signature" in answers, false);
+  assert.equal(answers["keyPhoto.readings"], undefined);
 });
 
 test("a job folder is keyed by the job number and address", () => {

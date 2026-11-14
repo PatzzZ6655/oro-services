@@ -10,7 +10,9 @@ import {
   itemPhotoField,
   itemPhotoMax,
   jobSafety,
+  keyPhotoField,
   maxRepeatRows,
+  smokePhotoMax,
   reportPhotoBytes,
   reportPhotoMax,
   reportPhotoTotalBytes,
@@ -314,6 +316,15 @@ function readAppliances(formData: FormData, errors: FieldErrors): GasAppliance[]
       errors[`${prefix}.record`] = "Use 40 characters or fewer.";
       rowOk = false;
     }
+    const photoField = keyPhotoField(`appliance.${index}`);
+    const photos = fileCount(formData, photoField);
+    if (photos === 0) {
+      errors[photoField] = "Add a photo of this appliance or its data plate.";
+      rowOk = false;
+    } else if (photos > 1) {
+      errors[photoField] = "Add one photo of this appliance.";
+      rowOk = false;
+    }
     if (rowOk && servicedAnswer) {
       appliances.push({
         type,
@@ -343,6 +354,7 @@ function validateGas(formData: FormData, errors: FieldErrors, now: Date): GasRep
 
   const checks = readChecks(formData, errors, "check", gasChecks);
   const appliances = readAppliances(formData, errors);
+  requirePhotoCount(formData, errors, keyPhotoField("readings"), "Add a photo of the test readings.", 1, "Add one photo of the test readings.");
   const urgent = readUrgent(formData, errors);
   const nextDue = errors.date ? null : addYears(date, 2);
   if (!errors.date && !nextDue) errors.date = "Enter a date.";
@@ -465,6 +477,16 @@ function validateElectrical(formData: FormData, errors: FieldErrors, now: Date):
   const polarity = readChecks(formData, errors, "polarity", electricalPolarity);
   const earth = readChecks(formData, errors, "earth", electricalEarth, true);
   const rcds = readRcds(formData, errors);
+  requirePhotoCount(formData, errors, keyPhotoField("switchboard"), "Add a photo of the switchboard with the cover open.", 1, "Add one photo of the switchboard.");
+  requirePhotoCount(formData, errors, keyPhotoField("rcd"), "Add a photo of the RCD test reading.", 1, "Add one photo of the RCD test reading.");
+  requirePhotoCount(
+    formData,
+    errors,
+    keyPhotoField("smoke"),
+    "Add a photo of the smoke alarm showing the expiry date.",
+    smokePhotoMax,
+    "Add up to 4 smoke alarm photos.",
+  );
   const urgent = readUrgent(formData, errors);
   const nextDue = errors.date ? null : addYears(date, 2);
   const smokeNextDue = errors.date ? null : addYears(date, 1);
@@ -535,6 +557,38 @@ export function parseSignature(value: string): { ok: true; bytes: Uint8Array } |
 
 function fileCount(formData: FormData, key: string): number {
   return formData.getAll(key).filter((item) => item instanceof File && item.size > 0).length;
+}
+
+function requirePhotoCount(formData: FormData, errors: FieldErrors, field: string, missing: string, max: number, tooMany: string) {
+  const count = fileCount(formData, field);
+  if (count === 0) errors[field] = missing;
+  else if (count > max) errors[field] = tooMany;
+}
+
+export type KeyPhotoSlot = { field: string; caption: string; max: number };
+
+export function keyPhotoSlots(report: ReportValue, formData: FormData): KeyPhotoSlot[] {
+  if (report.kind === "gas-safety") {
+    const slots: KeyPhotoSlot[] = [{ field: "readings", caption: "Test readings", max: 1 }];
+    let seen = 0;
+    for (let index = 0; index < maxRepeatRows; index += 1) {
+      const filled = ["type", "location", "makeModel", "serviced", "co", "record"].map((part) => text(formData, `appliance.${index}.${part}`));
+      if (filled.every((value) => value === "")) continue;
+      const appliance = report.appliances[seen];
+      seen += 1;
+      if (!appliance) continue;
+      slots.push({ field: `appliance.${index}`, caption: `${appliance.type}, ${appliance.location}`, max: 1 });
+    }
+    return slots;
+  }
+  if (report.kind === "electrical-safety") {
+    return [
+      { field: "switchboard", caption: "Switchboard, cover open", max: 1 },
+      { field: "rcd", caption: "RCD test reading", max: 1 },
+      { field: "smoke", caption: "Smoke alarm", max: smokePhotoMax },
+    ];
+  }
+  return [];
 }
 
 export function validatePhotoBudget(files: { size: number; type: string }[]): string | null {
