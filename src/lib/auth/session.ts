@@ -20,6 +20,13 @@ export type StaffSession = {
   name: string;
 };
 
+export type StaffRole = "owner" | "staff";
+
+export type AllowlistEntry = {
+  email: string;
+  role: StaffRole;
+};
+
 function trimmedEnv(value: string | undefined): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -41,15 +48,29 @@ export function cleanName(value: unknown): string {
 /**
  * Comma-separated allowlist. A blank variable starts at pat.z@orosvc.com.
  * A non-blank variable replaces that starter list entirely.
- * There is no failure counter and no lockout.
+ * The first address is the owner. Every later address is staff.
+ * Sign-in does not use the role yet. There is no failure counter and no lockout.
  */
-export function allowedEmails(raw: string | undefined = process.env.INTERNAL_ALLOWED_EMAILS): Set<string> | null {
+export function allowlist(raw: string | undefined = process.env.INTERNAL_ALLOWED_EMAILS): AllowlistEntry[] | null {
   const source = typeof raw === "string" && raw.trim() ? raw : STARTER_ALLOWLIST;
-  const emails = source
-    .split(",")
-    .map((part) => normalizeEmail(part))
-    .filter((email): email is string => Boolean(email));
-  return emails.length > 0 ? new Set(emails) : null;
+  const entries: AllowlistEntry[] = [];
+  for (const part of source.split(",")) {
+    const email = normalizeEmail(part);
+    if (!email || entries.some((entry) => entry.email === email)) continue;
+    entries.push({ email, role: entries.length === 0 ? "owner" : "staff" });
+  }
+  return entries.length > 0 ? entries : null;
+}
+
+export function allowedEmails(raw: string | undefined = process.env.INTERNAL_ALLOWED_EMAILS): Set<string> | null {
+  const entries = allowlist(raw);
+  return entries ? new Set(entries.map((entry) => entry.email)) : null;
+}
+
+export function staffRole(email: string, raw?: string): StaffRole | null {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  return allowlist(raw)?.find((entry) => entry.email === normalized)?.role ?? null;
 }
 
 export function isEmailAllowed(email: string, raw?: string): boolean {

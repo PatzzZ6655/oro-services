@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { PDFDocument } from "pdf-lib";
-import { internalLoginHref, stockDashboardHref } from "@/lib/content";
+import { barLinks, dashboardHref, menuLinks, staffPortalHref } from "@/lib/content";
 import {
+  allowlist,
   allowedEmails,
   authConfigured,
   isEmailAllowed,
+  staffRole,
   readSession,
   signSession,
 } from "@/lib/auth/session";
@@ -130,9 +132,20 @@ function electricalForm(extra?: Record<string, string>) {
   return data;
 }
 
-test("the footer target is the on-site portal and the stock dashboard stays external", () => {
-  assert.equal(internalLoginHref, "/internal");
-  assert.equal(stockDashboardHref, "https://tape.orosvc.com");
+test("the public menu links to the dashboard and the staff portal", () => {
+  assert.deepEqual(
+    barLinks.map((link) => link.label),
+    ["Emoro Building", "Emporo Plumbing", "Contact"],
+  );
+  assert.deepEqual(
+    menuLinks.map((link) => link.label),
+    ["Emoro Building", "Emporo Plumbing", "Contact", "Dashboard", "Staff Portal"],
+  );
+  assert.equal(menuLinks.find((link) => link.label === "Dashboard")?.href, dashboardHref);
+  assert.equal(dashboardHref, "https://tape.orosvc.com");
+  assert.equal(menuLinks.find((link) => link.label === "Staff Portal")?.href, staffPortalHref);
+  assert.equal(staffPortalHref, "/internal");
+  assert.equal(menuLinks.some((link) => /stock/i.test(link.label)), false);
 });
 
 test("site job safety items follow the company", () => {
@@ -417,6 +430,15 @@ test("the allowlist starts with pat and a rejection does not lock anyone out", (
   }
   assert.equal(isEmailAllowed("pat.z@orosvc.com", "pat.z@orosvc.com"), true);
   assert.equal(allowedEmails("@@@"), null);
+  assert.deepEqual(allowlist(""), [{ email: "pat.z@orosvc.com", role: "owner" }]);
+  assert.equal(staffRole("pat.z@orosvc.com", ""), "owner");
+  assert.deepEqual(allowlist("pat.z@orosvc.com, Worker@orosvc.com"), [
+    { email: "pat.z@orosvc.com", role: "owner" },
+    { email: "worker@orosvc.com", role: "staff" },
+  ]);
+  assert.equal(isEmailAllowed("worker@orosvc.com", "pat.z@orosvc.com, worker@orosvc.com"), true);
+  assert.equal(staffRole("worker@orosvc.com", "pat.z@orosvc.com, worker@orosvc.com"), "staff");
+  assert.equal(staffRole("other@orosvc.com", "pat.z@orosvc.com, worker@orosvc.com"), null);
 });
 
 test("sessions round-trip only for an allowlisted email", async () => {
