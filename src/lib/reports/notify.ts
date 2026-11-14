@@ -1,5 +1,5 @@
 import { sendCompanyReport } from "@/lib/gmail";
-import { companies, companyFor, reportCard, reportMailIdentity, type ReportValue } from "@/lib/reports/catalog";
+import { companies, companyFor, reportCard, reportMailIdentity, type CompanyId, type ReportValue } from "@/lib/reports/catalog";
 import { formatAuDate } from "@/lib/reports/dates";
 
 export function staffInbox(): string {
@@ -73,4 +73,28 @@ export async function emailReport(options: {
     }
   }
   return { staff: staffSent, client: clientSent, clientRequested: Boolean(client && client !== staff) };
+}
+
+export async function emailSafetyCopy(options: {
+  company: CompanyId;
+  title: string;
+  date: string;
+  address: string;
+  pdf: Uint8Array;
+  driveUrl: string;
+}): Promise<boolean> {
+  const company = companies[options.company];
+  try {
+    return await sendCompanyReport({
+      fromName: company.name,
+      alias: company.email,
+      to: staffInbox(),
+      replyTo: company.email,
+      subject: `${options.title} — ${options.address.replace(/[\r\n]+/g, " ")}`.slice(0, 180),
+      text: [options.title, company.legalName, formatAuDate(options.date), options.address, "", "The PDF is attached.", options.driveUrl ? `Drive copy: ${options.driveUrl}` : ""].filter(Boolean).join("\n"),
+      attachments: [{ filename: `${options.title}.pdf`, content: Buffer.from(options.pdf), contentType: "application/pdf" }],
+    });
+  } catch {
+    return false;
+  }
 }

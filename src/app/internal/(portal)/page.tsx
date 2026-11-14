@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/current";
 import { PortalFallback, PortalFrame } from "@/components/internal/portal-frame";
 import { stockDashboardHref } from "@/lib/content";
 import { reportCards } from "@/lib/reports/catalog";
+import { safetyCards } from "@/lib/reports/safety";
 import { formatAuDate } from "@/lib/reports/dates";
 import { driveConfigured, listRecentReports, type StoredReport } from "@/lib/reports/drive";
 
@@ -86,20 +87,31 @@ function ReportsPanel({
 }) {
   return (
     <div className="mt-4 space-y-4">
-      <ul className="grid gap-3">
-        {reportCards.map((card) => (
-          <li key={card.kind} className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-base font-semibold text-brand-navy">{card.title}</h2>
-            <p className="mt-1 text-sm text-slate-600">{card.summary}</p>
-            <Link
-              href={`/internal/reports/${card.kind}`}
-              className="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
-            >
-              Start
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {(
+        [
+          ["Inspections", reportCards.filter((card) => card.kind === "gas-safety" || card.kind === "electrical-safety")],
+          ["Job records", reportCards.filter((card) => card.kind === "site-job-sheet" || card.kind === "job-sign-off")],
+          ["Safety", [...safetyCards, { kind: "training", title: "Training and licences", summary: "Licences and expiry dates." }]],
+        ] as const
+      ).map(([heading, cards]) => (
+        <section key={heading} className="space-y-3">
+          <h2 className="text-sm font-semibold text-slate-500">{heading}</h2>
+          <ul className="grid gap-3">
+            {cards.map((card) => (
+              <li key={card.kind} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-base font-semibold text-brand-navy">{card.title}</h3>
+                <p className="mt-1 text-sm text-slate-600">{card.summary}</p>
+                <Link
+                  href={card.kind === "training" ? "/internal/training" : `/internal/reports/${card.kind}`}
+                  className="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
+                >
+                  {card.kind === "training" ? "Open" : "Start"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-base font-semibold text-brand-navy">Recent reports</h2>
         {recent?.status === "unconfigured" ? (

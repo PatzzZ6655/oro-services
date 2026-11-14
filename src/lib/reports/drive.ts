@@ -1,6 +1,7 @@
 import { allowedEmails } from "@/lib/auth/session";
 import { reportCard, type ReportKind } from "@/lib/reports/catalog";
 import { driveAppProperty, driveFolderQuery, submissionFolderName } from "@/lib/reports/paths";
+import { isSafetyKind, latestLicences, safetyCard, type LicenceRecord } from "@/lib/reports/safety";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
@@ -160,8 +161,13 @@ function shortProperty(value: string): string {
   return value.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
+function filingCard(kind: string): { title: string; folder: string } {
+  if (isSafetyKind(kind)) return safetyCard(kind);
+  return reportCard(kind as ReportKind);
+}
+
 export async function saveReportPackage(options: {
-  kind: ReportKind;
+  kind: string;
   date: string;
   address: string;
   pdf: Uint8Array;
@@ -169,10 +175,10 @@ export async function saveReportPackage(options: {
 }): Promise<{ url: string; folderId: string }> {
   const token = await accessToken();
   const rootId = await ensureFolder(token, "ORO Reports");
-  const typeId = await ensureFolder(token, reportCard(options.kind).folder, rootId);
+  const typeId = await ensureFolder(token, filingCard(options.kind).folder, rootId);
   const yearId = await ensureFolder(token, options.date.slice(0, 4), typeId);
   const folderId = await ensureFolder(token, submissionFolderName(options.date, options.address), yearId);
-  const card = reportCard(options.kind);
+  const card = filingCard(options.kind);
   const uploaded = await uploadFile(token, folderId, `${card.title}.pdf`, "application/pdf", options.pdf, {
     oroApp: driveAppProperty,
     oroKind: "report-pdf",
@@ -223,8 +229,8 @@ export async function listRecentReports(): Promise<StoredReport[]> {
     .filter((file): file is { id: string; name?: string; webViewLink?: string; createdTime?: string; appProperties?: Record<string, string> } => Boolean(file.id))
     .map((file) => {
       const kind = file.appProperties?.oroType;
-      const title = kind === "site-job-sheet" || kind === "job-sign-off" || kind === "gas-safety" || kind === "electrical-safety"
-        ? reportCard(kind).title
+      const title = kind && (isSafetyKind(kind) || kind === "site-job-sheet" || kind === "job-sign-off" || kind === "gas-safety" || kind === "electrical-safety")
+        ? filingCard(kind).title
         : file.name || "Report";
       return {
         id: file.id,
@@ -243,4 +249,51 @@ export async function listRecentReports(): Promise<StoredReport[]> {
     address: row.address,
     url: row.url,
   }));
+}
+
+export async function saveLicenceRecord(record: Omit<LicenceRecord, "id" | "created">): Promise<void> {
+  const token = await accessToken();
+  const rootId = await ensureFolder(token, "ORO Reports");
+  const folderId = await ensureFolder(token, "Training Register", rootId);
+  const body = new TextEncoder().encode(JSON.stringify(record));
+  await uploadFile(token, folderId, `${shortProperty(record.name) || "worker"}.json`, "application/json", body, {
+    oroApp: driveAppProperty,
+    oroKind: "licence-record",
+    oroName: shortProperty(record.name),
+    oroCompany: record.company,
+    oroWhiteCard: shortProperty(record.whiteCard),
+    oroLicence: shortProperty(record.licence),
+    oroExpiry: record.expiry,
+  });
+}
+
+export async function listLicenceRecords(): Promise<LicenceRecord[]> {
+  const token = await accessToken();
+  const params = new URLSearchParams({
+    q: "appProperties has { key='oroKind' and value='licence-record' } and trashed = false",
+    pageSize: "100",
+    fields: "files(id,createdTime,appProperties)",
+    orderBy: "createdTime desc",
+    spaces: "drive",
+  });
+  let response = await driveFetch(token, `${FILES_URL}?${params}`);
+  if (response.status === 400) {
+    params.delete("orderBy");
+    response = await driveFetch(token, `${FILES_URL}?${params}`);
+  }
+  if (!response.ok) throw new Error("The training register could not be loaded.");
+  const json = (await response.json()) as { files?: { id?: string; createdTime?: string; appProperties?: Record<string, string> }[] };
+  const records: LicenceRecord[] = (json.files ?? [])
+    .filter((file): file is { id: string; createdTime?: string; appProperties?: Record<string, string> } => Boolean(file.id))
+    .map((file): LicenceRecord => ({
+      id: file.id,
+      name: file.appProperties?.oroName || "",
+      company: file.appProperties?.oroCompany === "emporo" ? "emporo" : "emoro",
+      whiteCard: file.appProperties?.oroWhiteCard || "",
+      licence: file.appProperties?.oroLicence || "",
+      expiry: file.appProperties?.oroExpiry || "",
+      created: file.createdTime || "",
+    }))
+    .filter((record) => record.name.length > 0);
+  return latestLicences(records);
 }
