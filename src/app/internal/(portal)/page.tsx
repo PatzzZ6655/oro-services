@@ -2,25 +2,22 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/current";
 import { PortalFallback, PortalFrame } from "@/components/internal/portal-frame";
-import { stockDashboardHref } from "@/lib/content";
 import { reportCards } from "@/lib/reports/catalog";
 import { safetyCards } from "@/lib/reports/safety";
 import { formatAuDate } from "@/lib/reports/dates";
 import { driveConfigured, listRecentReports, type StoredReport } from "@/lib/reports/drive";
 
-export default function Page({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default function Page() {
   return (
     <Suspense fallback={<PortalFallback />}>
-      <Hub searchParams={searchParams} />
+      <Hub />
     </Suspense>
   );
 }
 
-async function Hub({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+async function Hub() {
   const user = await requireUser();
-  const params = await searchParams;
-  const tab = params.tab === "stock" ? "stock" : "reports";
-  const recent = tab === "reports" ? await recentReports() : null;
+  const recent = await recentReports();
 
   return (
     <PortalFrame email={user.email} name={user.name}>
@@ -30,49 +27,8 @@ async function Hub({ searchParams }: { searchParams: Promise<{ tab?: string }> }
           Jobs
         </Link>
       </div>
-      <nav className="mt-4 grid grid-cols-2 gap-2" aria-label="Portal">
-        <Tab href="/internal" current={tab === "reports"}>
-          Reports
-        </Tab>
-        <Tab href="/internal?tab=stock" current={tab === "stock"}>
-          Stock dashboard
-        </Tab>
-      </nav>
-      {tab === "stock" ? <StockPanel /> : <ReportsPanel recent={recent} />}
+      <ReportsPanel recent={recent} />
     </PortalFrame>
-  );
-}
-
-function Tab({ href, current, children }: { href: string; current: boolean; children: string }) {
-  return (
-    <Link
-      href={href}
-      aria-current={current ? "page" : undefined}
-      className={`flex min-h-12 items-center justify-center rounded-xl border px-3 text-sm font-semibold ${
-        current ? "border-brand-navy bg-white text-brand-navy" : "border-transparent bg-slate-200/70 text-slate-600"
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function StockPanel() {
-  return (
-    <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-semibold text-brand-navy">Stock dashboard</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        This opens tape.orosvc.com. That site has its own sign-in. Stock figures stay there.
-      </p>
-      <a
-        href={stockDashboardHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-4 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
-      >
-        Open stock dashboard
-      </a>
-    </section>
   );
 }
 

@@ -4,9 +4,9 @@ export const siteName = "ORO Services";
 
 export const corporateEmail = "info@orosvc.com";
 
-export const internalLoginHref = "/internal";
+export const staffPortalHref = "/internal";
 
-export const stockDashboardHref = "https://tape.orosvc.com";
+export const dashboardHref = "https://tape.orosvc.com";
 
 export const photoMaxBytes = 2 * 1024 * 1024;
 
@@ -160,6 +160,8 @@ export const navLinks = [
   { href: "/emoro", label: "Emoro Building" },
   { href: "/emporo", label: "Emporo Plumbing" },
   { href: "/contact", label: "Contact" },
+  { href: dashboardHref, label: "Dashboard" },
+  { href: staffPortalHref, label: "Staff Portal" },
 ] as const;
 
 export function absoluteUrl(path: string): string {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoImage } from "@/components/logo-image";
-import { internalLoginHref, oroLogo } from "@/lib/content";
+import { oroLogo } from "@/lib/content";
 
 export function SiteFooter() {
   return (
@@ -27,12 +27,6 @@ export function SiteFooter() {
               Contact
             </Link>
           </p>
-          <Link
-            href={internalLoginHref}
-            className="text-[11px] font-normal text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-          >
-            Internal Login
-          </Link>
         </div>
       </div>
     </footer>

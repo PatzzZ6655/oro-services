@@ -38,13 +38,13 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-8 text-sm font-medium tracking-wide text-slate-300 lg:flex">
           {navLinks.map((link) => (
-            <Link
+            <MenuLink
               key={link.href}
               href={link.href}
               className="rounded-sm transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
             >
               {link.label}
-            </Link>
+            </MenuLink>
           ))}
         </nav>
       </div>
@@ -57,7 +57,7 @@ export function SiteHeader() {
         </summary>
         <div id="mobile-menu" className="space-y-4 border-b border-slate-800 bg-brand-navy px-6 py-6">
           {navLinks.map((link, index) => (
-            <Link
+            <MenuLink
               key={link.href}
               href={link.href}
               className={`block py-2 font-medium text-slate-300 hover:text-white ${
@@ -65,11 +65,26 @@ export function SiteHeader() {
               }`}
             >
               {link.label}
-            </Link>
+            </MenuLink>
           ))}
         </div>
       </details>
       <script dangerouslySetInnerHTML={{ __html: closeMenuScript }} />
     </header>
+  );
+}
+
+function MenuLink({ href, className, children }: { href: string; className: string; children: string }) {
+  if (href.startsWith("https://")) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }
