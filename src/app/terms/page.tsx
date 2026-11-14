@@ -74,10 +74,9 @@ export default function TermsPage() {
   return (
     <SiteFrame>
       <article className="terms-page mx-auto max-w-3xl px-6 pb-20 pt-32 text-base leading-relaxed text-slate-800 md:pt-36 print:pb-0 print:pt-0 print:text-brand-navy">
-        <h1 className="text-4xl font-black tracking-tight text-brand-navy md:text-5xl">
-          Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)
-        </h1>
-        <p className="mt-4 text-sm text-slate-600 print:text-brand-navy">Last updated: 15 November 2026</p>
+        <h1 className="text-4xl font-black tracking-tight text-brand-navy md:text-5xl">Terms and Conditions</h1>
+        <p className="mt-4 text-sm text-slate-600 print:text-brand-navy">ORO Services · Emoro Building and Emporo Plumbing</p>
+        <p className="mt-1 text-sm text-slate-600 print:text-brand-navy">Last updated: 15 November 2026</p>
         <div className="mt-10 space-y-10">
           {sections.map((section) => (
             <section key={section.heading} className="space-y-4">

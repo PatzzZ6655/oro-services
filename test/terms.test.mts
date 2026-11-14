@@ -29,7 +29,10 @@ test("the terms page keeps the approved wording and stays public", () => {
   assert.match(page, /title: "Terms and Conditions"/);
   assert.match(page, /path: "\/terms"/);
   assert.match(page, /Last updated: 15 November 2026/);
-  assert.match(page, /Terms and Conditions \(ORO Services: Emoro Building and Emporo Plumbing\)/);
+  assert.match(page, />Terms and Conditions</);
+  assert.match(page, /ORO Services · Emoro Building and Emporo Plumbing/);
+  assert.ok(page.indexOf("ORO Services · Emoro Building and Emporo Plumbing") < page.indexOf("Last updated: 15 November 2026"));
+  assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
   assert.equal(/within \d+ hours/.test(page) && /respond/.test(page), false);
 
