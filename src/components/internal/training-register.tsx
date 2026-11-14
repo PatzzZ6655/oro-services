@@ -1,16 +1,18 @@
 "use client";
 
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
 import { submitLicence } from "@/app/internal/safety-actions";
-import { companies, type CompanyId } from "@/lib/reports/catalog";
+import { companies } from "@/lib/reports/catalog";
 import { licenceStatus, type LicenceRecord } from "@/lib/reports/safety";
 import { initialSubmitState } from "@/lib/reports/state";
 import { formatAuDate } from "@/lib/reports/dates";
 import { CompanyChoice, TextInput } from "@/components/internal/form-controls";
+import { useStored } from "@/components/internal/prefill";
 
 export function TrainingRegister({ records, today }: { records: LicenceRecord[] | null; today: string }) {
   const [state, action, pending] = useActionState(submitLicence, initialSubmitState);
-  const [company, setCompany] = useState<CompanyId | "">("");
+  const [storedCompany, setStoredCompany] = useStored("oro-company", "");
+  const company = storedCompany === "emoro" || storedCompany === "emporo" ? storedCompany : "";
   const errors = state.status === "invalid" ? state.errors : {};
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -50,7 +52,7 @@ export function TrainingRegister({ records, today }: { records: LicenceRecord[] 
       ) : null}
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <h2 className="text-base font-semibold text-brand-navy">Add a record</h2>
-        <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
+        <CompanyChoice company={company} onChange={setStoredCompany} error={errors.company} />
         <TextInput label="Worker" name="name" error={errors.name} autoComplete="name" />
         <TextInput label="White card" name="whiteCard" optional />
         <TextInput label="Licence" name="licence" error={errors.licence} />

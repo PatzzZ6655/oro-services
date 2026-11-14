@@ -31,6 +31,8 @@ test("a SWMS needs the work category, a step, and a signature", () => {
   data.set("jobNumber", "100");
   data.set("work", "Replace the roof sheet");
   data.set("emergency", "Call 000. First aid kit is in the ute.");
+  data.set("reviewer", "Pat Zee");
+  data.set("consulted", "yes");
   assert.equal(validateSafety("swms", data, now).ok, false);
   data.set("hrcw.fall", "yes");
   data.set("step.0.step", "Set up the ladder");
@@ -77,7 +79,11 @@ test("an incident keeps the WorkSafe note on the record", () => {
   data.set("preserved", "yes");
   const filed = validateSafety("incident", data, now);
   assert.equal(filed.ok, true);
-  if (filed.ok) assert.match(filed.value.note ?? "", /does not send that notice/);
+  if (filed.ok) {
+    assert.match(filed.value.note ?? "", /does not send that notice/);
+    assert.match(filed.value.note ?? "", /5 years/);
+    assert.doesNotMatch(filed.value.footer, /2007|WHS/);
+  }
 });
 
 test("licence dates are marked and the newest record for a worker is kept", () => {

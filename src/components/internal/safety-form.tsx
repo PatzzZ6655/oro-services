@@ -7,7 +7,8 @@ import { companies, type CompanyId, type FieldErrors } from "@/lib/reports/catal
 import { heightChecks, hrcwItems, plantChecks, safetyCard, swmsPresets, take5Checks, type SafetyKind } from "@/lib/reports/safety";
 import { initialSubmitState } from "@/lib/reports/state";
 import { validateSafety } from "@/lib/reports/safety";
-import { AreaInput, CompanyChoice, ResultList, SignaturePad, TextInput, YesNoGroup } from "@/components/internal/form-controls";
+import { AddMore, AreaInput, CompanyChoice, ResultList, SignaturePad, TextInput, YesNoGroup } from "@/components/internal/form-controls";
+import { useStored, type FormDefaults } from "@/components/internal/prefill";
 
 function BrandHeading({ company, title }: { company: CompanyId | ""; title: string }) {
   const profile = company ? companies[company] : null;
@@ -26,20 +27,42 @@ function BrandHeading({ company, title }: { company: CompanyId | ""; title: stri
   );
 }
 
-function SignOns({ prefix, errors, label }: { prefix: string; errors: FieldErrors; label: string }) {
+function SignOns({
+  prefix,
+  errors,
+  label,
+  defaults,
+  remember = false,
+  multiple = false,
+  named = true,
+}: {
+  prefix: string;
+  errors: FieldErrors;
+  label: string;
+  defaults: FormDefaults;
+  remember?: boolean;
+  multiple?: boolean;
+  named?: boolean;
+}) {
   const [count, setCount] = useState(1);
+  const [worker, setWorker] = useStored("oro-worker", defaults.name);
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium text-slate-800">{label}</p>
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="space-y-3 rounded-xl border border-slate-200 p-3">
-          <TextInput label="Name" name={`${prefix}.${index}.name`} error={errors[`${prefix}.${index}.name`]} autoComplete="name" />
-          <TextInput label="Date" name={`${prefix}.${index}.date`} type="date" error={errors[`${prefix}.${index}.date`]} />
+          {named && index === 0 && remember ? (
+            <TextInput label="Name" name={`${prefix}.0.name`} error={errors[`${prefix}.0.name`]} autoComplete="name" value={worker} onValue={setWorker} />
+          ) : null}
+          {named && !(index === 0 && remember) ? (
+            <TextInput label="Name" name={`${prefix}.${index}.name`} error={errors[`${prefix}.${index}.name`]} autoComplete="name" />
+          ) : null}
+          <TextInput label="Date" name={`${prefix}.${index}.date`} type="date" error={errors[`${prefix}.${index}.date`]} defaultValue={index === 0 ? defaults.date : undefined} />
           <SignaturePad name={`${prefix}.${index}.signature`} error={errors[`${prefix}.${index}.signature`]} />
         </div>
       ))}
       {errors[prefix] ? <p className="text-sm text-red-800">{errors[prefix]}</p> : null}
-      {count < 12 ? (
+      {multiple && count < 12 ? (
         <button type="button" className="min-h-12 text-sm font-semibold text-brand-navy" onClick={() => setCount((value) => value + 1)}>
           Add another person
         </button>
@@ -77,10 +100,19 @@ function Rows({
   );
 }
 
-export function SafetyForm({ kind }: { kind: SafetyKind }) {
+const commonRisk = new Set(["fall", "confined", "trench", "asbestos", "demolition", "electrical", "gas", "atmosphere", "plant", "water"]);
+
+function useCompany(): [CompanyId | "", (value: CompanyId) => void] {
+  const [company, setCompany] = useStored("oro-company", "");
+  const chosen = company === "emoro" || company === "emporo" ? company : "";
+  return [chosen, (value) => setCompany(value)];
+}
+
+export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: FormDefaults }) {
   const card = safetyCard(kind);
   const [state, action, pending] = useActionState(submitSafety, initialSubmitState);
-  const [company, setCompany] = useState<CompanyId | "">("");
+  const [company, setCompany] = useCompany();
+  const [address, setAddress] = useStored("oro-address", "");
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const [steps, setSteps] = useState([{ step: "", hazard: "", control: "" }]);
   const errors = { ...(state.status === "invalid" ? state.errors : {}), ...clientErrors };
@@ -103,8 +135,8 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
       <BrandHeading company={company} title={card.title} />
       <div className="space-y-4 px-4">
         <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
-        <TextInput label="Date" name="date" type="date" error={errors.date} />
-        <TextInput label="Site address" name="address" error={errors.address} autoComplete="street-address" />
+        <TextInput label="Date" name="date" type="date" error={errors.date} defaultValue={defaults.date} />
+        <TextInput label="Site address" name="address" error={errors.address} autoComplete="street-address" value={address} onValue={setAddress} />
         {kind === "swms" ? (
           <>
             <TextInput label="Job / invoice" name="jobNumber" error={errors.jobNumber} />
@@ -112,13 +144,21 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
             <fieldset>
               <legend className="text-sm font-medium text-slate-800">High risk construction work</legend>
               <div className="mt-2 space-y-2">
-                {hrcwItems.map((item) => (
+                {hrcwItems.filter((item) => commonRisk.has(item.id)).map((item) => (
                   <label key={item.id} className="flex items-start gap-3 text-sm text-slate-800">
                     <input type="checkbox" name={`hrcw.${item.id}`} value="yes" className="mt-1 size-5" />
                     {item.label}
                   </label>
                 ))}
               </div>
+              <AddMore label="Other high risk work">
+                {hrcwItems.filter((item) => !commonRisk.has(item.id)).map((item) => (
+                  <label key={item.id} className="flex items-start gap-3 text-sm text-slate-800">
+                    <input type="checkbox" name={`hrcw.${item.id}`} value="yes" className="mt-1 size-5" />
+                    {item.label}
+                  </label>
+                ))}
+              </AddMore>
               {errors.hrcw ? <p className="mt-1 text-sm text-red-800">{errors.hrcw}</p> : null}
             </fieldset>
             <div className="flex flex-wrap gap-2">
@@ -149,8 +189,13 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
               ) : null}
             </div>
             <AreaInput label="PPE and emergency plan" name="emergency" error={errors.emergency} />
-            <TextInput label="Review" name="review" optional />
-            <SignOns prefix="worker" errors={errors} label="Workers signed on" />
+            <TextInput label="Person responsible for monitoring and review" name="reviewer" error={errors.reviewer} />
+            <label className="flex items-start gap-3 text-sm text-slate-800">
+              <input type="checkbox" name="consulted" value="yes" className="mt-1 size-5" />
+              Prepared in consultation with the workers or HSR
+            </label>
+            {errors.consulted ? <p className="text-sm text-red-800">{errors.consulted}</p> : null}
+            <SignOns prefix="worker" errors={errors} label="Workers signed on" defaults={defaults} remember multiple />
           </>
         ) : null}
         {kind === "take-5" ? (
@@ -159,8 +204,10 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
             {take5Checks.map((item) => (
               <YesNoGroup key={item.id} legend={item.label} name={`take.${item.id}`} error={errors[`take.${item.id}`]} />
             ))}
-            <AreaInput label="Notes" name="notes" optional />
-            <SignOns prefix="worker" errors={errors} label="Signed" />
+            <AddMore label="Notes">
+              <AreaInput label="Notes" name="notes" optional />
+            </AddMore>
+            <SignOns prefix="worker" errors={errors} label="Signed" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "confined-space" ? (
@@ -172,7 +219,7 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
             <Rows name="air" errors={errors} columns={[{ key: "time", label: "Time" }, { key: "oxygen", label: "Oxygen %" }, { key: "lel", label: "LEL %" }, { key: "co", label: "CO" }, { key: "result", label: "Result" }]} />
             <Rows name="log" errors={errors} columns={[{ key: "name", label: "Name" }, { key: "in", label: "Time in" }, { key: "out", label: "Time out" }]} />
             <YesNoGroup legend="Permit closed" name="closed" error={errors.closed} />
-            <SignOns prefix="worker" errors={errors} label="Permit signed" />
+            <SignOns prefix="worker" errors={errors} label="Permit signed" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "hot-work" ? (
@@ -185,42 +232,44 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
               Extinguisher is at the work
             </label>
             {errors.extinguisher ? <p className="text-sm text-red-800">{errors.extinguisher}</p> : null}
-            <SignOns prefix="worker" errors={errors} label="Permit signed" />
+            <SignOns prefix="worker" errors={errors} label="Permit signed" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "heights" ? (
           <>
             <ResultList group="height" items={heightChecks} errors={errors} />
-            <SignOns prefix="worker" errors={errors} label="Checked by" />
+            <SignOns prefix="worker" errors={errors} label="Checked by" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "induction" ? (
           <>
             <TextInput label="Worker" name="worker" error={errors.worker} autoComplete="name" />
             <TextInput label="Construction induction card" name="whiteCard" error={errors.whiteCard} />
-            <TextInput label="Licence" name="licence" optional />
+            <AddMore label="Licence">
+              <TextInput label="Licence" name="licence" optional />
+            </AddMore>
             <TextInput label="Emergency contact" name="emergency" error={errors.emergency} />
             <label className="flex items-start gap-3 text-sm text-slate-800">
               <input type="checkbox" name="rules" value="yes" className="mt-1 size-5" />
               Site rules acknowledged
             </label>
             {errors.rules ? <p className="text-sm text-red-800">{errors.rules}</p> : null}
-            <SignOns prefix="workerSign" errors={errors} label="Signature" />
+            <SignOns prefix="workerSign" errors={errors} label="Signature" defaults={defaults} named={false} />
           </>
         ) : null}
         {kind === "toolbox" ? (
           <>
             <TextInput label="Topic" name="topic" error={errors.topic} />
             <AreaInput label="Notes" name="notes" error={errors.notes} />
-            <SignOns prefix="worker" errors={errors} label="Attendees" />
+            <SignOns prefix="worker" errors={errors} label="Attendees" defaults={defaults} multiple />
           </>
         ) : null}
         {kind === "incident" ? (
           <>
             <p className="rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-800">
-              A notifiable incident under the OHS Act 2004, section 38, must be reported to WorkSafe Victoria by the employer. Leave the site as it is until an inspector arrives, unless someone needs help or the site has to be made safe. This form does not send that notice.
+              A notifiable incident under the OHS Act 2004, section 38, must be reported to WorkSafe Victoria by the employer. Leave the site as it is until an inspector arrives, unless someone needs help or the site has to be made safe. This form does not send that notice. Keep this record for 5 years.
             </p>
-            <TextInput label="Time" name="time" type="time" error={errors.time} />
+            <TextInput label="Time" name="time" type="time" error={errors.time} defaultValue={defaults.time} />
             <fieldset>
               <legend className="text-sm font-medium text-slate-800">Type</legend>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -234,10 +283,12 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
               {errors.kindOf ? <p className="mt-1 text-sm text-red-800">{errors.kindOf}</p> : null}
             </fieldset>
             <AreaInput label="What happened" name="what" error={errors.what} />
-            <TextInput label="People involved" name="people" optional />
             <YesNoGroup legend="Site left as it was" name="preserved" error={errors.preserved} />
-            <AreaInput label="Actions taken" name="actions" optional />
-            <SignOns prefix="worker" errors={errors} label="Reported by" />
+            <AddMore label="People or actions">
+              <TextInput label="People involved" name="people" optional />
+              <AreaInput label="Actions taken" name="actions" optional />
+            </AddMore>
+            <SignOns prefix="worker" errors={errors} label="Reported by" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "hazard" ? (
@@ -256,16 +307,20 @@ export function SafetyForm({ kind }: { kind: SafetyKind }) {
               {errors.risk ? <p className="mt-1 text-sm text-red-800">{errors.risk}</p> : null}
             </fieldset>
             <AreaInput label="Action" name="action" error={errors.action} />
-            <TextInput label="Close-out date" name="close" type="date" optional error={errors.close} />
-            <SignOns prefix="worker" errors={errors} label="Reported by" />
+            <AddMore label="Close-out">
+              <TextInput label="Close-out date" name="close" type="date" optional error={errors.close} />
+            </AddMore>
+            <SignOns prefix="worker" errors={errors} label="Reported by" defaults={defaults} remember />
           </>
         ) : null}
         {kind === "plant-prestart" ? (
           <>
             <TextInput label="Equipment" name="equipment" error={errors.equipment} />
-            <TextInput label="ID / serial" name="asset" optional />
+            <AddMore label="ID or serial">
+              <TextInput label="ID / serial" name="asset" optional />
+            </AddMore>
             <ResultList group="plant" items={plantChecks} errors={errors} />
-            <SignOns prefix="worker" errors={errors} label="Checked by" />
+            <SignOns prefix="worker" errors={errors} label="Checked by" defaults={defaults} remember />
           </>
         ) : null}
         {state.status === "error" ? <p className="text-sm text-red-800">{state.message}</p> : null}

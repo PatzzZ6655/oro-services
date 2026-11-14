@@ -286,10 +286,12 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
     const jobNumber = oneLine(read(formData, "jobNumber"));
     const work = block(read(formData, "work"));
     const emergency = block(read(formData, "emergency"));
-    const review = oneLine(read(formData, "review"));
+    const reviewer = oneLine(read(formData, "reviewer"));
     requireText(errors, "jobNumber", jobNumber, 1, 40, "Enter the job number.");
     requireText(errors, "work", work, 3, 2000, "Describe the work.");
     requireText(errors, "emergency", emergency, 3, 1000, "Add the emergency plan.");
+    requireText(errors, "reviewer", reviewer, 2, 80, "Name the person responsible for monitoring and review.");
+    if (oneLine(read(formData, "consulted")) !== "yes") errors.consulted = "Confirm it was prepared in consultation.";
     const ticks = hrcwItems.map((item) => ({ id: item.id, label: item.label, on: oneLine(read(formData, `hrcw.${item.id}`)) === "yes" }));
     if (!ticks.some((item) => item.on)) errors.hrcw = "Tick the high risk construction work that applies.";
     const steps: StepRow[] = [];
@@ -313,7 +315,8 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
           { label: "Job / invoice", value: jobNumber },
           { label: "Work", value: work },
           { label: "Emergency", value: emergency },
-          { label: "Review", value: review || "Not recorded" },
+          { label: "Monitoring and review", value: reviewer },
+          { label: "Consultation", value: "Prepared with the workers or HSR" },
         ],
         ticks,
         steps,
@@ -335,7 +338,7 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
     const notes = block(read(formData, "notes"));
     const signs = readSigns(formData, errors, "worker", 1);
     if (Object.keys(errors).length || !company) return { ok: false, errors };
-    return { ok: true, value: { ...base, company, fields: [{ label: "Task", value: task }, { label: "Notes", value: notes || "None" }], checks: [{ title: "Pre-start", rows }], signs, signLabel: "Signed" } };
+    return { ok: true, value: { ...base, company, fields: [{ label: "Task", value: task }, ...(notes ? [{ label: "Notes", value: notes }] : [])], checks: [{ title: "Pre-start", rows }], signs, signLabel: "Signed" } };
   }
 
   if (kind === "confined-space") {
@@ -415,6 +418,7 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
 
   if (kind === "induction") {
     const worker = oneLine(read(formData, "worker"));
+    if (!oneLine(read(formData, "workerSign.0.name"))) formData.set("workerSign.0.name", worker);
     const whiteCard = oneLine(read(formData, "whiteCard"));
     const licence = oneLine(read(formData, "licence"));
     const emergency = oneLine(read(formData, "emergency"));
@@ -459,14 +463,14 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
         fields: [
           { label: "Time", value: time },
           { label: "Type", value: kindOf === "incident" ? "Incident" : "Near miss" },
-          { label: "People", value: people || "Not recorded" },
+          ...(people ? [{ label: "People", value: people }] : []),
           { label: "What happened", value: what },
           { label: "Site left as it was", value: preserved === "yes" ? "Yes" : "No" },
-          { label: "Actions", value: actions || "None recorded" },
+          ...(actions ? [{ label: "Actions", value: actions }] : []),
         ],
         signs,
         signLabel: "Reported by",
-        note: "If this is a notifiable incident under the OHS Act 2004, section 38, the employer must notify WorkSafe Victoria. The site of a notifiable incident must not be disturbed until an inspector arrives, unless it is necessary to protect a person's health or safety, or to help an injured person, or to make the site safe, or to prevent a further incident. This form does not send that notice.",
+        note: "If this is a notifiable incident under the OHS Act 2004, section 38, the employer must notify WorkSafe Victoria. The site of a notifiable incident must not be disturbed until an inspector arrives, unless it is necessary to protect a person's health or safety, or to help an injured person, or to make the site safe, or to prevent a further incident. This form does not send that notice. Keep this record for 5 years.",
       },
     };
   }

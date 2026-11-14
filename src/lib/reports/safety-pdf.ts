@@ -95,6 +95,7 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
     text(document.note, 9, regular, navy, 8);
   }
   for (const field of document.fields) {
+    if (!field.value || field.value === "Not recorded" || field.value === "None" || field.value === "Open") continue;
     text(field.label, 11, semibold, accent, 3);
     text(field.value, 10, regular, navy, 8);
   }
@@ -113,7 +114,14 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
   }
   for (const group of document.checks ?? []) {
     text(group.title, 11, semibold, accent, 4);
+    const quiet = group.rows.every((row) => (row.result === "pass" || row.result === "yes") && !row.comment);
+    if (quiet) {
+      text(group.rows.some((row) => row.result === "yes") ? "All yes." : "All pass.", 10, regular, navy, 4);
+      continue;
+    }
+    const rest = group.rows.filter((row) => (row.result === "pass" || row.result === "yes") && !row.comment);
     for (const [index, row] of group.rows.entries()) {
+      if ((row.result === "pass" || row.result === "yes") && !row.comment) continue;
       const mark = row.result === "pass" ? "Pass" : row.result === "fail" ? "Fail" : row.result === "yes" ? "Yes" : row.result === "no" ? "No" : "N/A";
       text(`${row.label}: ${mark}${row.comment ? ` — ${row.comment}` : ""}`, 10, regular, navy, 2);
       const shots = photos.filter((photo) => photo.itemKey === `${group.photoGroup}.${row.id}`);
@@ -138,6 +146,7 @@ export async function buildSafetyPdf(document: SafetyDocument, photos: ReportPho
         y -= tallest + 8;
       }
     }
+    if (rest.length > 0) text("Other items: pass.", 10, regular, navy, 2);
     y -= 4;
   }
   if (document.air) {
