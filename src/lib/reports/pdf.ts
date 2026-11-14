@@ -21,7 +21,7 @@ const margin = 40;
 const contentWidth = pageWidth - margin * 2;
 
 const navy = rgb(15 / 255, 23 / 255, 42 / 255);
-const orange = rgb(234 / 255, 88 / 255, 12 / 255);
+const orange = rgb(202 / 255, 53 / 255, 0);
 const blue = rgb(30 / 255, 64 / 255, 175 / 255);
 const slate = rgb(71 / 255, 85 / 255, 105 / 255);
 const ink = rgb(15 / 255, 23 / 255, 42 / 255);

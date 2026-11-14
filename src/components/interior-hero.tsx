@@ -36,7 +36,7 @@ export function InteriorHero({
           </nav>
         ) : null}
         {eyebrow ? (
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-200">{eyebrow}</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-orange-mist">{eyebrow}</p>
         ) : null}
         <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-5xl">{title}</h1>
         <div className="mt-5 max-w-2xl text-lg font-light leading-relaxed text-slate-200">{children}</div>
