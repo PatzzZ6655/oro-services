@@ -54,10 +54,7 @@ function BrandHeading({
           <p className="text-sm font-semibold text-slate-700">Choose the company</p>
         )}
         {profile ? (
-          <p className="mt-2 text-sm font-semibold text-brand-navy">
-            {profile.legalName}
-            <span className="mt-0.5 block text-xs font-normal text-slate-500">ABN {profile.abn}</span>
-          </p>
+          <p className="mt-2 text-sm font-semibold text-brand-navy">{profile.legalName}</p>
         ) : null}
       </div>
       <div className="px-4 pb-4">

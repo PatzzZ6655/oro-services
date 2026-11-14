@@ -37,7 +37,6 @@ export async function emailReport(options: {
       text: [
         card.title,
         company.legalName,
-        `ABN ${company.abn}`,
         formatAuDate(options.report.date),
         address,
         "",
@@ -66,7 +65,6 @@ export async function emailReport(options: {
           "A copy of the report is attached.",
           "",
           company.legalName,
-          `ABN ${company.abn}`,
         ].join("\n"),
         attachments: [attachment],
       });

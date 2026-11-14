@@ -446,6 +446,6 @@ test("safety reports use the company identity, not a typed business name", () =>
     assert.equal(reportMailIdentity(electrical.value).fromName, "Emoro Building");
     assert.equal(reportMailIdentity(electrical.value).replyTo, "info.emoro@orosvc.com");
   }
-  assert.equal(companies.emoro.abn, "36 695 596 019");
-  assert.equal(companies.emporo.abn, "63 695 532 944");
+  assert.equal(companies.emoro.legalName, "Emoro Building Pty Ltd");
+  assert.equal(companies.emporo.legalName, "Emporo Plumbing Pty Ltd");
 });

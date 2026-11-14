@@ -189,7 +189,7 @@ export async function buildReportPdf(options: {
   y = pageHeight - 108;
   page.drawText(title, { x: margin, y, size: 18, font: semibold, color: navy });
   y -= 16;
-  text(`${company.legalName}  ·  ABN ${company.abn}`, 9, regular, slate, 2);
+  text(company.legalName, 9, regular, slate, 2);
   if (meta.note) text(meta.note, 9, regular, slate, 8);
 
   for (const row of meta.rows) pair(row.label, row.value);
@@ -229,7 +229,7 @@ export async function buildReportPdf(options: {
 
   const pages = doc.getPages();
   pages.forEach((target, index) => {
-    target.drawText(`${company.name} · ABN ${company.abn}`, { x: margin, y: 28, size: 8, font: regular, color: slate });
+    target.drawText(company.name, { x: margin, y: 28, size: 8, font: regular, color: slate });
     const pager = `Page ${index + 1} of ${pages.length}`;
     target.drawText(pager, {
       x: pageWidth - margin - regular.widthOfTextAtSize(pager, 8),
