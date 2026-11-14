@@ -18,3 +18,29 @@
     scroll-behavior: auto !important;
   }
 }
+
+@media print {
+  body:has(.terms-page) header,
+  body:has(.terms-page) footer {
+    display: none;
+  }
+
+  body:has(.terms-page) {
+    background: #fff;
+    color: #0f172a;
+  }
+
+  .terms-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .terms-page h1,
+  .terms-page h2 {
+    break-after: avoid;
+  }
+
+  .terms-page section {
+    break-inside: avoid;
+  }
+}
