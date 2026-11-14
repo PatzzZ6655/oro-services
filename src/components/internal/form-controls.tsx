@@ -244,6 +244,17 @@ export function ItemPhotoField({ name, error, required = false }: { name: string
   const inputRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<{ id: string; url: string; file: File }[]>([]);
 
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const restore = () => {
+      const files = Array.from(input.files ?? []);
+      setPhotos(files.map((file) => ({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file })));
+    };
+    input.addEventListener("oro-files", restore);
+    return () => input.removeEventListener("oro-files", restore);
+  }, []);
+
   function writeFiles(next: { id: string; url: string; file: File }[]) {
     const transfer = new DataTransfer();
     for (const photo of next) transfer.items.add(photo.file);

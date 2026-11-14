@@ -33,6 +33,7 @@ test("a SWMS needs the work category, a step, and a signature", () => {
   data.set("emergency", "Call 000. First aid kit is in the ute.");
   data.set("reviewer", "Pat Zee");
   data.set("consulted", "yes");
+  data.set("reviewedToday", "yes");
   assert.equal(validateSafety("swms", data, now).ok, false);
   data.set("hrcw.fall", "yes");
   data.set("step.0.step", "Set up the ladder");

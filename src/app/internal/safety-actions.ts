@@ -10,6 +10,8 @@ import { isRealCalendarDate } from "@/lib/appointments";
 import { itemPhotoMax, type FieldErrors } from "@/lib/reports/catalog";
 import { validateSafety } from "@/lib/reports/safety";
 import type { SubmitState } from "@/lib/reports/state";
+import { answersFromForm } from "@/lib/jobs/queries";
+import { databaseConfigured, recordJobReport } from "@/lib/jobs/db";
 
 function read(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -41,7 +43,7 @@ async function readItemPhotos(formData: FormData): Promise<{ files: ReportPhoto[
 }
 
 export async function submitSafety(_previous: SubmitState, formData: FormData): Promise<SubmitState> {
-  await requireUser();
+  const user = await requireUser();
   const parsed = validateSafety(read(formData, "kind"), formData);
   const photos = await readItemPhotos(formData);
   if (!parsed.ok || photos.error) {
@@ -52,13 +54,30 @@ export async function submitSafety(_previous: SubmitState, formData: FormData): 
   }
   try {
     const pdf = await buildSafetyPdf(parsed.value, photos.files);
+    const jobId = read(formData, "jobId");
+    const jobNumber = read(formData, "jobNumber");
     const saved = await saveReportPackage({
       kind: parsed.value.kind,
       date: parsed.value.date,
       address: parsed.value.address,
+      jobNumber,
       pdf,
       photos: photos.files,
     });
+    if (jobId && databaseConfigured()) {
+      try {
+        await recordJobReport({
+          jobId,
+          formType: parsed.value.kind,
+          driveFileId: saved.fileId,
+          driveUrl: saved.url,
+          answers: JSON.stringify(answersFromForm(formData)),
+          submittedBy: user.email,
+        });
+      } catch {
+        console.error("job report record failed");
+      }
+    }
     const emailed = parsed.value.kind === "incident" ? false : await emailSafetyCopy({
       company: parsed.value.company,
       title: parsed.value.title,

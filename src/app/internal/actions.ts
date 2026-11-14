@@ -8,6 +8,8 @@ import { buildReportPdf, type ReportPhoto } from "@/lib/reports/pdf";
 import { type SubmitState } from "@/lib/reports/state";
 import { itemPhotoField, itemPhotoMax, type ReportValue } from "@/lib/reports/catalog";
 import { parseSignature, reportAddress, reportDate, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
+import { answersFromForm } from "@/lib/jobs/queries";
+import { databaseConfigured, recordJobReport } from "@/lib/jobs/db";
 
 function itemSlots(report: ReportValue): { key: string; index: number; label: string }[] {
   if (report.kind === "site-job-sheet") {
@@ -119,14 +121,32 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
       photos: photos.files,
       itemPhotos: itemPhotos.files,
       submittedBy: user.email,
+      jobNumber: readText(formData, "jobNumber"),
     });
+    const jobId = readText(formData, "jobId");
+    const jobNumber = readText(formData, "jobNumber");
     const saved = await saveReportPackage({
       kind: parsed.value.kind,
       date: reportDate(parsed.value),
       address: reportAddress(parsed.value),
+      jobNumber,
       pdf,
       photos: [...photos.files, ...itemPhotos.files],
     });
+    if (jobId && databaseConfigured()) {
+      try {
+        await recordJobReport({
+          jobId,
+          formType: parsed.value.kind,
+          driveFileId: saved.fileId,
+          driveUrl: saved.url,
+          answers: JSON.stringify(answersFromForm(formData)),
+          submittedBy: user.email,
+        });
+      } catch {
+        console.error("job report record failed");
+      }
+    }
     const mailed = await emailReport({
       report: parsed.value,
       pdf,

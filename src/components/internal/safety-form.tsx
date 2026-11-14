@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { LogoImage } from "@/components/logo-image";
 import { submitSafety } from "@/app/internal/safety-actions";
 import { companies, type CompanyId, type FieldErrors } from "@/lib/reports/catalog";
@@ -8,7 +8,10 @@ import { heightChecks, hrcwItems, plantChecks, safetyCard, swmsPresets, take5Che
 import { initialSubmitState } from "@/lib/reports/state";
 import { validateSafety } from "@/lib/reports/safety";
 import { AddMore, AreaInput, CompanyChoice, ResultList, SignaturePad, TextInput, YesNoGroup } from "@/components/internal/form-controls";
-import { useStored, type FormDefaults } from "@/components/internal/prefill";
+import { useStored, type FormDefaults, type JobPrefill } from "@/components/internal/prefill";
+import { copyLastAnswers } from "@/app/internal/job-actions";
+import { applyAnswers } from "@/components/internal/draft-store";
+import { useFormDraft } from "@/components/internal/use-draft";
 
 function BrandHeading({ company, title }: { company: CompanyId | ""; title: string }) {
   const profile = company ? companies[company] : null;
@@ -102,17 +105,32 @@ function Rows({
 
 const commonRisk = new Set(["fall", "confined", "trench", "asbestos", "demolition", "electrical", "gas", "atmosphere", "plant", "water"]);
 
-function useCompany(): [CompanyId | "", (value: CompanyId) => void] {
-  const [company, setCompany] = useStored("oro-company", "");
+function useCompany(initial?: CompanyId): [CompanyId | "", (value: CompanyId) => void] {
+  const [company, setCompany] = useStored("oro-company", initial ?? "", Boolean(initial));
   const chosen = company === "emoro" || company === "emporo" ? company : "";
   return [chosen, (value) => setCompany(value)];
 }
 
-export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: FormDefaults }) {
+export function SafetyForm({ kind, defaults, job = null }: { kind: SafetyKind; defaults: FormDefaults; job?: JobPrefill | null }) {
   const card = safetyCard(kind);
   const [state, action, pending] = useActionState(submitSafety, initialSubmitState);
-  const [company, setCompany] = useCompany();
-  const [address, setAddress] = useStored("oro-address", "");
+  const [offline, setOffline] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [company, setCompany] = useCompany(job?.company);
+  const [address, setAddress] = useStored("oro-address", job?.address ?? "", Boolean(job?.address));
+  useFormDraft(`${kind}:${job?.id || "loose"}`, formRef, state.status === "sent");
+  useEffect(() => {
+    const retry = () => {
+      if (!offline || !formRef.current) return;
+      setOffline(false);
+      const data = new FormData(formRef.current);
+      startTransition(() => {
+        void Promise.resolve(action(data)).catch(() => setOffline(true));
+      });
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [action, offline]);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const [steps, setSteps] = useState([{ step: "", hazard: "", control: "" }]);
   const errors = { ...(state.status === "invalid" ? state.errors : {}), ...clientErrors };
@@ -126,12 +144,26 @@ export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: For
       return;
     }
     setClientErrors({});
-    startTransition(() => action(data));
+    if (!navigator.onLine) {
+      setOffline(true);
+      return;
+    }
+    startTransition(() => {
+      void Promise.resolve(action(data)).catch(() => setOffline(true));
+    });
+  }
+
+  async function copyLast() {
+    if (!job || !formRef.current) return;
+    const answers = await copyLastAnswers(job.id, kind, address);
+    if (answers) applyAnswers(formRef.current, answers);
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 pb-10" noValidate>
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-6 pb-10" noValidate>
       <input type="hidden" name="kind" value={kind} />
+      {job ? <input type="hidden" name="jobId" value={job.id} /> : null}
+      {job && kind !== "swms" ? <input type="hidden" name="jobNumber" value={job.jobNumber} /> : null}
       <BrandHeading company={company} title={card.title} />
       <div className="space-y-4 px-4">
         <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
@@ -139,7 +171,7 @@ export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: For
         <TextInput label="Site address" name="address" error={errors.address} autoComplete="street-address" value={address} onValue={setAddress} />
         {kind === "swms" ? (
           <>
-            <TextInput label="Job / invoice" name="jobNumber" error={errors.jobNumber} />
+            <TextInput label="Job / invoice" name="jobNumber" error={errors.jobNumber} defaultValue={job?.jobNumber} />
             <AreaInput label="Work" name="work" error={errors.work} />
             <fieldset>
               <legend className="text-sm font-medium text-slate-800">High risk construction work</legend>
@@ -195,6 +227,11 @@ export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: For
               Prepared in consultation with the workers or HSR
             </label>
             {errors.consulted ? <p className="text-sm text-red-800">{errors.consulted}</p> : null}
+            <label className="flex items-start gap-3 text-sm text-slate-800">
+              <input type="checkbox" name="reviewedToday" value="yes" className="mt-1 size-5" />
+              Reviewed for this site today
+            </label>
+            {errors.reviewedToday ? <p className="text-sm text-red-800">{errors.reviewedToday}</p> : null}
             <SignOns prefix="worker" errors={errors} label="Workers signed on" defaults={defaults} remember multiple />
           </>
         ) : null}
@@ -322,6 +359,12 @@ export function SafetyForm({ kind, defaults }: { kind: SafetyKind; defaults: For
             <ResultList group="plant" items={plantChecks} errors={errors} />
             <SignOns prefix="worker" errors={errors} label="Checked by" defaults={defaults} remember />
           </>
+        ) : null}
+        {offline ? <p className="text-sm text-slate-700">Saved on this phone. It will file when the connection is back.</p> : null}
+        {job ? (
+          <button type="button" className="min-h-11 text-sm font-semibold text-brand-navy" onClick={() => void copyLast()}>
+            Copy last
+          </button>
         ) : null}
         {state.status === "error" ? <p className="text-sm text-red-800">{state.message}</p> : null}
         {state.status === "sent" ? (

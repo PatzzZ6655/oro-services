@@ -292,6 +292,7 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
     requireText(errors, "emergency", emergency, 3, 1000, "Add the emergency plan.");
     requireText(errors, "reviewer", reviewer, 2, 80, "Name the person responsible for monitoring and review.");
     if (oneLine(read(formData, "consulted")) !== "yes") errors.consulted = "Confirm it was prepared in consultation.";
+    if (oneLine(read(formData, "reviewedToday")) !== "yes") errors.reviewedToday = "Confirm this SWMS was reviewed for this site today.";
     const ticks = hrcwItems.map((item) => ({ id: item.id, label: item.label, on: oneLine(read(formData, `hrcw.${item.id}`)) === "yes" }));
     if (!ticks.some((item) => item.on)) errors.hrcw = "Tick the high risk construction work that applies.";
     const steps: StepRow[] = [];
@@ -317,6 +318,7 @@ export function validateSafety(kind: string, formData: FormData, now = new Date(
           { label: "Emergency", value: emergency },
           { label: "Monitoring and review", value: reviewer },
           { label: "Consultation", value: "Prepared with the workers or HSR" },
+          { label: "Reviewed for this site today", value: "Yes" },
         ],
         ticks,
         steps,

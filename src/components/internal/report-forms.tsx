@@ -28,11 +28,11 @@ import {
   TextInput,
   YesNoGroup,
 } from "@/components/internal/form-controls";
-import { useStored, type FormDefaults } from "@/components/internal/prefill";
+import { useStored, type FormDefaults, type JobPrefill } from "@/components/internal/prefill";
 import { ReportForm } from "@/components/internal/report-form";
 
-function useCompany(): [CompanyId | "", (value: CompanyId) => void] {
-  const [company, setCompany] = useStored("oro-company", "");
+function useCompany(initial?: CompanyId): [CompanyId | "", (value: CompanyId) => void] {
+  const [company, setCompany] = useStored("oro-company", initial ?? "", Boolean(initial));
   const chosen = company === "emoro" || company === "emporo" ? company : "";
   return [chosen, (value) => setCompany(value)];
 }
@@ -98,20 +98,20 @@ function ExtraResults({
   );
 }
 
-export function SiteJobSheetForm({ defaults }: { defaults: FormDefaults }) {
-  const [company, setCompany] = useCompany();
+export function SiteJobSheetForm({ defaults, job = null }: { defaults: FormDefaults; job?: JobPrefill | null }) {
+  const [company, setCompany] = useCompany(job?.company);
   const [worker, setWorker] = useStored("oro-worker", defaults.name);
-  const [address, setAddress] = useStored("oro-address", "");
+  const [address, setAddress] = useStored("oro-address", job?.address ?? "", Boolean(job?.address));
   return (
     <div className="space-y-5">
-      <ReportForm kind="site-job-sheet">
+      <ReportForm kind="site-job-sheet" jobId={job?.id ?? ""} jobNumber={job?.jobNumber ?? ""} hasJobField>
         {(errors) => (
           <>
             <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
             <BrandHeading company={company} title="Site job sheet" detail="Hours, work, and the site checks." />
             <TextInput label="Worker name" name="workerName" error={errors.workerName} autoComplete="name" maxLength={80} value={worker} onValue={setWorker} />
             <TextInput label="Date" name="date" type="date" error={errors.date} defaultValue={defaults.date} />
-            <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} />
+            <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} defaultValue={job?.jobNumber} />
             <TextInput label="Site address" name="address" error={errors.address} maxLength={200} value={address} onValue={setAddress} />
             <TextInput label="Start time" name="startTime" type="time" error={errors.startTime} defaultValue={defaults.time} />
             <TextInput label="Finish time" name="finishTime" type="time" error={errors.finishTime} />
@@ -163,18 +163,18 @@ function VbaFields({ errors }: { errors: FieldErrors }) {
   );
 }
 
-export function JobSignOffForm({ defaults }: { defaults: FormDefaults }) {
-  const [company, setCompany] = useCompany();
-  const [address, setAddress] = useStored("oro-address", "");
+export function JobSignOffForm({ defaults, job = null }: { defaults: FormDefaults; job?: JobPrefill | null }) {
+  const [company, setCompany] = useCompany(job?.company);
+  const [address, setAddress] = useStored("oro-address", job?.address ?? "", Boolean(job?.address));
   return (
     <div className="space-y-5">
-      <ReportForm kind="job-sign-off">
+      <ReportForm kind="job-sign-off" jobId={job?.id ?? ""} jobNumber={job?.jobNumber ?? ""} hasJobField>
         {(errors) => (
           <>
             <CompanyChoice company={company} onChange={setCompany} error={errors.company} />
             <BrandHeading company={company} title="Job completion sign-off" detail="The client confirms the finished work." />
-            <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} />
-            <TextInput label="Client name" name="clientName" error={errors.clientName} autoComplete="name" maxLength={80} />
+            <TextInput label="Job / invoice no." name="jobNumber" error={errors.jobNumber} maxLength={40} defaultValue={job?.jobNumber} />
+            <TextInput label="Client name" name="clientName" error={errors.clientName} autoComplete="name" maxLength={80} defaultValue={job?.clientName} />
             <TextInput label="Site address" name="address" error={errors.address} maxLength={200} value={address} onValue={setAddress} />
             <TextInput label="Completion date" name="date" type="date" error={errors.date} defaultValue={defaults.date} />
             <AreaInput label="Work completed" name="work" error={errors.work} maxLength={2000} />
@@ -218,13 +218,13 @@ function LicenceType({ error }: { error?: string }) {
   );
 }
 
-export function GasSafetyForm({ defaults }: { defaults: FormDefaults }) {
+export function GasSafetyForm({ defaults, job = null }: { defaults: FormDefaults; job?: JobPrefill | null }) {
   const [worker, setWorker] = useStored("oro-worker", defaults.name);
   const [licence, setLicence] = useStored("oro-licence", "");
-  const [address, setAddress] = useStored("oro-address", "");
+  const [address, setAddress] = useStored("oro-address", job?.address ?? "", Boolean(job?.address));
   return (
     <div className="space-y-5">
-      <ReportForm kind="gas-safety">
+      <ReportForm kind="gas-safety" jobId={job?.id ?? ""} jobNumber={job?.jobNumber ?? ""}>
         {(errors) => (
           <>
             <BrandHeading company="emporo" title="Gas safety check" detail="Victorian rental check. Next due is two years from the check date." />
@@ -258,17 +258,17 @@ const visualCore = ["consumers-mains", "switchboards", "earth-electrode", "water
 const polarityCore = ["consumers-mains", "circuit-protection", "rcds", "socket-outlets", "light-fittings"];
 const earthCore = ["mains-earth", "switchboard", "water-bond", "socket-outlets", "light-fittings"];
 
-export function ElectricalSafetyForm({ defaults }: { defaults: FormDefaults }) {
+export function ElectricalSafetyForm({ defaults, job = null }: { defaults: FormDefaults; job?: JobPrefill | null }) {
   const [worker, setWorker] = useStored("oro-worker", defaults.name);
   const [licence, setLicence] = useStored("oro-licence", "");
-  const [address, setAddress] = useStored("oro-address", "");
+  const [address, setAddress] = useStored("oro-address", job?.address ?? "", Boolean(job?.address));
   const extent = splitItems(electricalExtent, extentCore);
   const visual = splitItems(electricalVisual, visualCore);
   const polarity = splitItems(electricalPolarity, polarityCore);
   const earth = splitItems(electricalEarth, earthCore);
   return (
     <div className="space-y-5">
-      <ReportForm kind="electrical-safety">
+      <ReportForm kind="electrical-safety" jobId={job?.id ?? ""} jobNumber={job?.jobNumber ?? ""}>
         {(errors) => (
           <>
             <BrandHeading company="emoro" title="Electrical safety check" detail="AS/NZS 3019:2022 section 4. Next check in two years. Smoke alarms in 12 months." />

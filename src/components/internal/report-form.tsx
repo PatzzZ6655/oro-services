@@ -3,6 +3,9 @@
 import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { submitReport } from "@/app/internal/actions";
+import { copyLastAnswers } from "@/app/internal/job-actions";
+import { applyAnswers } from "@/components/internal/draft-store";
+import { useFormDraft } from "@/components/internal/use-draft";
 import { reportPhotoMax, reportPhotoTotalBytes, type FieldErrors, type ReportKind } from "@/lib/reports/catalog";
 import { initialSubmitState } from "@/lib/reports/state";
 import { parseSignature, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
@@ -31,13 +34,41 @@ async function compressPhoto(file: File): Promise<File> {
   return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
 }
 
-export function ReportForm({ kind, children }: { kind: ReportKind; children: (errors: FieldErrors) => ReactNode }) {
+export function ReportForm({
+  kind,
+  jobId = "",
+  jobNumber = "",
+  hasJobField = false,
+  children,
+}: {
+  kind: ReportKind;
+  jobId?: string;
+  jobNumber?: string;
+  hasJobField?: boolean;
+  children: (errors: FieldErrors) => ReactNode;
+}) {
   const [state, action, pending] = useActionState(submitReport, initialSubmitState);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
+  const [offline, setOffline] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLElement>(null);
   const errors = { ...(state.status === "invalid" ? state.errors : {}), ...clientErrors };
   const errorCount = Object.keys(errors).length;
+  const draftKey = `${kind}:${jobId || "loose"}`;
+  useFormDraft(draftKey, formRef, state.status === "sent");
+
+  useEffect(() => {
+    const retry = () => {
+      if (!offline || !formRef.current) return;
+      setOffline(false);
+      const data = new FormData(formRef.current);
+      startTransition(() => {
+        void Promise.resolve(action(data)).catch(() => setOffline(true));
+      });
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [action, offline]);
 
   useEffect(() => {
     if (state.status === "idle" && errorCount === 0) return;
@@ -82,9 +113,19 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
       return;
     }
     setClientErrors({});
+    if (!navigator.onLine) {
+      setOffline(true);
+      return;
+    }
     startTransition(() => {
-      action(data);
+      void Promise.resolve(action(data)).catch(() => setOffline(true));
     });
+  }
+
+  async function copyLast() {
+    if (!jobId || !formRef.current) return;
+    const answers = await copyLastAnswers(jobId, kind, String(new FormData(formRef.current).get("address") ?? ""));
+    if (answers) applyAnswers(formRef.current, answers);
   }
 
   if (state.status === "sent") {
@@ -118,6 +159,14 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
   return (
     <form ref={formRef} onSubmit={onSubmit} className="space-y-5" noValidate>
       <input type="hidden" name="kind" value={kind} />
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
+      {jobNumber && !hasJobField ? <input type="hidden" name="jobNumber" value={jobNumber} /> : null}
+      {offline ? <p className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">Saved on this phone. It will file when the connection is back.</p> : null}
+      {jobId ? (
+        <button type="button" className="min-h-11 text-sm font-semibold text-brand-navy" onClick={() => void copyLast()}>
+          Copy last
+        </button>
+      ) : null}
       {state.status === "error" ? (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {state.message}
