@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   manifest: "/internal/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "ORO",
+    title: "ORO Staff",
     statusBarStyle: "default",
     startupImage: [
       {

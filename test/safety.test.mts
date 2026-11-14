@@ -129,4 +129,20 @@ test("the staff manifest stays inside the portal", () => {
   assert.equal(manifest.start_url, "/internal");
   assert.equal(manifest.scope, "/internal");
   assert.equal(manifest.display, "standalone");
+  for (const [file, size] of [
+    ["../public/internal/icons/icon-192.png", 192],
+    ["../public/internal/icons/icon-512.png", 512],
+    ["../public/internal/icons/apple-touch-icon.png", 180],
+  ] as const) {
+    const png = readFileSync(new URL(file, import.meta.url));
+    assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(png.readUInt32BE(16), size);
+    assert.equal(png.readUInt32BE(20), size);
+    assert.equal(png[25], 2);
+    assert.equal(png.includes(Buffer.from("tRNS")), false);
+  }
+  const layout = readFileSync(new URL("../src/app/internal/layout.tsx", import.meta.url), "utf8");
+  assert.match(layout, /title: "ORO Staff"/);
+  assert.match(layout, /apple-touch-icon\.png/);
+  assert.equal(layout.includes('title: "ORO"'), false);
 });
