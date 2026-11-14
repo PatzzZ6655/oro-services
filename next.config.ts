@@ -52,6 +52,9 @@ function contentSecurityPolicy(): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // The staff portal is installable from /internal without a service worker.
+    // worker-src stays 'none' so a worker cannot be registered. The manifest is
+    // same-origin, so default-src 'self' already allows it. manifest-src is not set.
     "worker-src 'none'",
   ];
 

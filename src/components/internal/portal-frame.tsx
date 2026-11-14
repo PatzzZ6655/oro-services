@@ -24,7 +24,7 @@ export function PortalFrame({
 }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="bg-brand-navy text-white">
+      <header className={showLogo ? "bg-brand-navy text-white" : "border-b border-slate-200 bg-white text-brand-navy"}>
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           {showLogo ? (
             <Link href="/internal" className="inline-flex rounded-md bg-white px-2 py-1">
@@ -38,13 +38,13 @@ export function PortalFrame({
               />
             </Link>
           ) : (
-            <Link href="/internal" className="text-sm font-semibold text-white">
+            <Link href="/internal" className="text-sm font-semibold text-brand-navy">
               All reports
             </Link>
           )}
           <div className="min-w-0 text-right">
             <p className="text-sm font-semibold">Staff portal</p>
-            <p className="truncate text-xs text-slate-300">{name || email}</p>
+            <p className={`truncate text-xs ${showLogo ? "text-slate-300" : "text-slate-500"}`}>{name || email}</p>
           </div>
         </div>
       </header>

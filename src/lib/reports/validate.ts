@@ -7,6 +7,8 @@ import {
   electricalVisual,
   gasChecks,
   isReportKind,
+  itemPhotoField,
+  itemPhotoMax,
   jobSafety,
   maxRepeatRows,
   reportPhotoBytes,
@@ -117,9 +119,12 @@ function readChecks(
     }
     if (result === "fail" && comment.length < 3) errors[`${key}.comment`] = "Add a comment for this fail.";
     if (comment.length > 500) errors[`${key}.comment`] = "Use 500 characters or fewer.";
+    const photos = fileCount(formData, itemPhotoField(key));
+    if (photos > itemPhotoMax) errors[`${key}.photos`] = "Use up to 4 photos.";
+    if (result === "fail" && photos === 0) errors[`${key}.photos`] = "Add a photo for this fail.";
     if (reading.length > 24) errors[`${key}.reading`] = "Use a shorter reading.";
     else if (reading && !readingPattern.test(reading)) errors[`${key}.reading`] = "Use a short reading, such as 0.2 ohm.";
-    if (!errors[key] && !errors[`${key}.comment`] && !errors[`${key}.reading`]) {
+    if (!errors[key] && !errors[`${key}.comment`] && !errors[`${key}.reading`] && !errors[`${key}.photos`]) {
       answers.push({
         id: item.id,
         label: item.label,
@@ -524,6 +529,21 @@ export function parseSignature(value: string): { ok: true; bytes: Uint8Array } |
   }
   if (!looksLikeImage(bytes, "image/png") || bytes.length < 40) return { ok: false, error: "Add a signature." };
   return { ok: true, bytes };
+}
+
+function fileCount(formData: FormData, key: string): number {
+  return formData.getAll(key).filter((item) => item instanceof File && item.size > 0).length;
+}
+
+export function validatePhotoBudget(files: { size: number; type: string }[]): string | null {
+  let total = 0;
+  for (const file of files) {
+    total += file.size;
+    if (file.size > reportPhotoBytes) return "Each photo must be 1 MB or smaller.";
+    if (file.type !== "image/jpeg" && file.type !== "image/png") return "Use a JPEG or PNG photo.";
+  }
+  if (total > reportPhotoTotalBytes) return "Photos are too large together. Use fewer photos.";
+  return null;
 }
 
 export function validatePhotoFiles(files: { size: number; type: string }[]): string | null {

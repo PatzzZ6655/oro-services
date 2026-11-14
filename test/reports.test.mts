@@ -27,6 +27,10 @@ import { driveFolderQuery, submissionFolderName } from "@/lib/reports/paths";
 import { parseSignature, validateReport } from "@/lib/reports/validate";
 
 const now = new Date("2026-11-14T03:00:00.000Z");
+
+function failPhoto(data: FormData, key: string) {
+  data.append(key, new File([Uint8Array.of(0xff, 0xd8, 0xff)], "fail.jpg", { type: "image/jpeg" }));
+}
 const tinyPng =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -196,13 +200,17 @@ test("gas checks require a comment only on fail, and the next check is two years
   const bareFail = gasForm({ "check.leakage": "fail", overall: "non-compliant" });
   const failed = validateReport("gas-safety", bareFail, now);
   assert.equal(failed.ok, false);
-  if (!failed.ok) assert.equal(failed.errors["check.leakage.comment"], "Add a comment for this fail.");
+  if (!failed.ok) {
+    assert.equal(failed.errors["check.leakage.comment"], "Add a comment for this fail.");
+    assert.equal(failed.errors["check.leakage.photos"], "Add a photo for this fail.");
+  }
 
   const explained = gasForm({
     "check.leakage": "fail",
     "check.leakage.comment": "Drop at the cooker bayonet.",
     overall: "non-compliant",
   });
+  failPhoto(explained, "itemPhoto.check.leakage");
   assert.equal(validateReport("gas-safety", explained, now).ok, true);
 
   const stillCompliant = gasForm({
@@ -210,6 +218,7 @@ test("gas checks require a comment only on fail, and the next check is two years
     "check.leakage.comment": "Drop at the cooker bayonet.",
     overall: "compliant",
   });
+  failPhoto(stillCompliant, "itemPhoto.check.leakage");
   const compliant = validateReport("gas-safety", stillCompliant, now);
   assert.equal(compliant.ok, false);
   if (!compliant.ok) assert.match(compliant.errors.overall, /non-compliant/);
@@ -278,7 +287,10 @@ test("electrical fail comments, RCD rows, smoke alarms, and due dates", () => {
   const visualFail = electricalForm({ "visual.switchboards": "fail", overall: "non-compliant" });
   const missingComment = validateReport("electrical-safety", visualFail, now);
   assert.equal(missingComment.ok, false);
-  if (!missingComment.ok) assert.equal(missingComment.errors["visual.switchboards.comment"], "Add a comment for this fail.");
+  if (!missingComment.ok) {
+    assert.equal(missingComment.errors["visual.switchboards.comment"], "Add a comment for this fail.");
+    assert.equal(missingComment.errors["visual.switchboards.photos"], "Add a photo for this fail.");
+  }
 
   const noRcd = electricalForm();
   noRcd.delete("rcd.0.circuit");

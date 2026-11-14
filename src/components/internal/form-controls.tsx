@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { FieldErrors, NamedItem } from "@/lib/reports/catalog";
+import { itemPhotoField, itemPhotoMax, type FieldErrors, type NamedItem } from "@/lib/reports/catalog";
 import { addYears, formatAuDate } from "@/lib/reports/dates";
 
 export const fieldClass =
   "mt-1 w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
 
 const choiceClass =
-  "flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-2 text-center text-sm font-semibold text-slate-800 has-[:checked]:border-brand-navy has-[:checked]:bg-brand-navy has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-navy";
+  "flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-2 text-center text-sm font-semibold text-slate-700 has-[:checked]:border-brand-navy has-[:checked]:bg-slate-50 has-[:checked]:text-brand-navy has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-navy";
 
 export function Field({
   label,
@@ -187,11 +187,111 @@ export function ResultList({
               </label>
             ) : null}
             {errors[`${name}.comment`] ? <p className="mt-1 text-sm text-red-800">{errors[`${name}.comment`]}</p> : null}
+            <ItemPhotoField name={itemPhotoField(name)} error={errors[`${name}.photos`]} required={Boolean(fails[item.id])} />
           </fieldset>
         );
       })}
     </div>
   );
+}
+
+export function ItemPhotoField({ name, error, required = false }: { name: string; error?: string; required?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [photos, setPhotos] = useState<{ id: string; url: string; file: File }[]>([]);
+
+  function writeFiles(next: { id: string; url: string; file: File }[]) {
+    const transfer = new DataTransfer();
+    for (const photo of next) transfer.items.add(photo.file);
+    if (inputRef.current) inputRef.current.files = transfer.files;
+  }
+
+  async function addPhotos(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const next = [...photos];
+    for (const file of Array.from(list)) {
+      if (next.length >= itemPhotoMax) break;
+      try {
+        const compressed = await compressItemPhoto(file);
+        next.push({ id: crypto.randomUUID(), url: URL.createObjectURL(compressed), file: compressed });
+      } catch {
+        // Skip a file the browser cannot decode. The field error covers a failed item.
+      }
+    }
+    setPhotos(next);
+    writeFiles(next);
+  }
+
+  function removePhoto(id: string) {
+    const next = photos.filter((photo) => photo.id !== id);
+    const removed = photos.find((photo) => photo.id === id);
+    if (removed) URL.revokeObjectURL(removed.url);
+    setPhotos(next);
+    writeFiles(next);
+  }
+
+  return (
+    <div className="mt-2">
+      <input
+        ref={inputRef}
+        className="sr-only"
+        type="file"
+        name={name}
+        accept="image/*"
+        multiple
+        onChange={(event) => {
+          void addPhotos(event.target.files);
+          event.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+        onClick={() => inputRef.current?.click()}
+      >
+        Add photo
+      </button>
+      {required ? <p className="mt-1 text-xs text-slate-500">Add a photo for this fail.</p> : null}
+      {photos.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {photos.map((photo) => (
+            <li key={photo.id} className="relative">
+              {/* Blob previews are created in the browser, so next/image cannot optimise them. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo.url} alt="" className="h-14 w-14 rounded-lg object-cover" />
+              <button
+                type="button"
+                className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm text-slate-700 shadow"
+                aria-label="Remove photo"
+                onClick={() => removePhoto(photo.id)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {error ? <p className="mt-1 text-sm text-red-800">{error}</p> : null}
+    </div>
+  );
+}
+
+async function compressItemPhoto(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  const maxEdge = 1024;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("photo");
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.62));
+  if (!blob) throw new Error("photo");
+  const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 40) || "photo";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
 }
 
 export function YesNoGroup({ legend, name, error }: { legend: string; name: string; error?: string }) {
@@ -218,7 +318,7 @@ export function CheckDate({ smoke = false }: { smoke?: boolean }) {
   );
 }
 
-export function SignaturePad({ error }: { error?: string }) {
+export function SignaturePad({ error, name = "signature" }: { error?: string; name?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
@@ -298,7 +398,7 @@ export function SignaturePad({ error }: { error?: string }) {
       <button type="button" onClick={clear} className="mt-2 min-h-11 text-sm font-semibold text-slate-700 underline">
         Clear signature
       </button>
-      <input ref={inputRef} type="hidden" name="signature" />
+      <input ref={inputRef} type="hidden" name={name} />
       {error ? <p className="mt-1 text-sm text-red-800">{error}</p> : null}
     </div>
   );
@@ -323,7 +423,14 @@ export function CompanyChoice({
             ["emporo", "Emporo Plumbing"],
           ] as const
         ).map(([value, label]) => (
-          <label key={value} className={choiceClass}>
+          <label
+            key={value}
+            className={`flex min-h-12 cursor-pointer items-center justify-center rounded-xl border bg-white px-2 text-center text-sm font-semibold text-slate-700 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${
+              value === "emoro"
+                ? "border-slate-300 has-[:checked]:border-brand-orange has-[:checked]:text-brand-orange has-[:focus-visible]:outline-brand-orange"
+                : "border-slate-300 has-[:checked]:border-brand-blue has-[:checked]:text-brand-blue has-[:focus-visible]:outline-brand-blue"
+            }`}
+          >
             <input
               className="sr-only"
               type="radio"

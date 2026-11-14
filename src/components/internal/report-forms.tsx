@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LogoImage } from "@/components/logo-image";
 import {
   companies,
+  itemPhotoField,
   electricalEarth,
   electricalExtent,
   electricalPolarity,
@@ -19,6 +20,7 @@ import {
   CheckDate,
   ChoiceGroup,
   CompanyChoice,
+  ItemPhotoField,
   ResultList,
   SignaturePad,
   TextInput,
@@ -36,11 +38,10 @@ function BrandHeading({
   detail: string;
 }) {
   const profile = company ? companies[company] : null;
-  const bar = profile?.accent === "orange" ? "bg-brand-orange" : profile ? "bg-brand-blue" : "bg-slate-300";
+  const rule = profile?.accent === "orange" ? "bg-brand-orange" : profile ? "bg-brand-blue" : "bg-slate-200";
   return (
-    <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <div className={`h-2 ${bar}`} />
-      <div className="px-4 pt-3">
+    <header className="rounded-2xl border border-slate-200 bg-white">
+      <div className="px-4 pt-4">
         {profile ? (
           <LogoImage
             src={profile.logo}
@@ -57,7 +58,8 @@ function BrandHeading({
           <p className="mt-2 text-sm font-semibold text-brand-navy">{profile.legalName}</p>
         ) : null}
       </div>
-      <div className="px-4 pb-4">
+      <div className={`mx-4 mt-3 h-0.5 ${rule}`} />
+      <div className="px-4 pb-4 pt-3">
         <h1 className="text-2xl font-semibold text-brand-navy">{title}</h1>
         <p className="mt-1 text-sm text-slate-600">{detail}</p>
       </div>
@@ -87,7 +89,10 @@ export function SiteJobSheetForm() {
                 {(Object.keys(jobSafety) as ("emoro" | "emporo")[]).map((id) => (
                   <fieldset key={id} hidden={company !== id} disabled={company !== id} className="space-y-4">
                     {jobSafety[id].map((item) => (
-                      <YesNoGroup key={item.id} legend={item.label} name={`safety.${id}.${item.id}`} error={errors[`safety.${id}.${item.id}`]} />
+                      <div key={item.id} className="space-y-2">
+                        <YesNoGroup legend={item.label} name={`safety.${id}.${item.id}`} error={errors[`safety.${id}.${item.id}`]} />
+                        <ItemPhotoField name={itemPhotoField(`safety.${id}.${item.id}`)} />
+                      </div>
                     ))}
                   </fieldset>
                 ))}
@@ -279,7 +284,7 @@ function UrgentBlock({
           ).map(([value, label]) => (
             <label
               key={value}
-              className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 has-[:checked]:border-brand-navy has-[:checked]:bg-brand-navy has-[:checked]:text-white"
+              className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700 has-[:checked]:border-brand-navy has-[:checked]:bg-slate-50 has-[:checked]:text-brand-navy"
             >
               <input className="sr-only" type="radio" name="urgent" value={value} onChange={() => setAnswer(value)} />
               {label}

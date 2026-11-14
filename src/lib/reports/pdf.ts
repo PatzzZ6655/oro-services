@@ -32,6 +32,8 @@ export type ReportPhoto = {
   name: string;
   bytes: Uint8Array;
   mime: "image/jpeg" | "image/png";
+  itemKey?: string;
+  caption?: string;
 };
 
 function readAsset(file: "regular" | "semibold" | CompanyId): Uint8Array {
@@ -83,6 +85,7 @@ export async function buildReportPdf(options: {
   report: ReportValue;
   signature: Uint8Array;
   photos: ReportPhoto[];
+  itemPhotos?: ReportPhoto[];
   submittedBy: string;
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -105,20 +108,34 @@ export async function buildReportPdf(options: {
   let page = doc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - 92;
 
-  const paintHeader = (target: PDFPage, compact: boolean) => {
-    const bar = compact ? 36 : 78;
-    target.drawRectangle({ x: 0, y: pageHeight - bar, width: pageWidth, height: bar, color: accentColor });
+  const paintHeader = (target: PDFPage, compact: boolean): number => {
     if (compact) {
-      target.drawText(company.name, { x: margin, y: pageHeight - 24, size: 11, font: semibold, color: white });
-      return;
+      target.drawText(company.name, { x: margin, y: pageHeight - 32, size: 9, font: semibold, color: navy });
+      target.drawLine({
+        start: { x: margin, y: pageHeight - 40 },
+        end: { x: pageWidth - margin, y: pageHeight - 40 },
+        thickness: 1.25,
+        color: accentColor,
+      });
+      return pageHeight - 58;
     }
-    drawLogo(target, logo, margin, pageHeight - 66, companyId === "emoro" ? 150 : 168);
+    const logoWidth = companyId === "emoro" ? 148 : 160;
+    const logoHeight = (logo.height / logo.width) * logoWidth;
+    const logoBottom = pageHeight - 22 - logoHeight;
+    drawLogo(target, logo, margin, logoBottom, logoWidth);
+    const ruleY = logoBottom - 12;
+    target.drawLine({
+      start: { x: margin, y: ruleY },
+      end: { x: pageWidth - margin, y: ruleY },
+      thickness: 1.25,
+      color: accentColor,
+    });
+    return ruleY - 24;
   };
 
   const newPage = () => {
     page = doc.addPage([pageWidth, pageHeight]);
-    paintHeader(page, true);
-    y = pageHeight - 56;
+    y = paintHeader(page, true);
   };
 
   const ensure = (height: number) => {
@@ -135,12 +152,10 @@ export async function buildReportPdf(options: {
   };
 
   const heading = (value: string) => {
-    ensure(28);
-    y -= 6;
-    page.drawRectangle({ x: margin, y: y + 2, width: 28, height: 3, color: accentColor });
-    y -= 16;
-    page.drawText(value, { x: margin, y, size: 13, font: semibold, color: navy });
-    y -= 16;
+    ensure(22);
+    y -= 8;
+    page.drawText(value, { x: margin, y, size: 11, font: semibold, color: accentColor });
+    y -= 14;
   };
 
   const pair = (label: string, value: string) => {
@@ -150,8 +165,36 @@ export async function buildReportPdf(options: {
     text(value || "—", 11, semibold, ink, 6);
   };
 
-  const checks = (items: CheckAnswer[]) => {
-    for (const item of items) {
+  const itemShots = (key: string) => (options.itemPhotos ?? []).filter((photo) => photo.itemKey === key);
+
+  const drawShots = async (key: string, caption: string) => {
+    const shots = itemShots(key);
+    if (shots.length === 0) return;
+    ensure(14);
+    page.drawText(caption, { x: margin + 8, y, size: 8, font: regular, color: slate });
+    y -= 10;
+    let x = margin + 8;
+    let rowHeight = 0;
+    for (const shot of shots) {
+      const image = shot.mime === "image/png" ? await doc.embedPng(shot.bytes) : await doc.embedJpg(shot.bytes);
+      const thumbW = 92;
+      const thumbH = Math.min(68, (image.height / image.width) * thumbW);
+      if (x + thumbW > pageWidth - margin) {
+        y -= rowHeight + 8;
+        x = margin + 8;
+        rowHeight = 0;
+        ensure(thumbH + 8);
+      }
+      ensure(thumbH + 6);
+      page.drawImage(image, { x, y: y - thumbH, width: thumbW, height: thumbH });
+      x += thumbW + 8;
+      rowHeight = Math.max(rowHeight, thumbH);
+    }
+    y -= rowHeight + 10;
+  };
+
+  const checks = async (items: CheckAnswer[], group: string) => {
+    for (const [index, item] of items.entries()) {
       const detail = [item.reading, item.comment].filter(Boolean).join(" — ");
       const labelLines = wrap(item.label, regular, 10, contentWidth - 64);
       const detailLines = detail ? wrap(detail, regular, 9, contentWidth - 12) : [];
@@ -181,12 +224,12 @@ export async function buildReportPdf(options: {
         thickness: 0.4,
         color: line,
       });
-      y -= 6;
+      y -= 8;
+      await drawShots(`${group}.${item.id}`, `Item ${index + 1}: ${item.label}`);
     }
   };
 
-  paintHeader(page, false);
-  y = pageHeight - 108;
+  y = paintHeader(page, false);
   page.drawText(title, { x: margin, y, size: 18, font: semibold, color: navy });
   y -= 16;
   text(company.legalName, 9, regular, slate, 2);
@@ -196,7 +239,14 @@ export async function buildReportPdf(options: {
   for (const section of meta.sections) {
     heading(section.title);
     if (section.prose) text(section.prose, 10, regular, ink, 6);
-    if (section.checks) checks(section.checks);
+    if (section.checks) await checks(section.checks, section.group ?? "check");
+    if (section.linked) {
+      for (const row of section.linked) {
+        text(row.text, 10, regular, ink, 2);
+        await drawShots(row.key, row.caption);
+      }
+      y -= 4;
+    }
     if (section.lines) {
       for (const row of section.lines) text(row, 10, regular, ink, 2);
       y -= 4;
@@ -263,7 +313,9 @@ type Section = {
   title: string;
   prose?: string;
   checks?: CheckAnswer[];
+  group?: string;
   lines?: string[];
+  linked?: { key: string; text: string; caption: string }[];
 };
 
 function docMeta(report: ReportValue): { note: string; rows: { label: string; value: string }[]; sections: Section[] } {
@@ -282,7 +334,11 @@ function docMeta(report: ReportValue): { note: string; rows: { label: string; va
         { title: "Materials", prose: report.materials || "None recorded." },
         {
           title: "Safety",
-          lines: report.safety.map((item) => `${item.label}: ${item.answer === "yes" ? "Yes" : "No"}`),
+          linked: report.safety.map((item, index) => ({
+            key: `safety.${report.company}.${item.id}`,
+            text: `${item.label}: ${item.answer === "yes" ? "Yes" : "No"}`,
+            caption: `Item ${index + 1}: ${item.label}`,
+          })),
         },
         { title: "Issues", prose: report.issues || "None recorded." },
       ],
@@ -328,7 +384,7 @@ function gasMeta(report: GasReport): { note: string; rows: { label: string; valu
       { label: "Overall result", value: report.overall === "compliant" ? "Compliant" : "Non-compliant" },
     ],
     sections: [
-      { title: `Installation checks · ${resultLabel(report.checks)}`, checks: report.checks },
+      { title: `Installation checks · ${resultLabel(report.checks)}`, checks: report.checks, group: "check" },
       {
         title: "Type A appliances",
         lines:
@@ -367,9 +423,9 @@ function electricalMeta(report: ElectricalReport): { note: string; rows: { label
     ],
     sections: [
       { title: "Extent of the check", prose: report.limitations ? `${extent}\n\nLimitations: ${report.limitations}` : extent },
-      { title: `Visual inspection · ${resultLabel(report.visual)}`, checks: report.visual },
-      { title: `Polarity and correct connections · ${resultLabel(report.polarity)}`, checks: report.polarity },
-      { title: `Earth continuity · ${resultLabel(report.earth)}`, checks: report.earth },
+      { title: `Visual inspection · ${resultLabel(report.visual)}`, checks: report.visual, group: "visual" },
+      { title: `Polarity and correct connections · ${resultLabel(report.polarity)}`, checks: report.polarity, group: "polarity" },
+      { title: `Earth continuity · ${resultLabel(report.earth)}`, checks: report.earth, group: "earth" },
       {
         title: "RCD tests",
         lines: report.rcds.map((row) => {

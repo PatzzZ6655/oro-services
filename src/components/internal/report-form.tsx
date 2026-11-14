@@ -5,7 +5,7 @@ import Link from "next/link";
 import { submitReport } from "@/app/internal/actions";
 import { reportPhotoMax, reportPhotoTotalBytes, type FieldErrors, type ReportKind } from "@/lib/reports/catalog";
 import { initialSubmitState } from "@/lib/reports/state";
-import { parseSignature, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
+import { parseSignature, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
 
 async function compressPhoto(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
@@ -61,7 +61,13 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
     }
     const photos = data.getAll("photos").filter((item): item is File => item instanceof File);
     const photoError = validatePhotoFiles(photos.map((file) => ({ size: file.size, type: file.type })));
-    if (photos.reduce((total, file) => total + file.size, 0) > reportPhotoTotalBytes && !photoError) {
+    const everyFile = [...data.values()].filter((item): item is File => item instanceof File && item.size > 0);
+    const budgetError = validatePhotoBudget(everyFile.map((file) => ({ size: file.size, type: file.type })));
+    if (photoError || budgetError) {
+      setClientErrors({ photos: photoError ?? budgetError ?? "Photos are too large together. Use fewer photos." });
+      return;
+    }
+    if (everyFile.reduce((total, file) => total + file.size, 0) > reportPhotoTotalBytes) {
       setClientErrors({ photos: "Photos are too large together. Use fewer photos." });
       return;
     }
@@ -125,7 +131,7 @@ export function ReportForm({ kind, children }: { kind: ReportKind; children: (er
       {children(errors)}
       <div>
         <label htmlFor="photos" className="block text-sm font-medium text-slate-800">
-          Photos (optional)
+          Overall photos (optional)
         </label>
         <input
           id="photos"
