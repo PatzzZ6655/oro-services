@@ -57,9 +57,29 @@ The Maps script loads only after the person focuses the suburb field. A chosen p
 
 Use a browser key restricted to the HTTP referrers `https://www.orosvc.com/*` and `https://orosvc.com/*`, plus the Vercel preview host if previews should show suggestions. Restrict the key to Maps JavaScript API and Places API (New).
 
-## Internal login
+## Staff portal
 
-A small footer link points at the internal dashboard: [tape.orosvc.com](https://tape.orosvc.com). It uses `rel="noopener noreferrer nofollow"` and is not listed in the sitemap.
+The footer link Internal Login opens `/internal` on this site. After Google sign-in, Reports lists the job and safety forms. Stock dashboard is only a link to [tape.orosvc.com](https://tape.orosvc.com), which keeps its own sign-in.
+
+`/internal` is not in the sitemap and is disallowed in `robots.txt`. The public pages and the enquiry form stay open without a session. There is still no middleware.
+
+Sign-in is Google only. The allowlist is `INTERNAL_ALLOWED_EMAILS` (comma-separated). When that variable is blank, only `pat.z@orosvc.com` can sign in. A rejected Google account is told it is not on the staff list. Failed attempts do not lock the account.
+
+Drive filing uses an OAuth refresh token for `pat.z@orosvc.com` with the `drive.file` scope, so the app can only see files it creates. It creates `ORO Reports/<report type>/<year>/<date address>` and does not update or delete existing Drive files. The exact setup steps are in the pull request for this portal. `scripts/google-drive-consent.mjs` prints the one-time consent URL and the refresh token. Do not commit that token.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID` | Yes | Web OAuth client. Staff sign-in asks only for `openid email`. |
+| `GOOGLE_CLIENT_SECRET` | Yes | Matching client secret. |
+| `INTERNAL_SESSION_SECRET` | Yes | At least 16 characters. Signs the staff session cookie. |
+| `INTERNAL_ALLOWED_EMAILS` | No | Comma-separated staff emails. Blank starts as `pat.z@orosvc.com`. |
+| `GOOGLE_DRIVE_REFRESH_TOKEN` | Yes, to file reports | Offline token with scope `https://www.googleapis.com/auth/drive.file`. |
+| `REPORT_NOTIFY_EMAIL` | No | Office copy. Defaults to `pat.z@orosvc.com`. |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | No | Same mail path as the enquiry form. Reports still file when mail is unset. |
+
+Redirect URI for staff sign-in: `https://www.orosvc.com/internal/auth/google/callback`. Local: `http://localhost:3000/internal/auth/google/callback`.
+
+Do not commit the client secret, session secret, or refresh token.
 
 ## HTTP and the canonical host
 

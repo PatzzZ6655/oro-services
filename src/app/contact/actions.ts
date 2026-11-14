@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import nodemailer from "nodemailer";
+import { sendGmailMessage } from "@/lib/gmail";
 import {
   deliveryConfigured,
   enquiryMailto,
@@ -49,48 +49,14 @@ async function readPhoto(
   };
 }
 
-function gmailAuth(): { user: string; pass: string } | undefined {
-  const user = process.env.GMAIL_USER?.trim() ?? "";
-  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "") ?? "";
-  if (!user.includes("@") || pass.length < 16) return undefined;
-  return { user, pass };
-}
-
 async function sendWithGmail(enquiry: ParsedEnquiry, attachment?: Attachment): Promise<boolean> {
-  const auth = gmailAuth();
-  if (!auth) return false;
-
-  const fromName = process.env.MAIL_FROM_NAME?.replace(/[\r\n]+/g, " ").trim() || "ORO Services";
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth,
-    connectionTimeout: 10_000,
-    socketTimeout: 20_000,
+  return sendGmailMessage({
+    to: enquiry.inbox,
+    replyTo: enquiry.email,
+    subject: `${enquiry.serviceLabel} — ${enquiry.suburb}`,
+    text: enquiryText(enquiry, attachment?.filename),
+    attachments: attachment ? [attachment] : undefined,
   });
-
-  try {
-    await transporter.sendMail({
-      from: { name: fromName, address: auth.user },
-      to: enquiry.inbox,
-      replyTo: enquiry.email,
-      subject: `${enquiry.serviceLabel} — ${enquiry.suburb}`,
-      text: enquiryText(enquiry, attachment?.filename),
-      attachments: attachment
-        ? [
-            {
-              filename: attachment.filename,
-              content: attachment.content,
-              contentType: attachment.contentType,
-            },
-          ]
-        : undefined,
-    });
-    return true;
-  } finally {
-    transporter.close();
-  }
 }
 
 export async function sendEnquiry(

@@ -4,7 +4,9 @@ export const siteName = "ORO Services";
 
 export const corporateEmail = "info@orosvc.com";
 
-export const internalLoginHref = "https://tape.orosvc.com";
+export const internalLoginHref = "/internal";
+
+export const stockDashboardHref = "https://tape.orosvc.com";
 
 export const photoMaxBytes = 2 * 1024 * 1024;
 
