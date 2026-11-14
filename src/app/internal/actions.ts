@@ -6,8 +6,8 @@ import { saveReportPackage, driveConfigured } from "@/lib/reports/drive";
 import { emailReport } from "@/lib/reports/notify";
 import { buildReportPdf, type ReportPhoto } from "@/lib/reports/pdf";
 import { type SubmitState } from "@/lib/reports/state";
-import { itemPhotoField, itemPhotoMax, reportPhotoMax, type ReportValue } from "@/lib/reports/catalog";
-import { parseSignature, reportAddress, reportDate, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
+import { itemPhotoField, itemPhotoMax, keyPhotoField, reportPhotoMax, type ReportValue } from "@/lib/reports/catalog";
+import { keyPhotoSlots, parseSignature, reportAddress, reportDate, validatePhotoBudget, validatePhotoFiles, validateReport } from "@/lib/reports/validate";
 import { answersFromForm } from "@/lib/jobs/queries";
 import { databaseConfigured, recordJobReport } from "@/lib/jobs/db";
 
@@ -60,6 +60,31 @@ async function readItemPhotos(formData: FormData, report: ReportValue): Promise<
         caption: `Item ${slot.index}: ${slot.label}`,
       });
       number += 1;
+    }
+  }
+  return { files };
+}
+
+async function readKeyPhotos(formData: FormData, report: ReportValue): Promise<{ files: ReportPhoto[]; error?: string; field?: string }> {
+  const files: ReportPhoto[] = [];
+  for (const slot of keyPhotoSlots(report, formData)) {
+    const uploaded = formData.getAll(keyPhotoField(slot.field)).filter((item): item is File => item instanceof File && item.size > 0);
+    if (uploaded.length > slot.max) return { files: [], error: "Use fewer photos.", field: keyPhotoField(slot.field) };
+    for (const [index, file] of uploaded.entries()) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const mime = file.type === "image/png" ? "image/png" : file.type === "image/jpeg" ? "image/jpeg" : null;
+      if (!mime || !looksLikeImage(bytes, mime)) {
+        return { files: [], error: "Use a JPEG or PNG photo.", field: keyPhotoField(slot.field) };
+      }
+      const caption = uploaded.length > 1 ? `${slot.caption} ${index + 1}` : slot.caption;
+      const safe = caption.replace(/[^a-zA-Z0-9]+/g, " ").trim().slice(0, 40) || "photo";
+      const extension = mime === "image/png" ? "png" : "jpg";
+      files.push({
+        name: `Key ${files.length + 1} ${safe}.${extension}`,
+        bytes,
+        mime,
+        caption,
+      });
     }
   }
   return { files };
@@ -119,12 +144,13 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
   const photos = await readPhotos(formData);
   const morePhotos = await readMorePhotos(formData);
   const itemPhotos = parsed.ok ? await readItemPhotos(formData, parsed.value) : { files: [] as ReportPhoto[] };
-  const budgetFiles = [...(photos.files ?? []), ...(morePhotos.files ?? []), ...(itemPhotos.files ?? [])].map((file) => ({
+  const keyPhotos = parsed.ok ? await readKeyPhotos(formData, parsed.value) : { files: [] as ReportPhoto[] };
+  const budgetFiles = [...(photos.files ?? []), ...(morePhotos.files ?? []), ...(itemPhotos.files ?? []), ...(keyPhotos.files ?? [])].map((file) => ({
     size: file.bytes.byteLength,
     type: file.mime,
   }));
   const budgetError = validatePhotoBudget(budgetFiles);
-  if (!parsed.ok || !signature.ok || photos.error || morePhotos.error || itemPhotos.error || budgetError) {
+  if (!parsed.ok || !signature.ok || photos.error || morePhotos.error || itemPhotos.error || keyPhotos.error || budgetError) {
     return {
       status: "invalid",
       errors: {
@@ -133,6 +159,7 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
         ...(photos.error ? { photos: photos.error } : {}),
         ...(morePhotos.error ? { photos: morePhotos.error } : {}),
         ...(itemPhotos.error ? { photos: itemPhotos.error } : {}),
+        ...(keyPhotos.error ? { [keyPhotos.field ?? "photos"]: keyPhotos.error } : {}),
         ...(budgetError ? { photos: budgetError } : {}),
       },
     };
@@ -147,6 +174,7 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
       signature: signature.bytes,
       photos: [...photos.files, ...morePhotos.files],
       itemPhotos: itemPhotos.files,
+      keyPhotos: keyPhotos.files,
       submittedBy: user.email,
       jobNumber: readText(formData, "jobNumber"),
     });
@@ -158,7 +186,7 @@ export async function submitReport(_previous: SubmitState, formData: FormData): 
       address: reportAddress(parsed.value),
       jobNumber,
       pdf,
-      photos: [...photos.files, ...morePhotos.files, ...itemPhotos.files],
+      photos: [...keyPhotos.files, ...photos.files, ...morePhotos.files, ...itemPhotos.files],
     });
     if (jobId && databaseConfigured()) {
       try {

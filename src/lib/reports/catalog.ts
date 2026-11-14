@@ -183,11 +183,16 @@ export const electricalEarth: readonly NamedItem[] = [
 export const maxRepeatRows = 12;
 export const reportPhotoMax = 8;
 export const itemPhotoMax = 4;
+export const smokePhotoMax = 4;
 export const reportPhotoBytes = 1024 * 1024;
 export const reportPhotoTotalBytes = 2_800_000;
 
 export function itemPhotoField(key: string): string {
   return `itemPhoto.${key}`;
+}
+
+export function keyPhotoField(slot: string): string {
+  return `keyPhoto.${slot}`;
 }
 
 export type CheckAnswer = {

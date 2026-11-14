@@ -102,7 +102,7 @@ export async function latestAnswers(query: Query, jobId: string, formType: strin
   const answers: Record<string, string> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (typeof value !== "string") continue;
-    if (key === "reviewedToday" || key === "jobId" || key.includes("signature") || key.startsWith("itemPhoto") || key.startsWith("moreCaption.") || key === "photos" || key === "morePhotos") continue;
+    if (key === "reviewedToday" || key === "jobId" || key.includes("signature") || key.startsWith("itemPhoto") || key.startsWith("keyPhoto") || key.startsWith("moreCaption.") || key === "photos" || key === "morePhotos") continue;
     if (value.startsWith("data:image")) continue;
     answers[key] = value;
   }
@@ -113,7 +113,7 @@ export function answersFromForm(formData: FormData): Record<string, string> {
   const answers: Record<string, string> = {};
   for (const [key, value] of formData.entries()) {
     if (typeof value !== "string") continue;
-    if (key === "reviewedToday" || key === "jobId" || key.includes("signature") || key.startsWith("itemPhoto") || key.startsWith("moreCaption.") || key === "photos" || key === "morePhotos") continue;
+    if (key === "reviewedToday" || key === "jobId" || key.includes("signature") || key.startsWith("itemPhoto") || key.startsWith("keyPhoto") || key.startsWith("moreCaption.") || key === "photos" || key === "morePhotos") continue;
     if (value.startsWith("data:image")) continue;
     answers[key] = value;
   }

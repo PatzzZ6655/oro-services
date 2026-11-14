@@ -24,12 +24,16 @@ import {
 import { addYears } from "@/lib/reports/dates";
 import { buildReportPdf } from "@/lib/reports/pdf";
 import { driveFolderQuery, submissionFolderName } from "@/lib/reports/paths";
-import { parseSignature, validateReport } from "@/lib/reports/validate";
+import { keyPhotoSlots, parseSignature, validateReport } from "@/lib/reports/validate";
 
 const now = new Date("2026-11-14T03:00:00.000Z");
 
+function jpegFile(name = "photo.jpg") {
+  return new File([Uint8Array.of(0xff, 0xd8, 0xff)], name, { type: "image/jpeg" });
+}
+
 function failPhoto(data: FormData, key: string) {
-  data.append(key, new File([Uint8Array.of(0xff, 0xd8, 0xff)], "fail.jpg", { type: "image/jpeg" }));
+  data.append(key, jpegFile("fail.jpg"));
 }
 const tinyPng =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
@@ -94,6 +98,7 @@ function gasForm(extra?: Record<string, string>) {
   };
   for (const item of gasChecks) fields[`check.${item.id}`] = fields[`check.${item.id}`] ?? "pass";
   for (const [key, value] of Object.entries(fields)) data.set(key, value);
+  data.append("keyPhoto.readings", jpegFile("readings.jpg"));
   return data;
 }
 
@@ -119,6 +124,9 @@ function electricalForm(extra?: Record<string, string>) {
   for (const item of electricalPolarity) fields[`polarity.${item.id}`] ??= "pass";
   for (const item of electricalEarth) fields[`earth.${item.id}`] ??= "na";
   for (const [key, value] of Object.entries(fields)) data.set(key, value);
+  data.append("keyPhoto.switchboard", jpegFile("board.jpg"));
+  data.append("keyPhoto.rcd", jpegFile("rcd.jpg"));
+  data.append("keyPhoto.smoke", jpegFile("smoke.jpg"));
   return data;
 }
 
@@ -263,14 +271,36 @@ test("gas checks require a comment only on fail, and the next check is two years
   appliance.set("appliance.0.serviced", "yes");
   appliance.set("appliance.0.co", "0 ppm, no spillage");
   appliance.set("appliance.0.record", "CC-19");
+  const missingPlate = validateReport("gas-safety", appliance, now);
+  assert.equal(missingPlate.ok, false);
+  if (!missingPlate.ok) assert.equal(missingPlate.errors["keyPhoto.appliance.0"], "Add a photo of this appliance or its data plate.");
+  appliance.append("keyPhoto.appliance.0", jpegFile("cooker.jpg"));
   const withAppliance = validateReport("gas-safety", appliance, now);
   assert.equal(withAppliance.ok, true);
-  if (withAppliance.ok && withAppliance.value.kind === "gas-safety") assert.equal(withAppliance.value.appliances.length, 1);
+  if (withAppliance.ok && withAppliance.value.kind === "gas-safety") {
+    assert.equal(withAppliance.value.appliances.length, 1);
+    assert.deepEqual(
+      keyPhotoSlots(withAppliance.value, appliance).map((slot) => slot.caption),
+      ["Test readings", "Cooker, Kitchen"],
+    );
+  }
 
   const record = gasForm({ servicingRecord: "yes" });
   const recorded = validateReport("gas-safety", record, now);
   assert.equal(recorded.ok, true);
   if (recorded.ok && recorded.value.kind === "gas-safety") assert.equal(recorded.value.servicingRecord, true);
+
+  const noReadings = gasForm();
+  noReadings.delete("keyPhoto.readings");
+  const readings = validateReport("gas-safety", noReadings, now);
+  assert.equal(readings.ok, false);
+  if (!readings.ok) assert.equal(readings.errors["keyPhoto.readings"], "Add a photo of the test readings.");
+
+  const twoReadings = gasForm();
+  twoReadings.append("keyPhoto.readings", jpegFile("again.jpg"));
+  const extraReading = validateReport("gas-safety", twoReadings, now);
+  assert.equal(extraReading.ok, false);
+  if (!extraReading.ok) assert.equal(extraReading.errors["keyPhoto.readings"], "Add one photo of the test readings.");
 });
 
 test("electrical fail comments, RCD rows, smoke alarms, and due dates", () => {
@@ -327,6 +357,30 @@ test("electrical fail comments, RCD rows, smoke alarms, and due dates", () => {
   if (timedResult.ok && timedResult.value.kind === "electrical-safety") {
     assert.equal(timedResult.value.rcds[0]?.timeMs, "48");
   }
+
+  const noBoard = electricalForm();
+  noBoard.delete("keyPhoto.switchboard");
+  const board = validateReport("electrical-safety", noBoard, now);
+  assert.equal(board.ok, false);
+  if (!board.ok) assert.equal(board.errors["keyPhoto.switchboard"], "Add a photo of the switchboard with the cover open.");
+
+  const noRcdPhoto = electricalForm();
+  noRcdPhoto.delete("keyPhoto.rcd");
+  const rcdPhoto = validateReport("electrical-safety", noRcdPhoto, now);
+  assert.equal(rcdPhoto.ok, false);
+  if (!rcdPhoto.ok) assert.equal(rcdPhoto.errors["keyPhoto.rcd"], "Add a photo of the RCD test reading.");
+
+  const noSmokePhoto = electricalForm();
+  noSmokePhoto.delete("keyPhoto.smoke");
+  const smokePhoto = validateReport("electrical-safety", noSmokePhoto, now);
+  assert.equal(smokePhoto.ok, false);
+  if (!smokePhoto.ok) assert.equal(smokePhoto.errors["keyPhoto.smoke"], "Add a photo of the smoke alarm showing the expiry date.");
+
+  const manySmoke = electricalForm();
+  for (let index = 0; index < 4; index += 1) manySmoke.append("keyPhoto.smoke", jpegFile(`smoke-${index}.jpg`));
+  const tooManySmoke = validateReport("electrical-safety", manySmoke, now);
+  assert.equal(tooManySmoke.ok, false);
+  if (!tooManySmoke.ok) assert.equal(tooManySmoke.errors["keyPhoto.smoke"], "Add up to 4 smoke alarm photos.");
 });
 
 test("calendar addition clamps a leap day", () => {
@@ -443,6 +497,50 @@ test("a site job sheet becomes a pdf", async () => {
   const document = await PDFDocument.load(pdf);
   assert.equal(document.getAuthor(), "Emporo Plumbing");
   assert.equal(document.getCreator(), "Emporo Plumbing Pty Ltd");
+});
+
+const tinyJpeg = Uint8Array.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00,
+  0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0a, 0x0c, 0x14, 0x0d, 0x0c, 0x0b, 0x0b, 0x0c, 0x19, 0x12, 0x13, 0x0f,
+  0x14, 0x1d, 0x1a, 0x1f, 0x1e, 0x1d, 0x1a, 0x1c, 0x1c, 0x20, 0x24, 0x2e, 0x27, 0x20, 0x22, 0x2c, 0x23, 0x1c, 0x1c, 0x28, 0x37, 0x29, 0x2c, 0x30, 0x31,
+  0x34, 0x34, 0x34, 0x1f, 0x27, 0x39, 0x3d, 0x38, 0x32, 0x3c, 0x2e, 0x33, 0x34, 0x32, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01,
+  0x11, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0xff,
+  0xc4, 0x00, 0x14, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xda, 0x00, 0x08,
+  0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x7f, 0x00, 0xff, 0xd9,
+]);
+
+function embeddedImages(pdf: Uint8Array): number {
+  return Buffer.from(pdf).toString("latin1").match(/\/Subtype\s*\/Image/g)?.length ?? 0;
+}
+
+test("key photos sit in the pdf ahead of any additional photos", async () => {
+  const parsed = validateReport("gas-safety", gasForm(), now);
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  const signature = parseSignature(tinyPng);
+  assert.equal(signature.ok, true);
+  if (!signature.ok) return;
+  const plain = await buildReportPdf({ report: parsed.value, signature: signature.bytes, photos: [], submittedBy: "pat.z@orosvc.com" });
+  const withKey = await buildReportPdf({
+    report: parsed.value,
+    signature: signature.bytes,
+    photos: [],
+    keyPhotos: [{ name: "Key 1 Test readings.jpg", bytes: tinyJpeg, mime: "image/jpeg", caption: "Test readings" }],
+    submittedBy: "pat.z@orosvc.com",
+  });
+  const withBoth = await buildReportPdf({
+    report: parsed.value,
+    signature: signature.bytes,
+    photos: [{ name: "Additional 1.jpg", bytes: tinyJpeg, mime: "image/jpeg", caption: "Hallway" }],
+    keyPhotos: [{ name: "Key 1 Test readings.jpg", bytes: tinyJpeg, mime: "image/jpeg", caption: "Test readings" }],
+    submittedBy: "pat.z@orosvc.com",
+  });
+  assert.equal(embeddedImages(withKey), embeddedImages(plain) + 1);
+  assert.equal(embeddedImages(withBoth), embeddedImages(plain) + 2);
+  const raw = Buffer.from(withBoth).toString("latin1");
+  const keyAt = raw.indexOf("Key photos");
+  const extraAt = raw.indexOf("Additional photos");
+  if (keyAt >= 0 && extraAt >= 0) assert.ok(keyAt < extraAt);
 });
 
 test("safety reports use the company identity, not a typed business name", () => {

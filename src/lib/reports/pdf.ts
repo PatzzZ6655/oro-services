@@ -87,6 +87,7 @@ export async function buildReportPdf(options: {
   signature: Uint8Array;
   photos: ReportPhoto[];
   itemPhotos?: ReportPhoto[];
+  keyPhotos?: ReportPhoto[];
   submittedBy: string;
   jobNumber?: string;
 }): Promise<Uint8Array> {
@@ -241,7 +242,41 @@ export async function buildReportPdf(options: {
     }
   }
 
+  const keyShots = options.keyPhotos ?? [];
+  if (keyShots.length > 0) {
+    heading("Key photos");
+    const thumbW = 120;
+    const gap = 10;
+    const columns = 4;
+    for (let start = 0; start < keyShots.length; start += columns) {
+      const row = keyShots.slice(start, start + columns);
+      const embedded: { image: PDFImage; height: number; caption: string }[] = [];
+      let rowHeight = 0;
+      for (const shot of row) {
+        const image = shot.mime === "image/png" ? await doc.embedPng(shot.bytes) : await doc.embedJpg(shot.bytes);
+        const height = Math.min(88, (image.height / image.width) * thumbW);
+        embedded.push({ image, height, caption: shot.caption?.trim() || "Photo" });
+        rowHeight = Math.max(rowHeight, height);
+      }
+      const captionHeight = 22;
+      ensure(rowHeight + captionHeight + 8);
+      let x = margin;
+      for (const shot of embedded) {
+        page.drawImage(shot.image, { x, y: y - rowHeight, width: thumbW, height: shot.height });
+        const caption = wrap(shot.caption, regular, 8, thumbW).slice(0, 2);
+        caption.forEach((line, lineIndex) => {
+          page.drawText(line, { x, y: y - rowHeight - 12 - lineIndex * 10, size: 8, font: regular, color: slate });
+        });
+        x += thumbW + gap;
+      }
+      y -= rowHeight + captionHeight + 8;
+    }
+  }
+
   if (photos.length > 0) {
+    const first = photos[0];
+    const firstHeight = first ? Math.min(140, (first.height / first.width) * 180) : 140;
+    ensure(firstHeight + 80);
     heading("Additional photos");
     for (const [index, photo] of photos.entries()) {
       const maxWidth = 180;
