@@ -3,6 +3,7 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
+import { databaseConnectionString } from "@/lib/jobs/connection";
 import {
   getJob,
   insertJob,
@@ -26,7 +27,7 @@ export function databaseConfigured(): boolean {
 
 function getPool(): pg.Pool {
   if (!pool) {
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    pool = new pg.Pool({ connectionString: databaseConnectionString(process.env.DATABASE_URL ?? ""), max: 1 });
   }
   return pool;
 }
