@@ -68,6 +68,54 @@ const sections: { heading: string; paragraphs: string[] }[] = [
       "These terms are governed by the laws of Victoria, Australia. If any part of these terms cannot be enforced, the rest still applies.",
     ],
   },
+  {
+    heading: "Matching finishes",
+    paragraphs: [
+      "We will take reasonable care, but an exact match to existing colours, tiles, render, paint, timber or other finishes is not guaranteed, including because of ageing, light, wear or batch differences.",
+    ],
+  },
+  {
+    heading: "Customer-supplied materials",
+    paragraphs: [
+      "If the customer supplies materials or fixtures, we will install them with reasonable care, but we do not warrant their quality, suitability, colour or performance. If items are missing, incorrect or unsuitable, we will explain any extra labour and get your approval before charging it.",
+    ],
+  },
+  {
+    heading: "Product supply and substitutions",
+    paragraphs: [
+      "Where we supply products, the final brand or model may depend on supplier availability and compatibility with existing services and site conditions. If a listed item is unavailable or not compatible, we will tell you and agree any substitute or change in cost before we proceed.",
+    ],
+  },
+  {
+    heading: "Pre-existing conditions",
+    paragraphs: [
+      "We are not responsible for pre-existing defects, settlement or other movement, moisture, or work done by others before we started, except to the extent our work causes new damage.",
+    ],
+  },
+  {
+    heading: "Variations",
+    paragraphs: [
+      "Changes to the quoted scope, including customer-requested changes, are variations. We will explain any extra cost and get your approval before doing that work, except urgent make-safe work. Approved variations are charged at the agreed price.",
+    ],
+  },
+  {
+    heading: "Asbestos and hazardous materials",
+    paragraphs: [
+      "If we suspect asbestos or other hazardous material, we will stop work in the affected area. Testing and removal by appropriately licensed specialists is an extra cost. We will explain that cost and get your approval before that work goes ahead.",
+    ],
+  },
+  {
+    heading: "Work at heights",
+    paragraphs: [
+      "Work at heights is carried out only with appropriate safe access, such as scaffolding, an elevating work platform or edge protection, as required by Victorian occupational health and safety law. If the required access equipment is not included in the quote, we will explain the extra cost and get your approval before proceeding. We may decline or pause work that cannot be done safely.",
+    ],
+  },
+  {
+    heading: "Confined spaces",
+    paragraphs: [
+      "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that meets that definition. If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
+    ],
+  },
 ];
 
 export default function TermsPage() {
