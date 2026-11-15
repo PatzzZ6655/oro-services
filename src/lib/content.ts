@@ -89,7 +89,7 @@ export const brands: Brand[] = [
     logoWidth: 734,
     logoHeight: 194,
     description:
-      "Commercial and residential plumbing, including water and gas, taps and toilets, pipe relining, and drainage, including blocked drains.",
+      "Emporo delivers residential and commercial plumbing, gas fitting, pipe relining and drainage solutions.",
     email: "info.emporo@orosvc.com",
     schemaType: "Plumber",
     services: [
@@ -106,8 +106,8 @@ export const brands: Brand[] = [
       },
       {
         slug: "taps-toilets-pipe-relining",
-        name: "Taps, Toilets & Pipe Relining",
-        summary: "Leaking taps and toilets, and pipe relining.",
+        name: "Pipe Relining",
+        summary: "Pipe relining.",
       },
       {
         slug: "drainage",
@@ -148,7 +148,7 @@ export const aboutPoints = [
   },
   {
     title: "On site",
-    body: "Builds, renovations, fit-outs, plumbing, water and gas, taps and toilets, pipe relining, and drainage are carried out on site.",
+    body: "Builds, renovations, fit-outs, residential and commercial plumbing, gas fitting, pipe relining and drainage are carried out on site.",
   },
   {
     title: "Subcontracting",
