@@ -65,7 +65,13 @@ const sections: { heading: string; paragraphs: string[] }[] = [
   {
     heading: "Governing law",
     paragraphs: [
-      "These terms are governed by the laws of Victoria, Australia. If any part of these terms cannot be enforced, the rest still applies.",
+      "These terms are governed by the laws of Victoria, Australia. We and the customer submit to the non-exclusive jurisdiction of the courts of Victoria.",
+    ],
+  },
+  {
+    heading: "Severability",
+    paragraphs: [
+      "If any part of these terms cannot be enforced, the rest still applies.",
     ],
   },
   {
@@ -78,6 +84,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
     heading: "Customer-supplied materials",
     paragraphs: [
       "If the customer supplies materials or fixtures, we will install them with reasonable care, but we do not warrant their quality, suitability, colour or performance. If items are missing, incorrect or unsuitable, we will explain any extra labour and get your approval before charging it.",
+      "We may decline to install items that are not WaterMark-certified or otherwise not compliant with the relevant standards, or that we reasonably consider unsafe.",
     ],
   },
   {
@@ -113,7 +120,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
   {
     heading: "Confined spaces",
     paragraphs: [
-      "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that meets that definition. If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
+      "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that is a confined space under the Occupational Health and Safety Regulations 2017 (Vic). If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
     ],
   },
 ];

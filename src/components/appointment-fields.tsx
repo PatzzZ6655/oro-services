@@ -39,7 +39,7 @@ export function AppointmentFields({
 
   return (
     <fieldset className="space-y-4" aria-describedby={duplicateMessage ? "options-error" : undefined}>
-      <legend className="text-sm font-semibold text-slate-800">Preferred arrival times</legend>
+      <legend className="text-sm font-semibold text-slate-800">Preferred times</legend>
       <p className="text-sm text-slate-600">{preferredArrivalHelp}</p>
       {duplicateMessage ? (
         <p id="options-error" className="text-sm font-medium text-red-700">
@@ -92,7 +92,7 @@ export function AppointmentFields({
                     aria-invalid={windowError ? true : undefined}
                     aria-describedby={windowError ? windowErrorId : undefined}
                   >
-                  <legend className="text-sm font-semibold text-slate-800">Arrival window</legend>
+                  <legend className="text-sm font-semibold text-slate-800">Preferred time</legend>
                   {row.date ? (
                     <div className="flex flex-wrap gap-2">
                       {windows.map((window) => {

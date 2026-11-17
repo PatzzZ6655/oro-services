@@ -21,11 +21,14 @@ const clauses = [
   "Workmanship and consumer rights",
   "Nothing in these terms excludes, restricts or modifies any right or consumer guarantee that cannot legally be excluded under the Australian Consumer Law or other applicable law.",
   "Governing law",
-  "These terms are governed by the laws of Victoria, Australia.",
+  "These terms are governed by the laws of Victoria, Australia. We and the customer submit to the non-exclusive jurisdiction of the courts of Victoria.",
+  "Severability",
+  "If any part of these terms cannot be enforced, the rest still applies.",
   "Matching finishes",
   "We will take reasonable care, but an exact match to existing colours, tiles, render, paint, timber or other finishes is not guaranteed, including because of ageing, light, wear or batch differences.",
   "Customer-supplied materials",
   "If the customer supplies materials or fixtures, we will install them with reasonable care, but we do not warrant their quality, suitability, colour or performance. If items are missing, incorrect or unsuitable, we will explain any extra labour and get your approval before charging it.",
+  "We may decline to install items that are not WaterMark-certified or otherwise not compliant with the relevant standards, or that we reasonably consider unsafe.",
   "Product supply and substitutions",
   "Where we supply products, the final brand or model may depend on supplier availability and compatibility with existing services and site conditions. If a listed item is unavailable or not compatible, we will tell you and agree any substitute or change in cost before we proceed.",
   "Pre-existing conditions",
@@ -37,7 +40,7 @@ const clauses = [
   "Work at heights",
   "Work at heights is carried out only with appropriate safe access, such as scaffolding, an elevating work platform or edge protection, as required by Victorian occupational health and safety law. If the required access equipment is not included in the quote, we will explain the extra cost and get your approval before proceeding. We may decline or pause work that cannot be done safely.",
   "Confined spaces",
-  "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that meets that definition. If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
+  "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that is a confined space under the Occupational Health and Safety Regulations 2017 (Vic). If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
 ];
 
 test("the terms page keeps the approved wording and stays public", () => {
