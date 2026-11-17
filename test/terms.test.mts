@@ -32,6 +32,7 @@ const clauses = [
   "We are not responsible for pre-existing defects, settlement or other movement, moisture, or work done by others before we started, except to the extent our work causes new damage.",
   "Variations",
   "Changes to the quoted scope, including customer-requested changes, are variations. We will explain any extra cost and get your approval before doing that work, except urgent make-safe work. Approved variations are charged at the agreed price.",
+  "Minor unforeseen repairs: During the works we may uncover a fault in an existing component that was not apparent at the time of quoting and that must be fixed to complete the job safely and properly. Typical examples are a failed non-return valve or a leaking pressure/temperature relief valve on a hot water system. Such components are often already worn, scaled or near the end of their life, and the fault may only become apparent once they are handled. It is a pre-existing condition, and not damage caused by our work. Where the additional cost of the repair (parts and labour) is $160 excluding GST ($176 including GST) or less, we may carry out the repair without seeking your prior approval, and it will be itemised separately on your invoice. Where it would exceed this amount, we will not proceed without your approval, except for make-safe work under the Variations clause.",
   "Asbestos and hazardous materials",
   "If we suspect asbestos or other hazardous material, we will stop work in the affected area. Testing and removal by appropriately licensed specialists is an extra cost. We will explain that cost and get your approval before that work goes ahead.",
   "Work at heights",
@@ -44,10 +45,15 @@ test("the terms page keeps the approved wording and stays public", () => {
   const page = readFileSync(new URL("../src/app/terms/page.tsx", import.meta.url), "utf8");
   assert.match(page, /title: "Terms and Conditions"/);
   assert.match(page, /path: "\/terms"/);
-  assert.match(page, /Last updated: 15 November 2026/);
+  assert.match(page, /Last updated: 17 November 2026/);
+  assert.equal(page.includes("Last updated: 15 November 2026"), false);
   assert.match(page, />Terms and Conditions</);
   assert.match(page, /ORO Services · Emoro Building and Emporo Plumbing/);
-  assert.ok(page.indexOf("ORO Services · Emoro Building and Emporo Plumbing") < page.indexOf("Last updated: 15 November 2026"));
+  const subtitleAt = page.indexOf("ORO Services · Emoro Building and Emporo Plumbing");
+  const clausesAt = page.indexOf('className="mt-10 space-y-10"');
+  const updatedAt = page.indexOf("Last updated: 17 November 2026");
+  assert.ok(subtitleAt < clausesAt && clausesAt < updatedAt);
+  assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 17 November 2026/);
   assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
   assert.ok(page.indexOf('heading: "Governing law"') < page.indexOf('heading: "Matching finishes"'));
