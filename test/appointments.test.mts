@@ -69,7 +69,7 @@ test("appointment copy asks for two options", () => {
   assert.equal(appointmentCount, 2);
   assert.equal(
     preferredArrivalHelp,
-    "Choose two different days and an arrival window for each. We'll confirm one of them with you. Our plumber will arrive within the window you pick.",
+    "Choose two different days and a preferred time for each. We'll confirm a time with you. Arrival times are estimates and may change.",
   );
   assert.equal(differentDatesMessage, "Choose two different dates.");
   assert.equal(tooManyAppointmentsMessage, "Choose two preferred options.");
@@ -116,7 +116,7 @@ test("validation rejects fewer than two options", () => {
   assert.equal(blankSecond.ok, false);
   if (missingSecond.ok || blankSecond.ok) return;
   assert.equal(missingSecond.errors.option2Date, "Choose a date for preferred option 2.");
-  assert.equal(missingSecond.errors.option2Window, "Choose an arrival window for preferred option 2.");
+  assert.equal(missingSecond.errors.option2Window, "Choose a preferred time for preferred option 2.");
   assert.equal(blankSecond.errors.option2Date, "Choose a date for preferred option 2.");
 });
 
@@ -171,7 +171,7 @@ test("dates must be from tomorrow through 60 days, with the window for that day"
   if (todayResult.ok || beyondResult.ok || wrongWindow.ok) return;
   assert.equal(todayResult.errors.option1Date, "Choose a date from tomorrow, within the next 60 days.");
   assert.equal(beyondResult.errors.option2Date, "Choose a date from tomorrow, within the next 60 days.");
-  assert.equal(wrongWindow.errors.option2Window, "Choose an arrival window for that day.");
+  assert.equal(wrongWindow.errors.option2Window, "Choose a preferred time for that day.");
 });
 
 test("server accepts two Emporo options and emails both", () => {
