@@ -30,6 +30,12 @@ const sections: { heading: string; paragraphs: string[] }[] = [
     ],
   },
   {
+    heading: "Domestic building work over $10,000",
+    paragraphs: [
+      "Domestic building work over $10,000: Where the work is domestic building work with a contract price over $10,000, it will be carried out under a separate written major domestic building contract signed by both of us, which takes priority over these terms. The acceptance and approval methods in these terms do not apply to that work, and any variation will be made by a signed variation notice as required by the Domestic Building Contracts Act 1995 (Vic).",
+    ],
+  },
+  {
     heading: "Call-outs, access and after-hours",
     paragraphs: [
       "The customer or their property manager should give at least 24 hours' notice to cancel or reschedule. If a booking is cancelled, or we cannot get safe access, with less than 24 hours' notice, we may charge a call-out fee limited to our reasonable time and travel already committed.",
@@ -58,7 +64,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
   {
     heading: "Workmanship and consumer rights",
     paragraphs: [
-      "We stand behind our workmanship. Parts and fixtures follow the manufacturer's warranty.",
+      "If you notice a problem with our workmanship, tell us promptly. We will inspect it and, where it is our responsibility, fix it at no cost to you. Parts and fixtures follow the manufacturer's warranty.",
       "Nothing in these terms excludes, restricts or modifies any right or consumer guarantee that cannot legally be excluded under the Australian Consumer Law or other applicable law.",
     ],
   },
