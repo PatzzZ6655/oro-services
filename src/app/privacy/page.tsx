@@ -24,8 +24,6 @@ export default function PrivacyPage() {
         This page explains what ORO Services does with the details you send us. It is written for an Australian small business and follows the idea of the Australian Privacy Principles: collect only what the form asks for, use it for the enquiry, and let you ask about it.
       </InteriorHero>
       <article className="mx-auto max-w-3xl space-y-8 px-6 py-16 text-slate-700">
-        <p className="text-sm text-slate-600">Last updated 8 November 2026.</p>
-
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">Who we are</h2>
           <p>
@@ -45,11 +43,19 @@ export default function PrivacyPage() {
             <li>Your email address</li>
             <li>Your phone number, if you choose to give one</li>
             <li>The suburb or area you give</li>
+            <li>The preferred appointment days and times you choose, for an Emporo Plumbing enquiry</li>
             <li>The brand and service you pick</li>
             <li>Your description of the job</li>
             <li>A photo, if you attach one</li>
           </ul>
           <p>If you email us yourself, we receive whatever you put in that email.</p>
+          <p>
+            The suburb field can suggest places as you type. Those suggestions use Google Maps Places autocomplete. The text you type in that field is sent to Google so it can return suggestions. Google explains what it does with that information in its{" "}
+            <a className="font-semibold text-brand-navy underline" href="https://policies.google.com/privacy">
+              privacy policy
+            </a>
+            .
+          </p>
         </section>
 
         <section className="space-y-3">
@@ -107,6 +113,8 @@ export default function PrivacyPage() {
             The public pages do not use advertising cookies. The form includes a field that people should leave blank so we can ignore automated submissions.
           </p>
         </section>
+
+        <p className="mt-16 text-xs text-slate-500">Last updated: 18 November 2026</p>
       </article>
     </SiteFrame>
   );

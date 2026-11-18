@@ -1,7 +1,7 @@
 export const appointmentCount = 2;
 
 export const preferredArrivalHelp =
-  "Choose two different days and an arrival window for each. We'll confirm one of them with you. Our plumber will arrive within the window you pick.";
+  "Choose two different days and a preferred time for each. We'll confirm a time with you. Arrival times are estimates and may change.";
 
 export const differentDatesMessage = "Choose two different dates.";
 
@@ -143,11 +143,11 @@ export function validateAppointments(
     }
 
     if (!windowId) {
-      errors[windowField] = `Choose an arrival window for preferred option ${optionNumber}.`;
+      errors[windowField] = `Choose a preferred time for preferred option ${optionNumber}.`;
     } else if (date && isRealCalendarDate(date)) {
       const match = windowById(date, windowId);
       if (!match) {
-        errors[windowField] = "Choose an arrival window for that day.";
+        errors[windowField] = "Choose a preferred time for that day.";
       } else {
         choices[index] = { date, windowId, windowLabel: match.label };
       }
