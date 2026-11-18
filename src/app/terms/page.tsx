@@ -109,6 +109,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
     heading: "Variations",
     paragraphs: [
       "Changes to the quoted scope, including customer-requested changes, are variations. We will explain any extra cost and get your approval before doing that work, except urgent make-safe work. Approved variations are charged at the agreed price.",
+      "Incidental repairs: During the works we may identify a defect in an existing component that is directly connected to, or affected by, the quoted works and that was not apparent at the time of quoting (for example, a failed non-return valve or a leaking pressure/temperature relief valve on the hot water system being serviced). Such components are often already worn, scaled or near the end of their service life, and the defect may only become apparent once they are handled; it is a pre-existing condition unless caused by our work. Where the additional cost of rectifying it (parts and labour) is $176 (including GST) or less, we may carry out the repair without seeking your prior approval, and it will be itemised separately on your invoice. This does not apply to materials or fixtures supplied by the customer, and a change of brand or model still needs your agreement under Product supply and substitutions. Defects in components unrelated to the quoted works, or repairs that would exceed this amount, will not proceed without your approval, except for urgent make-safe work under the Variations clause.",
     ],
   },
   {
@@ -137,17 +138,26 @@ export default function TermsPage() {
       <article className="terms-page mx-auto max-w-3xl px-6 pb-20 pt-32 text-base leading-relaxed text-slate-800 md:pt-36 print:pb-0 print:pt-0 print:text-brand-navy">
         <h1 className="text-4xl font-black tracking-tight text-brand-navy md:text-5xl">Terms and Conditions</h1>
         <p className="mt-4 text-sm text-slate-600 print:text-brand-navy">ORO Services · Emoro Building and Emporo Plumbing</p>
-        <p className="mt-1 text-sm text-slate-600 print:text-brand-navy">Last updated: 15 November 2026</p>
         <div className="mt-10 space-y-10">
           {sections.map((section) => (
             <section key={section.heading} className="space-y-4">
               <h2 className="text-2xl font-bold text-brand-navy">{section.heading}</h2>
-              {section.paragraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
+              {section.paragraphs.map((paragraph) => {
+                const leadIn = "Incidental repairs:";
+                if (paragraph.startsWith(`${leadIn} `)) {
+                  return (
+                    <p key={paragraph}>
+                      <strong>{leadIn}</strong>
+                      {paragraph.slice(leadIn.length)}
+                    </p>
+                  );
+                }
+                return <p key={paragraph}>{paragraph}</p>;
+              })}
             </section>
           ))}
         </div>
+        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 18 November 2026</p>
       </article>
     </SiteFrame>
   );
