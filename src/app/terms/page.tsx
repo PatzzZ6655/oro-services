@@ -100,6 +100,12 @@ const sections: { heading: string; paragraphs: string[] }[] = [
     ],
   },
   {
+    heading: "Investigative and diagnostic repairs",
+    paragraphs: [
+      "Some faults, such as leaks, intermittent defects and concealed issues, require a process of elimination, as the cause may not be visible or may be in more than one location. Where we repair or treat an area identified during an attendance, no warranty can be provided that this will completely resolve the issue until it has been monitored under normal conditions (for roof leaks, after suitable rainfall). If the issue continues, further investigation and/or repair may be required. We will explain any extra cost and get your approval before that work goes ahead, as set out in Variations. A continuing issue after an investigative repair is not, of itself, a defect in our workmanship.",
+    ],
+  },
+  {
     heading: "Variations",
     paragraphs: [
       "Changes to the quoted scope, including customer-requested changes, are variations. We will explain any extra cost and get your approval before doing that work, except urgent make-safe work. Approved variations are charged at the agreed price.",
@@ -151,7 +157,7 @@ export default function TermsPage() {
             </section>
           ))}
         </div>
-        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 18 November 2026</p>
+        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 19 November 2026</p>
       </article>
     </SiteFrame>
   );
