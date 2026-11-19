@@ -49,6 +49,10 @@ async function readPhoto(
   };
 }
 
+function logEnquirySendFailed(brand: string, hasPhoto: boolean): void {
+  console.error(JSON.stringify({ event: "enquiry_email_failed", brand, hasPhoto }));
+}
+
 async function sendWithGmail(enquiry: ParsedEnquiry, attachment?: Attachment): Promise<boolean> {
   return sendGmailMessage({
     to: enquiry.inbox,
@@ -76,7 +80,7 @@ export async function sendEnquiry(
   }
 
   const headerStore = await headers();
-  const limited = !allowEnquiry(clientAddress(headerStore));
+  const limited = !(await allowEnquiry(clientAddress(headerStore)));
   if (limited) {
     return {
       status: "limited",
@@ -103,6 +107,7 @@ export async function sendEnquiry(
   try {
     const sent = await sendWithGmail(parsed.value, photo.attachment);
     if (!sent) {
+      logEnquirySendFailed(parsed.value.brand, photo.attached);
       return {
         status: "fallback",
         inbox: parsed.value.inbox,
@@ -111,6 +116,7 @@ export async function sendEnquiry(
       };
     }
   } catch {
+    logEnquirySendFailed(parsed.value.brand, photo.attached);
     return {
       status: "fallback",
       inbox: parsed.value.inbox,
