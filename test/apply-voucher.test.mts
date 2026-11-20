@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JOBS_COOKIE, signJobsSession } from "@/lib/jobs-app/session";
-import { applyVoucherStatus, canApplyVoucher, notionPageId, voucherNote } from "@/lib/jobs-app/voucher";
+import { applyVoucherStatus, canApplyVoucher, notionPageId, voucherNote, voucherSmsTemplates } from "@/lib/jobs-app/voucher";
 
 const SECRET = "test-make-secret";
 const PAGE = "0123456789abcdef0123456789abcdef";
@@ -45,6 +45,16 @@ test("unknown voucher statuses become none, and a failed mark is a warning", () 
   assert.equal(canApplyVoucher({ hasJob: false, code: "EMB-1", pending: false, redeemed: false }), false);
   assert.equal(canApplyVoucher({ hasJob: true, code: "  ", pending: false, redeemed: false }), false);
   assert.equal(canApplyVoucher({ hasJob: true, code: "EMP-1", pending: false, redeemed: false }), true);
+  const [approved, reduced] = voucherSmsTemplates(" emb-1 ");
+  assert.equal(approved, "Thanks [Name], your job is approved. Voucher emb-1 has been applied (-$60). Final price: $[X] incl GST.");
+  assert.equal(
+    reduced,
+    "Hi [Name], as discussed we've reduced the price to $[X] incl GST. As vouchers can't be combined with other discounts, voucher emb-1 is no longer valid.",
+  );
+  const [blankApproved] = voucherSmsTemplates("  ");
+  assert.equal(blankApproved.includes("[CODE]"), true);
+  assert.equal(blankApproved.includes("[Name]"), true);
+  assert.equal(blankApproved.includes("[X]"), true);
 });
 
 test("apply voucher posts mode and a 32-hex id, and maps a failed update", async () => {

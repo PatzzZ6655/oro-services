@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs } from "@/components/jobs/api";
 import { BackLink, JobsButton, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
-import { canApplyVoucher, notionPageId } from "@/lib/jobs-app/voucher";
+import { canApplyVoucher, notionPageId, voucherSmsTemplates } from "@/lib/jobs-app/voucher";
 import { businessLabel, type ApplyVoucherResult, type Business, type TodayJob } from "@/lib/jobs-app/types";
 
 type TodayResponse = { ok: true; date: string; jobs: TodayJob[] };
@@ -29,6 +29,8 @@ export function ApplyVoucherScreen() {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ApplyVoucherResult | null>(null);
   const [error, setError] = useState("");
+  const [smsEdits, setSmsEdits] = useState<[string | null, string | null]>([null, null]);
+  const [copied, setCopied] = useState<number | null>(null);
 
   useEffect(() => {
     let cancel = false;
@@ -58,6 +60,8 @@ export function ApplyVoucherScreen() {
   const redeemed = result?.voucherStatus === "redeemed";
   const ready = canApplyVoucher({ hasJob, code, pending, redeemed });
   const selected = usingPaste ? (matched?.title ?? (pastedId ? "Pasted job" : "none")) : (chosen?.title ?? "none");
+  const sms = voucherSmsTemplates(code);
+  const smsTexts: [string, string] = [smsEdits[0] ?? sms[0], smsEdits[1] ?? sms[1]];
   const green = Boolean(result && result.voucherStatus === "redeemed" && result.noteWritten);
   const issued = result && business ? issuerLine(result.voucherBusiness, result.business) : null;
 
@@ -88,6 +92,13 @@ export function ApplyVoucherScreen() {
     setError("");
     setCode("");
     setPending(false);
+    setSmsEdits([null, null]);
+    setCopied(null);
+  }
+
+  async function copySms(index: 0 | 1) {
+    await navigator.clipboard.writeText(smsTexts[index]);
+    setCopied(index);
   }
 
   return (
@@ -154,6 +165,35 @@ export function ApplyVoucherScreen() {
           className={fieldClass}
         />
       </label>
+      {hasJob ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-semibold">SMS templates</h2>
+          {(
+            [
+              ["Job approved", 0],
+              ["Price reduced", 1],
+            ] as const
+          ).map(([label, index]) => (
+            <label key={label} className="flex flex-col gap-2 text-base">
+              {label}
+              <textarea
+                value={smsTexts[index]}
+                rows={6}
+                onChange={(event) => {
+                  const next: [string | null, string | null] = [...smsEdits];
+                  next[index] = event.target.value;
+                  setSmsEdits(next);
+                  setCopied(null);
+                }}
+                className={`${fieldClass} py-3`}
+              />
+              <JobsButton type="button" variant="outline" onClick={() => copySms(index)}>
+                {copied === index ? "Copied" : "Copy"}
+              </JobsButton>
+            </label>
+          ))}
+        </section>
+      ) : null}
       <JobsButton type="button" onClick={apply} disabled={!ready}>
         {pending ? (
           <span className="flex items-center gap-3">

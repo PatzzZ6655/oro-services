@@ -44,6 +44,14 @@ export function canApplyVoucher(input: { hasJob: boolean; code: string; pending:
   return input.hasJob && input.code.trim().length > 0 && !input.pending && !input.redeemed;
 }
 
+export function voucherSmsTemplates(code: string): [string, string] {
+  const token = code.trim() || "[CODE]";
+  return [
+    `Thanks [Name], your job is approved. Voucher ${token} has been applied (-$60). Final price: $[X] incl GST.`,
+    `Hi [Name], as discussed we've reduced the price to $[X] incl GST. As vouchers can't be combined with other discounts, voucher ${token} is no longer valid.`,
+  ];
+}
+
 export function voucherNote(
   status: VoucherStatus,
   code: string,
