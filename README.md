@@ -97,7 +97,9 @@ Register these redirect URIs on the Google OAuth client:
 | Local | `http://localhost:3000/jobs/auth/google/callback` |
 | A Vercel preview | `https://<preview-host>/jobs/auth/google/callback` |
 
-Only a verified Google email in `JOBS_ALLOWED_EMAILS` can sign in. Anyone else sees Not authorised. The session cookie is httpOnly, signed, and lasts about 180 days.
+Only a verified Google email in `JOBS_ALLOWED_EMAILS` can sign in. Pat's address is `pat.z@orosvc.com`. Anyone else sees Not authorised. The session cookie is httpOnly, signed, and lasts about 180 days.
+
+New work order has an optional voucher code. Codes look like `EMB-XXXXXX` or `EMP-XXXXXX`. The app sends it as the multipart field `voucher`.
 
 From the iPhone home-screen icon, sign-in is a normal navigation to Google and back. iOS may open Google in Safari instead of the installed app. Safari and the home-screen app do not share cookies, so a sign-in that finishes in Safari does not unlock the icon. If Google shows `disallowed_useragent`, the home-screen webview was treated as an embedded browser. In that case, open `https://www.orosvc.com/jobs` in Safari and use it there. The callback stays under `/jobs`, which is the installed app's scope, so iOS can open the return URL in the icon when it stays in that window.
 

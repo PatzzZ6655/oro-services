@@ -13,6 +13,7 @@ import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
+import { voucherNote } from "@/lib/jobs-app/voucher";
 
 const SECRET = "test-make-secret";
 const ALLOWED = "pat.z@orosvc.com";
@@ -80,7 +81,7 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
   useEnv();
   const { leaveJob } = await import("@/lib/jobs-app/webhooks");
   const original = globalThis.fetch;
-  const tenantText = "Hi Sam, thanks for having us. Your $60 voucher is VCH-60, valid to 31 Jan 2027. Review: https://g.page/r/example";
+  const tenantText = "Hi Sam, thanks for having us. Your $60 voucher is EMB-123456, valid to 31 Jan 2027. Review: https://g.page/r/example";
   globalThis.fetch = (async () =>
     jsonResponse({
       ok: true,
@@ -97,7 +98,7 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
       ],
       summary: "第 2 趟已离开。整单完工。",
       pmEmailedTo: "",
-      voucherCode: "VCH-60",
+      voucherCode: "EMB-123456",
       voucherExpiry: "2027-01-31",
       driveLink: "https://drive.google.com/drive/folders/example",
     })) as typeof fetch;
@@ -112,13 +113,64 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
     const result = await leaveJob(form);
     assert.equal(result.status, 200);
     if (!result.body.ok) throw new Error(result.body.message);
-    assert.equal(result.body.voucherCode, "VCH-60");
+    assert.equal(result.body.voucherCode, "EMB-123456");
     assert.equal(result.body.voucherExpiry, "2027-01-31");
     assert.equal(result.body.pmEmailedTo, "");
     const body = tenantSms(result.body.sms, result.body.contacts, ["+61411111111", "+61412222222"]);
     assert.equal(body, tenantText);
-    assert.equal(body.includes("VCH-60"), true);
+    assert.equal(body.includes("EMB-123456"), true);
     assert.equal(body.includes("https://g.page/r/example"), true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("a new work order sends an optional EMB or EMP voucher code", async () => {
+  useEnv();
+  const { createJob } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  let sent = "";
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    const form = init?.body;
+    if (form instanceof FormData) sent = String(form.get("voucher") ?? "");
+    return jsonResponse({
+      jobUrl: "https://www.notion.so/job-1",
+      jobTitle: "Hot water",
+      voucherStatus: "redeemed",
+      voucherCode: "EMP-654321",
+      voucherValue: 60,
+    });
+  }) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emporo");
+    form.set("voucher", "  emp-654321  ");
+    form.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const result = await createJob(form);
+    assert.equal(sent, "EMP-654321");
+    assert.equal(result.status, 200);
+    if (!result.body.ok) throw new Error(result.body.message);
+    assert.equal(result.body.voucherStatus, "redeemed");
+    assert.equal(result.body.voucherCode, "EMP-654321");
+    assert.equal(result.body.voucherValue, "60");
+    assert.equal(voucherNote(result.body.voucherStatus, result.body.voucherCode, result.body.voucherValue)?.text, "已核销 EMP-654321，减 $60");
+    assert.match(voucherNote("notFound", "", "")?.text ?? "", /工单仍已创建/);
+    assert.match(voucherNote("alreadyRedeemed", "", "")?.text ?? "", /工单仍已创建/);
+    assert.match(voucherNote("expired", "", "")?.text ?? "", /工单仍已创建/);
+    assert.equal(voucherNote("none", "", ""), null);
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  globalThis.fetch = (async () => jsonResponse({ jobUrl: "https://www.notion.so/job-2", jobTitle: "Leak" })) as typeof fetch;
+  try {
+    const plain = new FormData();
+    plain.set("business", "emoro");
+    plain.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const result = await createJob(plain);
+    if (!result.body.ok) throw new Error(result.body.message);
+    assert.equal(result.body.voucherStatus, "none");
+    assert.equal(result.body.voucherCode, "");
   } finally {
     globalThis.fetch = original;
   }

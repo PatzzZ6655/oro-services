@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
-import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner } from "@/components/jobs/ui";
+import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
+import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
 
@@ -12,6 +13,19 @@ function created(value: boolean | null): string {
   if (value === true) return "新建";
   if (value === false) return "已有";
   return "—";
+}
+
+function VoucherLine({ status, code, value }: { status: NewJobResult["voucherStatus"]; code: string; value: string }) {
+  const note = voucherNote(status, code, value);
+  if (!note) return null;
+  if (note.tone === "warn") {
+    return (
+      <p role="alert" className="rounded-2xl border border-black px-4 py-3 text-base">
+        {note.text}
+      </p>
+    );
+  }
+  return <p className="text-base">{note.text}</p>;
 }
 
 function Line({ label, value }: { label: string; value: string }) {
@@ -27,6 +41,7 @@ function Line({ label, value }: { label: string; value: string }) {
 export function NewJobScreen() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [voucher, setVoucher] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<NewJobResult | null>(null);
@@ -53,6 +68,8 @@ export function NewJobScreen() {
       }
       const form = new FormData();
       form.set("business", business);
+      const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
+      if (code) form.set("voucher", code);
       for (const file of compressed) form.append("images", file);
       setResult(await postJobsForm<NewJobResult>("/jobs/api/new", form));
     } catch (reason) {
@@ -84,6 +101,7 @@ export function NewJobScreen() {
         <p className="text-base">
           新建了：房产 {created(result.propertyCreated)} · 客户 {created(result.customerCreated)} · 联系人 {created(result.contact1Created)}
         </p>
+        <VoucherLine status={result.voucherStatus} code={result.voucherCode} value={result.voucherValue} />
         {result.jobUrl ? (
           <JobsLink href={result.jobUrl} variant="outline">
             在 Notion 中打开
@@ -126,6 +144,18 @@ export function NewJobScreen() {
             />
           </label>
           <p className="text-base">{files.length > 0 ? `已选 ${files.length} 张，最多 ${NEW_JOB_MAX_IMAGES} 张` : `最多 ${NEW_JOB_MAX_IMAGES} 张截图`}</p>
+          <label className="flex flex-col gap-2 text-base">
+            Voucher 码（可选）
+            <input
+              value={voucher}
+              onChange={(event) => setVoucher(event.target.value.toUpperCase())}
+              placeholder="EMB-XXXXXX / EMP-XXXXXX"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              className={fieldClass}
+            />
+          </label>
           <JobsButton type="button" onClick={submit}>
             建立工单
           </JobsButton>

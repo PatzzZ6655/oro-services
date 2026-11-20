@@ -1,3 +1,5 @@
+import type { VoucherStatus } from "@/lib/jobs-app/voucher";
+
 export type Business = "emoro" | "emporo";
 
 export function isBusiness(value: unknown): value is Business {
@@ -85,6 +87,10 @@ export type NewJobResult = {
   propertyCreated: boolean | null;
   customerCreated: boolean | null;
   contact1Created: boolean | null;
+  voucherStatus: VoucherStatus;
+  voucherCode: string;
+  voucherValue: string;
+  voucherMessage: string;
 };
 
 export type JobsResult<T> = { status: number; body: T | JobsError };

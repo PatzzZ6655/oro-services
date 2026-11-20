@@ -1,5 +1,6 @@
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
+import { cleanVoucherCode, voucherStatus } from "@/lib/jobs-app/voucher";
 import {
   isBusiness,
   type Business,
@@ -407,7 +408,10 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
   if (!config) return unconfigured();
   const call = fetchImpl ?? globalThis.fetch;
   try {
-    const result = await postForm(config.newJob, formBody({ secret: config.secret, business }, images.files, "images"), call);
+    const voucher = cleanVoucherCode(fieldText(form.get("voucher"), 40));
+    const fields: Record<string, string> = { secret: config.secret, business };
+    if (voucher) fields.voucher = voucher;
+    const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
     const error = failure(result.status, result.json);
     if (error || !result.json) {
       const body = error ?? upstream().body;
@@ -438,6 +442,10 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
         propertyCreated: flag(result.json.propertyCreated),
         customerCreated: flag(result.json.customerCreated),
         contact1Created: flag(result.json.contact1Created),
+        voucherStatus: voucherStatus(result.json.voucherStatus),
+        voucherCode: text(result.json.voucherCode, 40, secret),
+        voucherValue: text(result.json.voucherValue, 20, secret),
+        voucherMessage: text(result.json.voucherMessage, 300, secret),
       },
     };
   } catch {
