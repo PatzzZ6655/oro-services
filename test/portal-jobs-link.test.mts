@@ -15,9 +15,10 @@ test("the job web app entry is limited to Pat on the server", () => {
   assert.match(source, /\{showOroJobsApp\(user\.email\) \? <OroJobsApp \/> : null\}/);
   const start = source.indexOf("function OroJobsApp");
   const tile = source.slice(start, source.indexOf("async function recentReports"));
-  assert.match(tile, /href="\/jobs"/);
-  assert.match(tile, /ORO 工单 \(Jobs\)/);
+  assert.match(tile, /href="https:\/\/www\.orosvc\.com\/jobs"/);
+  assert.match(tile, />ORO Jobs</);
   assert.match(tile, /Job web app/);
+  assert.equal(/[\u3400-\u9fff]/.test(tile), false);
   assert.equal(tile.includes("tape.orosvc.com"), false);
   assert.equal(tile.includes("target="), false);
 });
