@@ -22,3 +22,14 @@ test("the job web app entry is limited to Pat on the server", () => {
   assert.equal(tile.includes("tape.orosvc.com"), false);
   assert.equal(tile.includes("target="), false);
 });
+
+test("the staff header can leave the portal without a homepage redirect", () => {
+  const header = readFileSync(new URL("../src/components/internal/portal-frame.tsx", import.meta.url), "utf8");
+  const home = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+  assert.match(header, /const publicHome = "https:\/\/www\.orosvc\.com\/"/);
+  assert.match(header, /<a href=\{publicHome\}[\s\S]*<LogoImage/);
+  assert.match(header, />\s*Home\s*</);
+  assert.equal((header.match(/href=\{publicHome\}/g) ?? []).length, 2);
+  assert.equal(home.includes('redirect("/internal")'), false);
+  assert.equal(home.includes("redirect("), false);
+});
