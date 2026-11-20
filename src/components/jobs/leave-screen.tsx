@@ -34,23 +34,23 @@ export function LeaveScreen() {
   const [finished, setFinished] = useState<ActiveVisit | null>(null);
   const current = finished ?? visit;
 
-  if (!ready) return <Screen title="离开"><Spinner label="正在打开" /></Screen>;
+  if (!ready) return <Screen title="Leave"><Spinner label="Opening" /></Screen>;
 
   if (result && current) {
     return (
-      <Screen title="离开" back={<BackLink href="/jobs" />}>
-        <p className="whitespace-pre-wrap text-lg">{result.summary || "已记录离开。"}</p>
+      <Screen title="Leave" back={<BackLink href="/jobs" />}>
+        <p className="whitespace-pre-wrap text-lg">{result.summary || "Visit recorded."}</p>
         {result.driveLink ? (
           <JobsLink href={result.driveLink} variant="outline">
-            打开照片文件夹
+            Open photo folder
           </JobsLink>
         ) : null}
-        {result.pmEmailedTo ? <p className="text-base">完工邮件已发给：{result.pmEmailedTo}</p> : null}
+        {result.pmEmailedTo ? <p className="text-base">Completion email sent to: {result.pmEmailedTo}</p> : null}
         {result.outcome === "complete" && result.voucherCode ? (
           <section className="rounded-2xl border border-black px-4 py-4">
-            <p className="text-sm">$60 感谢券</p>
+            <p className="text-sm">$60 thank-you voucher</p>
             <p className="mt-1 break-all text-2xl font-semibold tracking-wide">{result.voucherCode}</p>
-            {result.voucherExpiry ? <p className="mt-2 text-base">有效期至 {result.voucherExpiry}</p> : null}
+            {result.voucherExpiry ? <p className="mt-2 text-base">Valid until {result.voucherExpiry}</p> : null}
           </section>
         ) : null}
         <SmsPicker
@@ -70,7 +70,7 @@ export function LeaveScreen() {
             router.refresh();
           }}
         >
-          完成
+          Done
         </JobsButton>
       </Screen>
     );
@@ -78,10 +78,10 @@ export function LeaveScreen() {
 
   if (!visit || blocked) {
     return (
-      <Screen title="离开" back={<BackLink href="/jobs" />}>
+      <Screen title="Leave" back={<BackLink href="/jobs" />}>
         <Alert>
-          {blocked ? "这个工单没有未离开的到访。请先点" : "请先点"}
-          <span className="whitespace-nowrap">「出发」</span>。
+          {blocked ? "No open visit for this job. Tap " : "Tap "}
+          <span className="whitespace-nowrap">Depart</span> first.
         </Alert>
         {blocked ? (
           <JobsButton
@@ -92,11 +92,11 @@ export function LeaveScreen() {
               router.refresh();
             }}
           >
-            清除出发记录
+            Clear this departure
           </JobsButton>
         ) : (
           <Link href="/jobs/depart" className="flex min-h-14 items-center justify-center rounded-2xl bg-black text-lg font-semibold text-white">
-            去出发
+            Go to Depart
           </Link>
         )}
       </Screen>
@@ -112,7 +112,7 @@ export function LeaveScreen() {
 
   async function send(files: File[]) {
     setDrop(null);
-    setBusy("正在提交");
+    setBusy("Sending");
     setError("");
     const form = new FormData();
     form.set("business", visit?.business ?? "");
@@ -136,7 +136,7 @@ export function LeaveScreen() {
         setBlocked(true);
         return;
       }
-      setError(reason instanceof JobsClientError ? reason.message : "服务器没有返回内容。请稍后再试。");
+      setError(reason instanceof JobsClientError ? reason.message : "The server did not reply. Try again.");
     } finally {
       setBusy("");
     }
@@ -147,11 +147,11 @@ export function LeaveScreen() {
     setDrop(null);
     if (!outcome) return;
     try {
-      setBusy("正在压缩照片");
+      setBusy("Compressing photos");
       const compressed = photos.length > 0 ? await compressFiles(photos, LEAVE_MAX_EDGE, LEAVE_QUALITIES) : [];
       const count = keptCount(compressed.map((file) => file.size));
       if (photos.length > 0 && count === 0) {
-        setError("照片太大，请少选几张。");
+        setError("The photos are too large. Choose fewer.");
         setBusy("");
         return;
       }
@@ -163,19 +163,19 @@ export function LeaveScreen() {
       await send(compressed.slice(0, count));
     } catch {
       setBusy("");
-      setError("这张照片没法压缩，请换一张 JPEG。");
+      setError("This photo could not be compressed. Use a JPEG.");
     }
   }
 
   return (
     <Screen
-      title="离开"
+      title="Leave"
       back={
         step === "checklist" ? (
           <BackLink href="/jobs" />
         ) : (
           <button type="button" className="min-h-11 text-base font-semibold underline" onClick={() => setStep(step === "details" ? "outcome" : "checklist")}>
-            返回
+            Back
           </button>
         )
       }
@@ -187,7 +187,7 @@ export function LeaveScreen() {
 
       {step === "checklist" && !busy ? (
         <div className="flex flex-col gap-3">
-          <p>离开前确认。没做到的不要勾。</p>
+          <p>Check what you finished. Leave unticked anything you did not do.</p>
           <ul className="flex flex-col gap-2">
             {REQUIRED_ITEMS.map((item) => (
               <li key={item}>
@@ -203,7 +203,7 @@ export function LeaveScreen() {
                   <input type="checkbox" className="h-6 w-6 accent-black" checked={selected.has(item)} onChange={() => toggle(item)} />
                   <span className="text-base">
                     {item}
-                    <span className="mt-1 block text-sm text-neutral-600">可选，不勾也不算缺</span>
+                    <span className="mt-1 block text-sm text-neutral-600">Optional. Leaving this unticked is fine.</span>
                   </span>
                 </label>
               </li>
@@ -216,36 +216,36 @@ export function LeaveScreen() {
               else setStep("outcome");
             }}
           >
-            下一步
+            Next
           </JobsButton>
         </div>
       ) : null}
 
       {step === "outcome" && !busy ? (
         <div className="flex flex-col gap-3">
-          <p>本次结束</p>
+          <p>How does this visit end?</p>
           <JobsButton type="button" onClick={() => { setOutcome("return"); setStep("details"); }}>
-            还要再来
+            Coming back
           </JobsButton>
           <JobsButton type="button" variant="outline" onClick={() => { setOutcome("complete"); setStep("details"); }}>
-            整单完工
+            Job complete
           </JobsButton>
-          <p className="text-sm">整单完工会给中介发邮件。还要再来不会。</p>
+          <p className="text-sm">Job complete closes this work order. Coming back leaves it open for another visit.</p>
         </div>
       ) : null}
 
       {step === "details" && !busy ? (
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-2 text-base">
-            备注（可选，可用键盘听写）
+            Notes (optional, dictation works)
             <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className={`${fieldClass} py-3`} />
           </label>
           <label className="flex flex-col gap-2 text-base">
-            发现的其他问题（可选，只记到 Notion，不会写进短信，也不会发给中介）
+            Other issues found (optional, saved to Notion only, not in the SMS or the property-manager email)
             <textarea value={issues} onChange={(event) => setIssues(event.target.value)} rows={3} className={`${fieldClass} py-3`} />
           </label>
           <label className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-black text-lg font-semibold">
-            选择照片
+            Choose photos
             <input
               type="file"
               accept="image/*"
@@ -257,9 +257,9 @@ export function LeaveScreen() {
               }}
             />
           </label>
-          {photos.length > 0 ? <p>已选 {photos.length} 张</p> : <p>可以不选照片。</p>}
+          {photos.length > 0 ? <p>{photos.length} selected</p> : <p>Photos are optional.</p>}
           <JobsButton type="button" onClick={() => submit(false)}>
-            提交
+            Submit
           </JobsButton>
         </div>
       ) : null}
@@ -267,7 +267,7 @@ export function LeaveScreen() {
       {warn ? (
         <div role="alertdialog" aria-labelledby="missing-title" className="fixed inset-0 z-20 flex items-end bg-black/40 p-4">
           <div className="w-full rounded-2xl bg-white p-4">
-            <h2 id="missing-title" className="text-lg font-semibold">这些还没确认</h2>
+            <h2 id="missing-title" className="text-lg font-semibold">These are not confirmed</h2>
             <ul className="mt-3 flex flex-col gap-2">
               {review.missing.map((item) => (
                 <li key={item}>{item}</li>
@@ -275,7 +275,7 @@ export function LeaveScreen() {
             </ul>
             <div className="mt-4 flex flex-col gap-3">
               <JobsButton type="button" onClick={() => setWarn(false)}>
-                返回补做
+                Go back and finish
               </JobsButton>
               <JobsButton
                 type="button"
@@ -285,7 +285,7 @@ export function LeaveScreen() {
                   setStep("outcome");
                 }}
               >
-                仍然继续
+                Continue anyway
               </JobsButton>
             </div>
           </div>
@@ -295,14 +295,14 @@ export function LeaveScreen() {
       {drop ? (
         <div role="alertdialog" aria-labelledby="drop-title" className="fixed inset-0 z-20 flex items-end bg-black/40 p-4">
           <div className="w-full rounded-2xl bg-white p-4">
-            <h2 id="drop-title" className="text-lg font-semibold">有 {drop.dropped} 张放不下</h2>
-            <p className="mt-2 text-base">单次大约 4 MB。可以只上传前面的 {drop.kept.length} 张。</p>
+            <h2 id="drop-title" className="text-lg font-semibold">{drop.dropped} photos do not fit</h2>
+            <p className="mt-2 text-base">One upload is about 4 MB. You can send the first {drop.kept.length}.</p>
             <div className="mt-4 flex flex-col gap-3">
               <JobsButton type="button" variant="outline" onClick={() => setDrop(null)}>
-                返回重选
+                Choose again
               </JobsButton>
               <JobsButton type="button" onClick={() => send(drop.kept)}>
-                只上传前 {drop.kept.length} 张
+                Upload the first {drop.kept.length}
               </JobsButton>
             </div>
           </div>

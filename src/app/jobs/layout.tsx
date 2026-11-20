@@ -2,14 +2,14 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: { default: "ORO 工单", template: "%s · ORO 工单" },
-  applicationName: "ORO 工单",
+  title: { default: "ORO Jobs", template: "%s · ORO Jobs" },
+  applicationName: "ORO Jobs",
   description: "ORO Services field jobs",
   robots: { index: false, follow: false, nocache: true },
   manifest: "/jobs/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "ORO 工单",
+    title: "ORO Jobs",
     statusBarStyle: "default",
   },
   icons: {
@@ -34,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function JobsLayout({ children }: { children: ReactNode }) {
   return (
-    <div lang="zh-Hans" className="min-h-dvh bg-white text-black">
+    <div lang="en" className="min-h-dvh bg-white text-black">
       {children}
     </div>
   );

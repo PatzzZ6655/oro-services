@@ -52,11 +52,11 @@ function makeConfig(): { secret: string; today: string; depart: string; leave: s
 }
 
 function unconfigured(): JobsResult<never> {
-  return { status: 503, body: { ok: false, error: "unconfigured", message: "服务器还没配好。" } };
+  return { status: 503, body: { ok: false, error: "unconfigured", message: "The server is not set up yet." } };
 }
 
 function upstream(): JobsResult<never> {
-  return { status: 502, body: { ok: false, error: "upstream", message: "服务器没有返回内容。请稍后再试。" } };
+  return { status: 502, body: { ok: false, error: "upstream", message: "The server did not reply. Try again." } };
 }
 
 function statusFor(error: JobsError, upstreamStatus: number): number {
@@ -105,14 +105,14 @@ function failure(status: number, json: Record<string, unknown> | null): JobsErro
   const failed = status >= 400 || (json?.ok === false) || raw.length > 0;
   if (!failed && json) return null;
   if (status === 409 || /no open visit/i.test(raw)) {
-    return { ok: false, error: "no_open_visit", message: "这个工单没有未离开的到访。请先点「出发」。" };
+    return { ok: false, error: "no_open_visit", message: "No open visit for this job. Tap Depart first." };
   }
   if (status === 401 || raw === "unauthorized") {
-    return { ok: false, error: "webhook_unauthorized", message: "密钥错误。" };
+    return { ok: false, error: "webhook_unauthorized", message: "The server key was rejected." };
   }
-  if (raw === "noAddress") return { ok: false, error: "no_address", message: "没读到地址，请换更清楚的截图。" };
-  if (raw === "needBusiness") return { ok: false, error: "need_business", message: "看不出是 Emoro 还是 Emporo，请重试并选择。" };
-  return { ok: false, error: "upstream", message: "服务器没有返回内容。请稍后再试。" };
+  if (raw === "noAddress") return { ok: false, error: "no_address", message: "No address was read. Try a clearer screenshot." };
+  if (raw === "needBusiness") return { ok: false, error: "need_business", message: "Could not tell Emoro from Emporo. Choose one and try again." };
+  return { ok: false, error: "upstream", message: "The server did not reply. Try again." };
 }
 
 function phoneList(value: unknown, secret: string): string[] {
@@ -285,15 +285,15 @@ export async function readUpload(form: FormData, field: string, maxCount: number
   for (const item of form.getAll(field)) {
     if (!(item instanceof File) || item.size <= 0) continue;
     if (!IMAGE_TYPES.has(item.type)) {
-      return { ok: false, status: 400, body: { ok: false, error: "bad_request", message: "请选择 JPEG 照片。" } };
+      return { ok: false, status: 400, body: { ok: false, error: "bad_request", message: "Choose a JPEG photo." } };
     }
     if (files.length >= maxCount) {
-      const message = field === "images" ? "最多 4 张截图。" : "照片太多，请少选几张。";
+      const message = field === "images" ? "At most 4 screenshots." : "Too many photos. Choose fewer.";
       return { ok: false, status: 400, body: { ok: false, error: "bad_request", message } };
     }
     total += item.size;
     if (item.size > UPLOAD_BUDGET_BYTES || total > UPLOAD_BUDGET_BYTES) {
-      return { ok: false, status: 413, body: { ok: false, error: "too_large", message: "照片太大，请少选几张。" } };
+      return { ok: false, status: 413, body: { ok: false, error: "too_large", message: "The photos are too large. Choose fewer." } };
     }
     files.push({
       name: `photo-${files.length + 1}.jpg`,
@@ -341,7 +341,7 @@ export async function leaveJob(form: FormData, fetchImpl?: FetchLike): Promise<J
   const jobId = cleanJobId(form.get("jobId"));
   const outcome = form.get("outcome");
   if (!isBusiness(business) || !jobId || (outcome !== "return" && outcome !== "complete")) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "请求不对" } };
+    return { status: 400, body: { ok: false, error: "bad_request", message: "That request was not valid." } };
   }
   const photos = await readUpload(form, "photos", LEAVE_MAX_PHOTOS);
   if (!photos.ok) return photos;
@@ -397,12 +397,12 @@ export async function leaveJob(form: FormData, fetchImpl?: FetchLike): Promise<J
 export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<JobsResult<NewJobResult>> {
   const business = form.get("business");
   if (!isBusiness(business)) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "请选择 Emoro 还是 Emporo。" } };
+    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose Emoro or Emporo." } };
   }
   const images = await readUpload(form, "images", NEW_JOB_MAX_IMAGES);
   if (!images.ok) return images;
   if (images.files.length === 0) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "请选择截图。" } };
+    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose a screenshot." } };
   }
   const config = makeConfig();
   if (!config) return unconfigured();

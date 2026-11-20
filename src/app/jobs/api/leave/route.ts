@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     form = await request.formData();
   } catch {
-    return jobsJson({ ok: false, error: "bad_request", message: "请求不对" }, 400);
+    return jobsJson({ ok: false, error: "bad_request", message: "That request was not valid." }, 400);
   }
   const result = await leaveJob(form);
   return jobsJson(result.body, result.status);

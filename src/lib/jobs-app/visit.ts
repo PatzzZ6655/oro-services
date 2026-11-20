@@ -42,11 +42,11 @@ export function formatMelbourne(value: string): string {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Melbourne",
-    month: "numeric",
     day: "numeric",
-    hour: "2-digit",
+    month: "short",
+    hour: "numeric",
     minute: "2-digit",
   }).format(date);
 }

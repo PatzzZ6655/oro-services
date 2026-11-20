@@ -11,12 +11,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return jobsJson({ ok: false, error: "bad_request", message: "请求不对" }, 400);
+    return jobsJson({ ok: false, error: "bad_request", message: "That request was not valid." }, 400);
   }
   const record = body && typeof body === "object" ? (body as { business?: unknown; jobId?: unknown }) : {};
   const jobId = cleanJobId(record.jobId);
   if (!isBusiness(record.business) || !jobId) {
-    return jobsJson({ ok: false, error: "bad_request", message: "请求不对" }, 400);
+    return jobsJson({ ok: false, error: "bad_request", message: "That request was not valid." }, 400);
   }
   const result = await departJob(record.business, jobId);
   return jobsJson(result.body, result.status);

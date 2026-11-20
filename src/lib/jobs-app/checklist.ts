@@ -1,14 +1,14 @@
 export const REQUIRED_ITEMS = [
-  "完工照片已拍（含前后对比）",
-  "水电气已恢复并测试、无漏水",
-  "现场已清理、家具归位",
-  "工具材料已带走",
-  "门窗已锁好",
+  "Before-and-after photos taken",
+  "Water, power and gas restored, tested, no leaks",
+  "Site cleaned and furniture put back",
+  "Tools and materials taken",
+  "Doors and windows locked",
 ] as const;
 
 export const OPTIONAL_ITEMS = [
-  "钥匙已归还（含换锁后的新钥匙交回中介办公室）",
-  "已向租客交代维修情况（租客不在可不选）",
+  "Keys returned, including new keys after a lock change, back to the agency",
+  "Told the tenant what was repaired (skip if they are out)",
 ] as const;
 
 export function checklistText(checked: ReadonlySet<string>): { text: string; missing: string[] } {
@@ -24,5 +24,5 @@ export function checklistText(checked: ReadonlySet<string>): { text: string; mis
   for (const item of OPTIONAL_ITEMS) {
     lines.push(checked.has(item) ? `✔ ${item}` : `✘ ${item}`);
   }
-  return { text: lines.join("；"), missing };
+  return { text: lines.join("; "), missing };
 }

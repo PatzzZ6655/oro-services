@@ -53,9 +53,9 @@ test("the checklist marks required gaps and keeps optional items out of them", (
   assert.equal(result.missing.length, 4);
   assert.equal(result.missing.includes(OPTIONAL_ITEMS[0]), false);
   assert.equal(result.missing.includes(OPTIONAL_ITEMS[1]), false);
-  assert.match(result.text, new RegExp(`✔ ${REQUIRED_ITEMS[0]}`));
-  assert.match(result.text, new RegExp(`✘ ${OPTIONAL_ITEMS[0]}`));
-  assert.equal(result.text.includes("；"), true);
+  assert.equal(result.text.includes(`✔ ${REQUIRED_ITEMS[0]}`), true);
+  assert.equal(result.text.includes(`✘ ${OPTIONAL_ITEMS[0]}`), true);
+  assert.equal(result.text.includes("; "), true);
 });
 
 test("a group message names the ticked tenants and uses the iOS group link", () => {
@@ -157,10 +157,10 @@ test("a new work order sends an optional EMB or EMP voucher code", async () => {
     assert.equal(result.body.voucherValue, "60");
     assert.equal(result.body.voucherBusiness, "emporo");
     assert.equal(result.body.voucherRedeemedDate, "");
-    assert.equal(voucherNote(result.body.voucherStatus, result.body.voucherCode, result.body.voucherValue)?.text, "已核销 EMP-654321，减 $60");
-    assert.match(voucherNote("notFound", "", "")?.text ?? "", /工单仍已创建/);
-    assert.equal(voucherNote("alreadyRedeemed", "EMP-654321", "", "2026-11-02")?.text, "这个券已在 2026-11-02 核销过了。工单仍已创建。");
-    assert.match(voucherNote("expired", "", "")?.text ?? "", /工单仍已创建/);
+    assert.equal(voucherNote(result.body.voucherStatus, result.body.voucherCode, result.body.voucherValue)?.text, "Redeemed EMP-654321, less $60");
+    assert.match(voucherNote("notFound", "", "")?.text ?? "", /still created/);
+    assert.equal(voucherNote("alreadyRedeemed", "EMP-654321", "", "2026-11-02")?.text, "This voucher was already redeemed on 2026-11-02. The job was still created.");
+    assert.match(voucherNote("expired", "", "")?.text ?? "", /still created/);
     assert.equal(voucherNote("none", "", ""), null);
   } finally {
     globalThis.fetch = original;
@@ -202,7 +202,7 @@ test("a vCard uses the tenant and short address as the display name", () => {
   const card = buildVCard(input);
   assert.match(card, /FN;CHARSET=UTF-8:Sam · 12 Smith Street Richmond/);
   assert.match(card, /ADR;TYPE=HOME;CHARSET=UTF-8:;;12 Smith Street\\, Richmond VIC 3121;;;;/);
-  assert.match(card, /NOTE;CHARSET=UTF-8:工单：漏水\\nJob ID：abc/);
+  assert.match(card, /NOTE;CHARSET=UTF-8:Job: 漏水\\nJob ID: abc/);
   assert.equal(buildVCardFile([input, { ...input, name: "Lee" }]).split("BEGIN:VCARD").length - 1, 2);
   assert.equal(mapsHref(input.address), "https://www.google.com/maps/dir/?api=1&destination=12%20Smith%20Street%2C%20Richmond%20VIC%203121&travelmode=driving");
 });
@@ -394,7 +394,7 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
     const deniedBody = await deniedLeave.json();
     assert.equal(deniedLeave.status, 409);
     assert.equal(deniedBody.error, "no_open_visit");
-    assert.match(deniedBody.message, /出发/);
+    assert.match(deniedBody.message, /Depart/);
     const leaveCall = calls.find((call) => String(call.url).endsWith("/leave"));
     assert.ok(leaveCall?.body instanceof FormData);
     assert.equal(leaveCall.body.get("secret"), SECRET);
@@ -408,7 +408,7 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
     const createdBody = await created.json();
     assert.equal(created.status, 422);
     assert.equal(createdBody.error, "no_address");
-    assert.match(createdBody.message, /地址/);
+    assert.match(createdBody.message, /address/i);
 
     globalThis.fetch = (async () => jsonResponse({ error: "needBusiness" }, 200)) as typeof fetch;
     const needBusiness = await create(authed("http://localhost:3000/jobs/api/new", { method: "POST", body: images }));
@@ -419,7 +419,7 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
     const unauthorizedBody = await unauthorized.json();
     assert.equal(unauthorized.status, 502);
     assert.equal(unauthorizedBody.error, "webhook_unauthorized");
-    assert.match(unauthorizedBody.message, /密钥/);
+    assert.match(unauthorizedBody.message, /key/i);
 
     globalThis.fetch = (async () =>
       jsonResponse({
@@ -465,6 +465,13 @@ test("the public site does not advertise /jobs and the source has no webhook URL
       assert.equal(text.includes("JOBS_APP_PASSWORD"), false, file);
       assert.equal(text.includes("JOBS_SESSION_SECRET"), false, file);
     }
+  }
+  const jobsUi = walk(fileURLToPath(new URL("../src", import.meta.url))).filter((file) =>
+    /\/jobs\/|\/jobs-app\//.test(file),
+  );
+  for (const file of jobsUi) {
+    const source = readFileSync(file, "utf8").replace(/const chinese = \/[\s\S]*?\);/, "");
+    assert.equal(/[\u4e00-\u9fff]/.test(source), false, file);
   }
   const header = readFileSync(new URL("../src/components/site-header.tsx", import.meta.url), "utf8");
   const footer = readFileSync(new URL("../src/components/site-footer.tsx", import.meta.url), "utf8");

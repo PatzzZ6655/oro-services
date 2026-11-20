@@ -65,11 +65,11 @@ export function SmsPicker({
     event.preventDefault();
     const phone = normalizePhone(draft);
     if (!phone) {
-      setManualError("请输入澳大利亚号码，例如 0412 345 678");
+      setManualError("Enter an Australian number, for example 0412 345 678");
       return;
     }
     if (recipients.some((recipient) => recipient.phone === phone)) {
-      setManualError("这个号码已经在列表里");
+      setManualError("That number is already listed");
       return;
     }
     const nextPhones = [...phones, phone];
@@ -108,7 +108,7 @@ export function SmsPicker({
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">发给谁</h2>
+      <h2 className="text-lg font-semibold">Send to</h2>
       {ticked ? (
         <ul>
           {recipients.map((recipient) => {
@@ -126,18 +126,18 @@ export function SmsPicker({
                 </label>
                 {recipient.name ? <p className="pl-9 text-base">{formatPhone(recipient.phone)}</p> : null}
                 <button type="button" className="mt-1 min-h-11 pl-9 text-base font-semibold underline" onClick={() => saveOne(recipient)}>
-                  保存到通讯录
+                  Save to contacts
                 </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p>正在读取号码</p>
+        <p>Loading numbers</p>
       )}
       {recipients.length > 1 ? (
         <button type="button" className="min-h-11 self-start text-base font-semibold underline" onClick={saveAll}>
-          全部保存到通讯录
+          Save all to contacts
         </button>
       ) : null}
       {allowManual && contacts.length === 0 ? (
@@ -147,12 +147,12 @@ export function SmsPicker({
             onChange={(event) => setDraft(event.target.value)}
             inputMode="tel"
             autoComplete="tel"
-            aria-label="电话号码"
+            aria-label="Phone number"
             placeholder="0412 345 678"
             className="min-h-14 w-full rounded-2xl border border-black px-4 text-lg"
           />
           <button type="submit" className="min-h-14 shrink-0 rounded-2xl border border-black px-4 text-lg font-semibold">
-            添加
+            Add
           </button>
         </form>
       ) : null}
@@ -162,20 +162,20 @@ export function SmsPicker({
         </p>
       ) : null}
       {body ? <p className="whitespace-pre-wrap rounded-2xl bg-neutral-100 px-4 py-3 text-base">{body}</p> : null}
-      {selected.length > 1 ? <p className="text-base">一条短信发给 {selected.length} 人，回复在同一个对话里。</p> : null}
+      {selected.length > 1 ? <p className="text-base">One message to {selected.length} people, so replies stay in one thread.</p> : null}
       {link ? (
         <a href={link.href} onClick={remember} className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-black px-4 text-lg font-semibold text-white">
-          发送短信
+          Send SMS
         </a>
       ) : (
         <JobsButton type="button" disabled>
-          发送短信
+          Send SMS
         </JobsButton>
       )}
-      <p className="text-center text-sm">会打开「信息」，你看过再发送。</p>
+      <p className="text-center text-sm">This opens Messages so you can review it before sending.</p>
       {link?.fallback ? (
         <a href={link.fallback} onClick={remember} className="text-center text-base font-semibold underline">
-          打不开群发时用这个
+          If the group message does not open, use this
         </a>
       ) : null}
     </section>
