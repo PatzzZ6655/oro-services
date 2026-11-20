@@ -112,6 +112,10 @@ const nextConfig: NextConfig = {
     "/internal/**": ["./assets/fonts/**", "./public/logos/**", "./db/migrations/**"],
   },
   async headers() {
+    const jobsPrivacy = [
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      { key: "Cache-Control", value: "private, no-store" },
+    ];
     return [
       {
         source: "/(.*)",
@@ -123,6 +127,8 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: permissionsPolicy },
         ],
       },
+      { source: "/jobs", headers: jobsPrivacy },
+      { source: "/jobs/:path*", headers: jobsPrivacy },
     ];
   },
 };
