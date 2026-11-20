@@ -46,21 +46,32 @@ const clauses = [
   "Work at heights is carried out only with appropriate safe access, such as scaffolding, an elevating work platform or edge protection, as required by Victorian occupational health and safety law. If the required access equipment is not included in the quote, we will explain the extra cost and get your approval before proceeding. We may decline or pause work that cannot be done safely.",
   "Confined spaces",
   "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that is a confined space under the Occupational Health and Safety Regulations 2017 (Vic). If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
+  "Thank-you vouchers",
+  "After a completed job we may send a thank-you voucher worth $60 off a future job with Emoro Building or Emporo Plumbing. Emoro codes start with EMB- and Emporo codes start with EMP-.",
+  "The voucher must be used for a booking confirmed within 3 months of the issue date shown on the voucher.",
+  "It applies to jobs of $150 or more (before the voucher is applied).",
+  "One voucher per job. It can be used once, and can't be exchanged for cash, split or combined with other offers.",
+  "Quote the code when booking, or we'll apply an eligible voucher automatically when we create your next job. It is marked as used when the final invoice is issued and is returned if the job is cancelled.",
+  "The voucher is a thank-you and is not conditional on leaving a review.",
 ];
 
 test("the terms page keeps the approved wording and stays public", () => {
   const page = readFileSync(new URL("../src/app/terms/page.tsx", import.meta.url), "utf8");
   assert.match(page, /title: "Terms and Conditions"/);
   assert.match(page, /path: "\/terms"/);
-  assert.match(page, /Last updated: 19 November 2026/);
-  assert.equal(page.includes("Last updated: 15 November 2026"), false);
+  assert.match(page, /Last updated: 20 November 2026/);
+  assert.equal(page.includes("Last updated: 19 November 2026"), false);
   assert.match(page, />Terms and Conditions</);
   assert.match(page, /ORO Services · Emoro Building and Emporo Plumbing/);
   const subtitleAt = page.indexOf("ORO Services · Emoro Building and Emporo Plumbing");
   const clausesAt = page.indexOf('className="mt-10 space-y-10"');
-  const updatedAt = page.indexOf("Last updated: 19 November 2026");
+  const updatedAt = page.indexOf("Last updated: 20 November 2026");
   assert.ok(subtitleAt < clausesAt && clausesAt < updatedAt);
-  assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 19 November 2026/);
+  assert.ok(page.indexOf('heading: "Thank-you vouchers"') < updatedAt);
+  assert.ok(page.indexOf('heading: "Confined spaces"') < page.indexOf('heading: "Thank-you vouchers"'));
+  assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 20 November 2026/);
+  const vouchers = page.slice(page.indexOf('heading: "Thank-you vouchers"'), updatedAt);
+  assert.equal(vouchers.includes("ABN"), false);
   assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
   assert.ok(page.indexOf('heading: "Governing law"') < page.indexOf('heading: "Matching finishes"'));

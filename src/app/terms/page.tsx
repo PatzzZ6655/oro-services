@@ -130,6 +130,17 @@ const sections: { heading: string; paragraphs: string[] }[] = [
       "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that is a confined space under the Occupational Health and Safety Regulations 2017 (Vic). If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get your approval before we proceed.",
     ],
   },
+  {
+    heading: "Thank-you vouchers",
+    paragraphs: [
+      "After a completed job we may send a thank-you voucher worth $60 off a future job with Emoro Building or Emporo Plumbing. Emoro codes start with EMB- and Emporo codes start with EMP-.",
+      "The voucher must be used for a booking confirmed within 3 months of the issue date shown on the voucher.",
+      "It applies to jobs of $150 or more (before the voucher is applied).",
+      "One voucher per job. It can be used once, and can't be exchanged for cash, split or combined with other offers.",
+      "Quote the code when booking, or we'll apply an eligible voucher automatically when we create your next job. It is marked as used when the final invoice is issued and is returned if the job is cancelled.",
+      "The voucher is a thank-you and is not conditional on leaving a review.",
+    ],
+  },
 ];
 
 export default function TermsPage() {
@@ -157,7 +168,7 @@ export default function TermsPage() {
             </section>
           ))}
         </div>
-        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 19 November 2026</p>
+        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 20 November 2026</p>
       </article>
     </SiteFrame>
   );
