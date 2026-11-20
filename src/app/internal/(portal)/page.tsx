@@ -27,26 +27,34 @@ async function Hub() {
           Jobs
         </Link>
       </div>
-      {showFieldJobs(user.email) ? <NewJobTile /> : null}
+      {showFieldJobs(user.email) ? <FieldJobTiles /> : null}
       <ReportsPanel recent={recent} />
     </PortalFrame>
   );
 }
 
-function NewJobTile() {
+const fieldJobTiles = [
+  { href: "https://www.orosvc.com/jobs/new", title: "New Job", summary: "Create a job" },
+  { href: "https://www.orosvc.com/jobs/depart", title: "Depart", summary: "Record departure for today's job" },
+  { href: "https://www.orosvc.com/jobs/leave", title: "Leave", summary: "Record leaving the site" },
+] as const;
+
+function FieldJobTiles() {
   return (
     <section className="mt-4">
-      <ul className="grid gap-3">
-        <li className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-base font-semibold text-brand-navy">New Job</h2>
-          <p className="mt-1 text-sm text-slate-600">Create a job</p>
-          <a
-            href="https://www.orosvc.com/jobs/new"
-            className="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
-          >
-            Open
-          </a>
-        </li>
+      <ul className="grid grid-cols-3 gap-2">
+        {fieldJobTiles.map((item) => (
+          <li key={item.href} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-3">
+            <h2 className="text-sm font-semibold text-brand-navy">{item.title}</h2>
+            <p className="mt-1 flex-1 text-xs leading-snug text-slate-600">{item.summary}</p>
+            <a
+              href={item.href}
+              className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-brand-navy px-2 text-sm font-semibold text-white"
+            >
+              Open
+            </a>
+          </li>
+        ))}
       </ul>
     </section>
   );
