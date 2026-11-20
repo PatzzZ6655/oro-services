@@ -5,7 +5,7 @@ import { useClientReady } from "@/components/jobs/client-ready";
 import { downloadText } from "@/components/jobs/download";
 import { JobsButton } from "@/components/jobs/ui";
 import { formatPhone, normalizePhone } from "@/lib/jobs-app/phones";
-import { sharedSms, smsHref, type SmsContact } from "@/lib/jobs-app/sms";
+import { sharedSms, smsHref, tenantSms, type SmsContact } from "@/lib/jobs-app/sms";
 import { browserSmsMemory, rememberSelection, tickedFromMemory } from "@/lib/jobs-app/sms-memory";
 import type { Contact } from "@/lib/jobs-app/types";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -17,6 +17,7 @@ export function SmsPicker({
   address,
   jobTitle,
   allowManual,
+  verbatim = false,
 }: {
   jobId: string;
   contacts: Contact[];
@@ -24,6 +25,7 @@ export function SmsPicker({
   address: string;
   jobTitle: string;
   allowManual: boolean;
+  verbatim?: boolean;
 }) {
   const [manual, setManual] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
@@ -96,7 +98,7 @@ export function SmsPicker({
   }
 
   const selected = recipients.filter((recipient) => ticked?.includes(recipient.phone));
-  const body = ticked ? sharedSms(topSms, recipients, ticked) : "";
+  const body = ticked ? (verbatim ? tenantSms(topSms, recipients, ticked) : sharedSms(topSms, recipients, ticked)) : "";
   const link = body ? smsHref(selected.map((recipient) => recipient.phone), body) : null;
 
   function remember() {

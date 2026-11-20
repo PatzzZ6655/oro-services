@@ -8,7 +8,7 @@ import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/ch
 import { keptCount } from "@/lib/jobs-app/photos";
 import { clearLoginFailures, loginAllowed, passwordsMatch, recordLoginFailure, resetJobsLoginLimits } from "@/lib/jobs-app/password";
 import { JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
-import { groupGreeting, sharedSms, smsHref } from "@/lib/jobs-app/sms";
+import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -71,6 +71,54 @@ test("a group message names the ticked tenants and uses the iOS group link", () 
   assert.equal(groupGreeting(["Sam", "Lee", "Jo", "Amy", "Pat"], 5), "Hi all,");
   assert.equal(groupGreeting([], 3), "Hi all,");
   assert.equal(sharedSms("We're on the way.", [{ name: "Sam", phone: "+61411111111", sms: "" }], ["+61411111111"]), "Hi Sam, We're on the way.");
+});
+
+test("leave complete keeps Make's tenant SMS, including the voucher", async () => {
+  useEnv();
+  const { leaveJob } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  const tenantText = "Hi Sam, thanks for having us. Your $60 voucher is VCH-60, valid to 31 Jan 2027. Review: https://g.page/r/example";
+  globalThis.fetch = (async () =>
+    jsonResponse({
+      ok: true,
+      business: "emoro",
+      brand: "Emoro Building",
+      outcome: "complete",
+      visit: 2,
+      jobTitle: "厨房漏水",
+      address: "12 Smith Street, Richmond VIC 3121",
+      sms: tenantText,
+      contacts: [
+        { name: "Sam", phone: "+61411111111", sms: tenantText },
+        { name: "Lee", phone: "+61412222222", sms: tenantText.replace("Hi Sam", "Hi Lee") },
+      ],
+      summary: "第 2 趟已离开。整单完工。",
+      pmEmailedTo: "",
+      voucherCode: "VCH-60",
+      voucherExpiry: "2027-01-31",
+      driveLink: "https://drive.google.com/drive/folders/example",
+    })) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emoro");
+    form.set("jobId", "emoro-1");
+    form.set("outcome", "complete");
+    form.set("notes", "");
+    form.set("checklist", "✔ 门窗已锁好");
+    form.set("issues", "");
+    const result = await leaveJob(form);
+    assert.equal(result.status, 200);
+    if (!result.body.ok) throw new Error(result.body.message);
+    assert.equal(result.body.voucherCode, "VCH-60");
+    assert.equal(result.body.voucherExpiry, "2027-01-31");
+    assert.equal(result.body.pmEmailedTo, "");
+    const body = tenantSms(result.body.sms, result.body.contacts, ["+61411111111", "+61412222222"]);
+    assert.equal(body, tenantText);
+    assert.equal(body.includes("VCH-60"), true);
+    assert.equal(body.includes("https://g.page/r/example"), true);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test("the last recipient ticks are remembered per job", () => {

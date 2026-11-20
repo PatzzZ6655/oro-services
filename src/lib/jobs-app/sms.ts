@@ -74,18 +74,32 @@ export function messageBody(source: string, names: string[], recipientCount: num
 
 export type SmsContact = { name: string; phone: string; sms: string };
 
-export function sharedSms(topSms: string, contacts: SmsContact[], tickedPhones: string[]): string {
+function selectedContacts(contacts: SmsContact[], tickedPhones: string[]): SmsContact[] {
   const ticked = new Set(tickedPhones.map((phone) => normalizePhone(phone)).filter((phone): phone is string => Boolean(phone)));
-  const selected = contacts.filter((contact) => {
+  return contacts.filter((contact) => {
     const phone = normalizePhone(contact.phone);
     return Boolean(phone && ticked.has(phone));
   });
-  const source =
+}
+
+function smsSource(topSms: string, contacts: SmsContact[], selected: SmsContact[]): string {
+  return (
     selected.find((contact) => contact.sms.trim())?.sms ??
     contacts.find((contact) => contact.sms.trim())?.sms ??
-    topSms;
-  if (!source.trim()) return "";
+    topSms
+  ).trim();
+}
+
+export function sharedSms(topSms: string, contacts: SmsContact[], tickedPhones: string[]): string {
+  const selected = selectedContacts(contacts, tickedPhones);
+  const source = smsSource(topSms, contacts, selected);
+  if (!source) return "";
   return messageBody(source, selected.map((contact) => contact.name), selected.length);
+}
+
+/** Leave complete: Make's tenant SMS already includes the voucher and review link. */
+export function tenantSms(topSms: string, contacts: SmsContact[], tickedPhones: string[]): string {
+  return smsSource(topSms, contacts, selectedContacts(contacts, tickedPhones));
 }
 
 export function smsHref(phones: string[], body: string): { href: string; fallback: string | null } | null {

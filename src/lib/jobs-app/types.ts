@@ -60,6 +60,8 @@ export type LeaveResult = {
   summary: string;
   reviewLinkConfigured: boolean;
   pmEmailedTo: string;
+  voucherCode: string;
+  voucherExpiry: string;
   leftAt: string;
 };
 

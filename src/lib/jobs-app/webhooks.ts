@@ -135,7 +135,7 @@ function contactsOf(json: Record<string, unknown>, secret: string, fallbackSms: 
       parsed.push({
         name: text(row.name, 80, secret),
         phone,
-        sms: text(row.sms, 1000, secret) || fallbackSms,
+        sms: text(row.sms, 2000, secret) || fallbackSms,
       });
       if (parsed.length >= 12) break;
     }
@@ -240,7 +240,7 @@ export async function listToday(fetchImpl?: FetchLike): Promise<JobsResult<{ ok:
 }
 
 function visitFields(json: Record<string, unknown>, secret: string, business: Business) {
-  const sms = text(json.sms, 1000, secret);
+  const sms = text(json.sms, 2000, secret);
   return {
     business: isBusiness(json.business) ? json.business : business,
     brand: text(json.brand, 80, secret),
@@ -383,6 +383,8 @@ export async function leaveJob(form: FormData, fetchImpl?: FetchLike): Promise<J
         summary: text(result.json.summary, 4000, config.secret),
         reviewLinkConfigured: flag(result.json.reviewLinkConfigured) ?? false,
         pmEmailedTo: text(result.json.pmEmailedTo, 200, config.secret),
+        voucherCode: text(result.json.voucherCode, 80, config.secret),
+        voucherExpiry: text(result.json.voucherExpiry, 80, config.secret),
         leftAt: text(result.json.leftAt, 80, config.secret),
       },
     };

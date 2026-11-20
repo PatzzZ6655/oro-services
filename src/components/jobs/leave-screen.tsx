@@ -45,8 +45,13 @@ export function LeaveScreen() {
             打开照片文件夹
           </JobsLink>
         ) : null}
-        {result.outcome === "complete" ? (
-          <p className="text-base">{result.pmEmailedTo ? `完工邮件已发给：${result.pmEmailedTo}` : "完工邮件没有收件人。"}</p>
+        {result.pmEmailedTo ? <p className="text-base">完工邮件已发给：{result.pmEmailedTo}</p> : null}
+        {result.outcome === "complete" && result.voucherCode ? (
+          <section className="rounded-2xl border border-black px-4 py-4">
+            <p className="text-sm">$60 感谢券</p>
+            <p className="mt-1 break-all text-2xl font-semibold tracking-wide">{result.voucherCode}</p>
+            {result.voucherExpiry ? <p className="mt-2 text-base">有效期至 {result.voucherExpiry}</p> : null}
+          </section>
         ) : null}
         <SmsPicker
           jobId={current.jobId}
@@ -55,6 +60,7 @@ export function LeaveScreen() {
           address={result.address || current.address}
           jobTitle={result.jobTitle || current.title}
           allowManual={result.contacts.length === 0}
+          verbatim={result.outcome === "complete"}
         />
         <JobsButton
           type="button"
