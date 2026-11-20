@@ -51,8 +51,7 @@ const clauses = [
   "Valid for 3 months from the issue date shown on the voucher. The job must be booked within that time.",
   "It applies to jobs of $150 or more (before the voucher is applied).",
   "One voucher per job. It can be used once, and can't be exchanged for cash, split or combined with other offers.",
-  "Quote the code when booking. The voucher is redeemed when we create your job, and the $60 is taken off that job's invoice.",
-  "If the job is cancelled or doesn't go ahead, contact us and we may reissue the voucher for the rest of its original 3 months.",
+  "Quote the code when booking. The voucher is used once it is applied to a new job and can't be reused, even if that job is cancelled or doesn't go ahead.",
   "The voucher is a thank-you and is not conditional on leaving a review.",
 ];
 
@@ -73,6 +72,7 @@ test("the terms page keeps the approved wording and stays public", () => {
   assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 20 November 2026/);
   const vouchers = page.slice(page.indexOf('heading: "Thank-you vouchers"'), updatedAt);
   assert.equal(vouchers.includes("ABN"), false);
+  assert.equal(vouchers.includes("reissue"), false);
   assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
   assert.ok(page.indexOf('heading: "Governing law"') < page.indexOf('heading: "Matching finishes"'));
