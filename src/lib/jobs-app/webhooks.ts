@@ -446,6 +446,8 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
         voucherCode: text(result.json.voucherCode, 40, secret),
         voucherValue: text(result.json.voucherValue, 20, secret),
         voucherMessage: text(result.json.voucherMessage, 300, secret),
+        voucherBusiness: text(result.json.voucherBusiness, 40, secret),
+        voucherRedeemedDate: text(result.json.voucherRedeemedDate, 10, secret),
       },
     };
   } catch {

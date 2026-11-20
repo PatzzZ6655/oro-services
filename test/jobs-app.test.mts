@@ -21,8 +21,8 @@ const ALLOWED = "pat.z@orosvc.com";
 function useEnv() {
   process.env.JOBS_ALLOWED_EMAILS = ALLOWED;
   process.env.JOBS_SESSION_SECRET = "test-session-secret-value";
-  process.env.GOOGLE_CLIENT_ID = "test-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "test-client-secret";
+  process.env.JOBS_GOOGLE_CLIENT_ID = "test-client-id";
+  process.env.JOBS_GOOGLE_CLIENT_SECRET = "test-client-secret";
   process.env.MAKE_SHORTCUTS_SECRET = SECRET;
   process.env.MAKE_JOBS_TODAY_URL = "http://127.0.0.1:9/today";
   process.env.MAKE_DEPART_URL = "http://127.0.0.1:9/depart";
@@ -139,6 +139,8 @@ test("a new work order sends an optional EMB or EMP voucher code", async () => {
       voucherStatus: "redeemed",
       voucherCode: "EMP-654321",
       voucherValue: 60,
+      voucherBusiness: "emporo",
+      voucherRedeemedDate: "",
     });
   }) as typeof fetch;
   try {
@@ -153,9 +155,11 @@ test("a new work order sends an optional EMB or EMP voucher code", async () => {
     assert.equal(result.body.voucherStatus, "redeemed");
     assert.equal(result.body.voucherCode, "EMP-654321");
     assert.equal(result.body.voucherValue, "60");
+    assert.equal(result.body.voucherBusiness, "emporo");
+    assert.equal(result.body.voucherRedeemedDate, "");
     assert.equal(voucherNote(result.body.voucherStatus, result.body.voucherCode, result.body.voucherValue)?.text, "已核销 EMP-654321，减 $60");
     assert.match(voucherNote("notFound", "", "")?.text ?? "", /工单仍已创建/);
-    assert.match(voucherNote("alreadyRedeemed", "", "")?.text ?? "", /工单仍已创建/);
+    assert.equal(voucherNote("alreadyRedeemed", "EMP-654321", "", "2026-11-02")?.text, "这个券已在 2026-11-02 核销过了。工单仍已创建。");
     assert.match(voucherNote("expired", "", "")?.text ?? "", /工单仍已创建/);
     assert.equal(voucherNote("none", "", ""), null);
   } finally {

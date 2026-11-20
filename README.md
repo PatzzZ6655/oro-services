@@ -88,7 +88,7 @@ Do not commit the client secret, session secret, or refresh token.
 
 Sign-in is Google only (authorization code, with `state` and PKCE). The button opens `/jobs/auth/google`. Google returns to `/jobs/auth/google/callback`. The redirect URI is the request host plus that path, so the same deployment works on the apex, www, and a preview host.
 
-Register these redirect URIs on the Google OAuth client:
+Register these redirect URIs on the jobs OAuth client (`JOBS_GOOGLE_CLIENT_ID`), not the staff client:
 
 | Host | Redirect URI |
 | --- | --- |
@@ -105,8 +105,8 @@ From the iPhone home-screen icon, sign-in is a normal navigation to Google and b
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `GOOGLE_CLIENT_ID` | Yes | Same web OAuth client as staff sign-in, with the field callback registered. |
-| `GOOGLE_CLIENT_SECRET` | Yes | Matching client secret. |
+| `JOBS_GOOGLE_CLIENT_ID` | Yes | Web OAuth client used only by `/jobs`. Do not reuse `GOOGLE_CLIENT_ID`. |
+| `JOBS_GOOGLE_CLIENT_SECRET` | Yes | Matching client secret. Do not reuse `GOOGLE_CLIENT_SECRET`. |
 | `JOBS_ALLOWED_EMAILS` | Yes | Comma-separated Google emails. Matching ignores case. Pat's address is `pat.z@orosvc.com`. A blank value lets nobody in. |
 | `JOBS_SESSION_SECRET` | Yes | At least 16 characters. Signs the field session cookie. |
 | `MAKE_JOBS_TODAY_URL` | Yes | Today's jobs webhook. |

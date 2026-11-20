@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
@@ -15,8 +15,18 @@ function created(value: boolean | null): string {
   return "—";
 }
 
-function VoucherLine({ status, code, value }: { status: NewJobResult["voucherStatus"]; code: string; value: string }) {
-  const note = voucherNote(status, code, value);
+function VoucherLine({
+  status,
+  code,
+  value,
+  redeemedDate,
+}: {
+  status: NewJobResult["voucherStatus"];
+  code: string;
+  value: string;
+  redeemedDate: string;
+}) {
+  const note = voucherNote(status, code, value, redeemedDate);
   if (!note) return null;
   if (note.tone === "warn") {
     return (
@@ -43,11 +53,13 @@ export function NewJobScreen() {
   const [files, setFiles] = useState<File[]>([]);
   const [voucher, setVoucher] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<NewJobResult | null>(null);
   const router = useRouter();
 
   async function submit() {
+    if (pending.current) return;
     if (!isBusiness(business)) {
       setError("请选择 Emoro 还是 Emporo。");
       return;
@@ -56,6 +68,7 @@ export function NewJobScreen() {
       setError("请选择截图。");
       return;
     }
+    pending.current = true;
     setError("");
     setBusy(true);
     try {
@@ -63,7 +76,6 @@ export function NewJobScreen() {
       const count = keptCount(compressed.map((file) => file.size));
       if (count === 0 || count < compressed.length) {
         setError("照片太大，请少选几张。");
-        setBusy(false);
         return;
       }
       const form = new FormData();
@@ -79,6 +91,7 @@ export function NewJobScreen() {
       }
       setError(reason instanceof JobsClientError ? reason.message : "这张截图没法压缩，请换一张 JPEG。");
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
@@ -101,7 +114,12 @@ export function NewJobScreen() {
         <p className="text-base">
           新建了：房产 {created(result.propertyCreated)} · 客户 {created(result.customerCreated)} · 联系人 {created(result.contact1Created)}
         </p>
-        <VoucherLine status={result.voucherStatus} code={result.voucherCode} value={result.voucherValue} />
+        <VoucherLine
+          status={result.voucherStatus}
+          code={result.voucherCode}
+          value={result.voucherValue}
+          redeemedDate={result.voucherRedeemedDate}
+        />
         {result.jobUrl ? (
           <JobsLink href={result.jobUrl} variant="outline">
             在 Notion 中打开
@@ -115,8 +133,7 @@ export function NewJobScreen() {
     <Screen title="新工单" back={<BackLink href="/jobs" />}>
       {error ? <Alert>{error}</Alert> : null}
       {busy ? <Spinner label="正在读取截图，大约 10 秒" /> : null}
-      {busy ? null : (
-        <>
+      <div className={busy ? "hidden" : "contents"}>
           <div className="grid grid-cols-1 gap-3">
             {(["emoro", "emporo"] as const).map((id) => (
               <button
@@ -156,11 +173,10 @@ export function NewJobScreen() {
               className={fieldClass}
             />
           </label>
-          <JobsButton type="button" onClick={submit}>
-            建立工单
-          </JobsButton>
-        </>
-      )}
+      </div>
+      <JobsButton type="button" onClick={submit} disabled={busy}>
+        {busy ? "正在建立" : "建立工单"}
+      </JobsButton>
     </Screen>
   );
 }

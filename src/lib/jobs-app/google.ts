@@ -41,11 +41,11 @@ export function jobsGoogleConfigured(): boolean {
 }
 
 function clientId(): string {
-  return process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+  return process.env.JOBS_GOOGLE_CLIENT_ID?.trim() ?? "";
 }
 
 function clientSecret(): string {
-  return process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+  return process.env.JOBS_GOOGLE_CLIENT_SECRET?.trim() ?? "";
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {

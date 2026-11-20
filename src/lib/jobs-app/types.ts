@@ -91,6 +91,8 @@ export type NewJobResult = {
   voucherCode: string;
   voucherValue: string;
   voucherMessage: string;
+  voucherBusiness: string;
+  voucherRedeemedDate: string;
 };
 
 export type JobsResult<T> = { status: number; body: T | JobsError };
