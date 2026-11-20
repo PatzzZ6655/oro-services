@@ -1,6 +1,6 @@
 import { originDenied } from "@/lib/jobs-app/guard";
 import { publicOrigin } from "@/lib/jobs-app/origin";
-import { jobsCookieOptions, serializeJobsCookie } from "@/lib/jobs-app/session";
+import { JOBS_COOKIE, jobsCookieOptions, serializeJobsCookie } from "@/lib/jobs-app/session";
 
 export function logoutResponse(request: Request): Response {
   const denied = originDenied(request);
@@ -12,6 +12,6 @@ export function logoutResponse(request: Request): Response {
       "cache-control": "private, no-store",
     },
   });
-  response.headers.append("set-cookie", serializeJobsCookie("", jobsCookieOptions(0)));
+  response.headers.append("set-cookie", serializeJobsCookie(JOBS_COOKIE, "", jobsCookieOptions(0)));
   return response;
 }

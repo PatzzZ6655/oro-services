@@ -5,20 +5,23 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { mapsHref, shortAddress } from "@/lib/jobs-app/address";
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
+import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
+import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
 import { keptCount } from "@/lib/jobs-app/photos";
-import { clearLoginFailures, loginAllowed, passwordsMatch, recordLoginFailure, resetJobsLoginLimits } from "@/lib/jobs-app/password";
-import { JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
+import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
 
 const SECRET = "test-make-secret";
-const PASSWORD = "test-password";
+const ALLOWED = "pat.z@orosvc.com";
 
 function useEnv() {
-  process.env.JOBS_APP_PASSWORD = PASSWORD;
+  process.env.JOBS_ALLOWED_EMAILS = ALLOWED;
   process.env.JOBS_SESSION_SECRET = "test-session-secret-value";
+  process.env.GOOGLE_CLIENT_ID = "test-client-id";
+  process.env.GOOGLE_CLIENT_SECRET = "test-client-secret";
   process.env.MAKE_SHORTCUTS_SECRET = SECRET;
   process.env.MAKE_JOBS_TODAY_URL = "http://127.0.0.1:9/today";
   process.env.MAKE_DEPART_URL = "http://127.0.0.1:9/depart";
@@ -156,34 +159,96 @@ test("photo batches stop before the upload budget", () => {
 
 test("the jobs session lasts about 180 days and rejects a bad signature", async () => {
   process.env.JOBS_SESSION_SECRET = "test-session-secret-value";
+  process.env.JOBS_ALLOWED_EMAILS = "Pat.Z@orosvc.com, other@example.com";
+  assert.equal(jobsEmailAllowed("pat.z@orosvc.com"), true);
+  assert.equal(jobsEmailAllowed("nope@example.com"), false);
   assert.equal(JOBS_MAX_AGE, 180 * 24 * 60 * 60);
   assert.equal(jobsCookieOptions(JOBS_MAX_AGE, true).secure, true);
   assert.equal(jobsCookieOptions(JOBS_MAX_AGE, true).httpOnly, true);
   assert.equal(jobsCookieOptions().path, "/jobs");
-  const token = await signJobsSession(Date.now());
-  assert.deepEqual(await readJobsSession(token), { ok: true });
+  assert.equal(jobsGoogleRedirectUri("https://www.orosvc.com"), `https://www.orosvc.com${JOBS_GOOGLE_CALLBACK_PATH}`);
+  const token = await signJobsSession("pat.z@orosvc.com");
+  assert.deepEqual(await readJobsSession(token), { ok: true, email: "pat.z@orosvc.com" });
   assert.equal(await readJobsSession(`${token.slice(0, -1)}a`), null);
   assert.equal(await readJobsSession(token, Date.now() + (JOBS_MAX_AGE + 60) * 1000), null);
+  process.env.JOBS_ALLOWED_EMAILS = "other@example.com";
+  assert.equal(await readJobsSession(token), null);
+  process.env.JOBS_ALLOWED_EMAILS = ALLOWED;
   process.env.JOBS_SESSION_SECRET = "another-session-secret";
   assert.equal(await readJobsSession(token), null);
   process.env.JOBS_SESSION_SECRET = "test-session-secret-value";
 });
 
-test("password checks are exact and guesses are limited", async () => {
-  resetJobsLoginLimits();
-  assert.equal(await passwordsMatch("test-password", "test-password"), true);
-  assert.equal(await passwordsMatch("nope", "test-password"), false);
-  assert.equal(loginAllowed("203.0.113.5"), true);
-  for (let attempt = 0; attempt < 5; attempt += 1) recordLoginFailure("203.0.113.5");
-  assert.equal(loginAllowed("203.0.113.5"), false);
-  clearLoginFailures("203.0.113.5");
-  assert.equal(loginAllowed("203.0.113.5"), true);
+test("google sign-in uses PKCE and only the allowlist", async () => {
+  useEnv();
+  const start = (await import("@/app/jobs/auth/google/route")).GET;
+  const callback = (await import("@/app/jobs/auth/google/callback/route")).GET;
+  const { finishJobsGoogleSignIn } = await import("@/lib/jobs-app/google");
+
+  const started = await start(new Request("https://www.orosvc.com/jobs/auth/google"));
+  assert.equal(started.status, 302);
+  const location = new URL(started.headers.get("location") ?? "");
+  assert.equal(location.origin + location.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://www.orosvc.com/jobs/auth/google/callback");
+  assert.equal(location.searchParams.get("scope"), "openid email profile");
+  assert.equal(location.searchParams.get("code_challenge_method"), "S256");
+  assert.equal((location.searchParams.get("code_challenge") ?? "").length > 20, true);
+  const oauth = started.headers.getSetCookie().find((cookie) => cookie.startsWith("oro_jobs_oauth="));
+  assert.match(oauth ?? "", /HttpOnly/i);
+  const state = location.searchParams.get("state") ?? "";
+
+  const preview = await start(
+    new Request("https://preview.vercel.app/jobs/auth/google", {
+      headers: { "x-forwarded-host": "oro-services-git-cursor-jobs-pwa-3080-oro-services.vercel.app", "x-forwarded-proto": "https" },
+    }),
+  );
+  const previewUrl = new URL(preview.headers.get("location") ?? "");
+  assert.equal(
+    previewUrl.searchParams.get("redirect_uri"),
+    "https://oro-services-git-cursor-jobs-pwa-3080-oro-services.vercel.app/jobs/auth/google/callback",
+  );
+
+  const denied = await finishJobsGoogleSignIn(
+    new Request(`https://www.orosvc.com/jobs/auth/google/callback?code=valid-code&state=${state}`, {
+      headers: { cookie: (oauth ?? "").split(";")[0] ?? "" },
+    }),
+    {
+      exchangeCode: async () => "denied-token",
+      verify: async () => ({ ok: false, reason: "not-allowed" }),
+    },
+  );
+  assert.equal(denied.status, 302);
+  assert.match(denied.headers.get("location") ?? "", /error=denied/);
+  assert.equal(denied.headers.getSetCookie().some((cookie) => cookie.startsWith(`${JOBS_COOKIE}=`) && cookie.includes("Max-Age=15552000")), false);
+
+  const signedIn = await finishJobsGoogleSignIn(
+    new Request(`https://orosvc.com/jobs/auth/google/callback?code=valid-code&state=${state}`, {
+      headers: { cookie: (oauth ?? "").split(";")[0] ?? "" },
+    }),
+    {
+      exchangeCode: async (options) => {
+        assert.equal(options.redirectUri, "https://orosvc.com/jobs/auth/google/callback");
+        assert.equal(options.verifier.length > 40, true);
+        return "good-token";
+      },
+      verify: async (_token, options) => {
+        assert.equal(options.audience, "test-client-id");
+        assert.equal(options.nonce.length > 20, true);
+        return { ok: true, email: "pat.z@orosvc.com", name: "Pat" };
+      },
+    },
+  );
+  assert.equal(signedIn.status, 302);
+  assert.equal(signedIn.headers.get("location"), "https://orosvc.com/jobs");
+  const session = signedIn.headers.getSetCookie().find((cookie) => cookie.startsWith(`${JOBS_COOKIE}=`));
+  assert.match(session ?? "", /HttpOnly/i);
+  assert.match(session ?? "", /Path=\/jobs/);
+  assert.match(session ?? "", /Max-Age=15552000/);
+  assert.equal(typeof callback, "function");
 });
 
 test("api routes proxy the webhooks and keep the secret on the server", async () => {
   useEnv();
-  resetJobsLoginLimits();
-  const login = (await import("@/app/jobs/api/login/route")).POST;
   const today = (await import("@/app/jobs/api/today/route")).POST;
   const depart = (await import("@/app/jobs/api/depart/route")).POST;
   const leave = (await import("@/app/jobs/api/leave/route")).POST;
@@ -193,38 +258,7 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
   const loggedOut = await today(new Request("http://localhost:3000/jobs/api/today", { method: "POST", headers: { origin: "http://localhost:3000" } }));
   assert.equal(loggedOut.status, 401);
 
-  const wrongOrigin = await login(
-    new Request("http://localhost:3000/jobs/api/login", {
-      method: "POST",
-      headers: { origin: "https://evil.example", "content-type": "application/json" },
-      body: JSON.stringify({ password: PASSWORD }),
-    }),
-  );
-  assert.equal(wrongOrigin.status, 403);
-
-  const badPassword = await login(
-    new Request("http://localhost:3000/jobs/api/login", {
-      method: "POST",
-      headers: { origin: "http://localhost:3000", "content-type": "application/json", "x-forwarded-for": "198.51.100.8" },
-      body: JSON.stringify({ password: "wrong" }),
-    }),
-  );
-  assert.equal(badPassword.status, 401);
-
-  const loggedIn = await login(
-    new Request("http://localhost:3000/jobs/api/login", {
-      method: "POST",
-      headers: { origin: "http://localhost:3000", "content-type": "application/json", "x-forwarded-for": "198.51.100.9" },
-      body: JSON.stringify({ password: PASSWORD }),
-    }),
-  );
-  assert.equal(loggedIn.status, 200);
-  const setCookie = loggedIn.headers.getSetCookie();
-  assert.equal(setCookie.length, 1);
-  assert.match(setCookie[0] ?? "", /oro_jobs=/);
-  assert.match(setCookie[0] ?? "", /HttpOnly/i);
-  assert.match(setCookie[0] ?? "", /Path=\/jobs/);
-  const cookie = (setCookie[0] ?? "").split(";")[0] ?? "";
+  const cookie = `${JOBS_COOKIE}=${encodeURIComponent(await signJobsSession("pat.z@orosvc.com"))}`;
 
   function authed(url: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);

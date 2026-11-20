@@ -82,6 +82,39 @@ Redirect URI for staff sign-in: `https://www.orosvc.com/internal/auth/google/cal
 
 Do not commit the client secret, session secret, or refresh token.
 
+## Field app
+
+`/jobs` is a private phone app for depart, leave, and new work orders. It is not linked from the public site, not in the sitemap, and disallowed in `robots.txt`. Add it to the iPhone home screen from Safari. The installed name is ORO 工单.
+
+Sign-in is Google only (authorization code, with `state` and PKCE). The button opens `/jobs/auth/google`. Google returns to `/jobs/auth/google/callback`. The redirect URI is the request host plus that path, so the same deployment works on the apex, www, and a preview host.
+
+Register these redirect URIs on the Google OAuth client:
+
+| Host | Redirect URI |
+| --- | --- |
+| Production www | `https://www.orosvc.com/jobs/auth/google/callback` |
+| Apex | `https://orosvc.com/jobs/auth/google/callback` |
+| Local | `http://localhost:3000/jobs/auth/google/callback` |
+| A Vercel preview | `https://<preview-host>/jobs/auth/google/callback` |
+
+Only a verified Google email in `JOBS_ALLOWED_EMAILS` can sign in. Anyone else sees Not authorised. The session cookie is httpOnly, signed, and lasts about 180 days.
+
+From the iPhone home-screen icon, sign-in is a normal navigation to Google and back. iOS may open Google in Safari instead of the installed app. Safari and the home-screen app do not share cookies, so a sign-in that finishes in Safari does not unlock the icon. If Google shows `disallowed_useragent`, the home-screen webview was treated as an embedded browser. In that case, open `https://www.orosvc.com/jobs` in Safari and use it there. The callback stays under `/jobs`, which is the installed app's scope, so iOS can open the return URL in the icon when it stays in that window.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID` | Yes | Same web OAuth client as staff sign-in, with the field callback registered. |
+| `GOOGLE_CLIENT_SECRET` | Yes | Matching client secret. |
+| `JOBS_ALLOWED_EMAILS` | Yes | Comma-separated Google emails. Matching ignores case. Pat's address is `pat.z@orosvc.com`. A blank value lets nobody in. |
+| `JOBS_SESSION_SECRET` | Yes | At least 16 characters. Signs the field session cookie. |
+| `MAKE_JOBS_TODAY_URL` | Yes | Today's jobs webhook. |
+| `MAKE_DEPART_URL` | Yes | Depart webhook. |
+| `MAKE_LEAVE_URL` | Yes | Leave webhook. |
+| `MAKE_NEWJOB_URL` | Yes | New work order webhook. |
+| `MAKE_SHORTCUTS_SECRET` | Yes | Shared secret sent to those webhooks. Never put it in the browser. |
+
+Do not commit the client secret, session secret, or webhook secret.
+
 ## HTTP and the canonical host
 
 `https://www.orosvc.com` is the canonical host. Redirects from `http://` and from the apex domain are done by Vercel in front of this app. There is no `vercel.json` redirect and no middleware for them. See the pull request notes if `http://` is answered by Cloudflare instead of Vercel.
