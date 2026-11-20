@@ -138,6 +138,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
       "It applies to jobs of $150 or more (before the voucher is applied).",
       "One voucher per job. It can't be exchanged for cash, split or combined with other offers.",
       "Vouchers are single use only. Quote your voucher code before your invoice is issued; vouchers can't be applied after an invoice has been issued. Once applied to a job, the voucher is redeemed and can't be reused or reissued, including if the job is later cancelled or doesn't go ahead.",
+      "Vouchers can't be combined with any other discount or price reduction. If we agree to reduce the quoted price, any voucher already applied to that job is treated as used and won't be reinstated.",
       "The voucher is a thank-you and is not conditional on leaving a review.",
       "Emoro Building and Emporo Plumbing reserve the right to determine how these terms apply, acting reasonably. Nothing in these terms limits your rights under the Australian Consumer Law.",
     ],

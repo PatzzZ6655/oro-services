@@ -52,6 +52,7 @@ const clauses = [
   "It applies to jobs of $150 or more (before the voucher is applied).",
   "One voucher per job. It can't be exchanged for cash, split or combined with other offers.",
   "Vouchers are single use only. Quote your voucher code before your invoice is issued; vouchers can't be applied after an invoice has been issued. Once applied to a job, the voucher is redeemed and can't be reused or reissued, including if the job is later cancelled or doesn't go ahead.",
+  "Vouchers can't be combined with any other discount or price reduction. If we agree to reduce the quoted price, any voucher already applied to that job is treated as used and won't be reinstated.",
   "The voucher is a thank-you and is not conditional on leaving a review.",
   "Emoro Building and Emporo Plumbing reserve the right to determine how these terms apply, acting reasonably. Nothing in these terms limits your rights under the Australian Consumer Law.",
 ];
@@ -72,6 +73,8 @@ test("the terms page keeps the approved wording and stays public", () => {
   assert.ok(page.indexOf('heading: "Confined spaces"') < page.indexOf('heading: "Thank-you vouchers"'));
   assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 20 November 2026/);
   const vouchers = page.slice(page.indexOf('heading: "Thank-you vouchers"'), updatedAt);
+  assert.ok(vouchers.indexOf("Vouchers are single use only.") < vouchers.indexOf("Vouchers can't be combined"));
+  assert.ok(vouchers.indexOf("Vouchers can't be combined") < vouchers.indexOf("The voucher is a thank-you"));
   assert.equal(vouchers.includes("ABN"), false);
   assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
