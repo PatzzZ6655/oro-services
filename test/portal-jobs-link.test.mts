@@ -34,8 +34,9 @@ test("the staff header can leave the portal without a homepage redirect", () => 
   const home = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
   assert.match(header, /const publicHome = "https:\/\/www\.orosvc\.com\/"/);
   assert.match(header, /<a href=\{publicHome\}[\s\S]*<LogoImage/);
-  assert.match(header, />\s*Home\s*</);
-  assert.equal((header.match(/href=\{publicHome\}/g) ?? []).length, 2);
+  assert.equal(header.includes(">Home<"), false);
+  assert.equal((header.match(/href=\{publicHome\}/g) ?? []).length, 1);
+  assert.match(header, /min-h-11[\s\S]*pointer-events-none h-10 w-auto/);
   assert.equal(home.includes('redirect("/internal")'), false);
   assert.equal(home.includes("redirect("), false);
 });
