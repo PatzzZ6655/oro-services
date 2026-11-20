@@ -1,0 +1,23 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync(new URL("../src/app/internal/(portal)/page.tsx", import.meta.url), "utf8");
+const expression = source.match(/function showOroJobsApp\(email: string\): boolean \{\n  return ([\s\S]*?);\n\}/);
+
+test("the job web app entry is limited to Pat on the server", () => {
+  assert.ok(expression);
+  const show = new Function("email", `return ${expression?.[1]};`) as (email: string) => boolean;
+  assert.equal(show("pat.z@orosvc.com"), true);
+  assert.equal(show("  Pat.Z@OROSVC.COM "), true);
+  assert.equal(show("staff.example@orosvc.com"), false);
+  assert.equal(show(""), false);
+  assert.match(source, /\{showOroJobsApp\(user\.email\) \? <OroJobsApp \/> : null\}/);
+  const start = source.indexOf("function OroJobsApp");
+  const tile = source.slice(start, source.indexOf("async function recentReports"));
+  assert.match(tile, /href="\/jobs"/);
+  assert.match(tile, /ORO 工单 \(Jobs\)/);
+  assert.match(tile, /Job web app/);
+  assert.equal(tile.includes("tape.orosvc.com"), false);
+  assert.equal(tile.includes("target="), false);
+});

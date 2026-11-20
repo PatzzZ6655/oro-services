@@ -15,6 +15,10 @@ export default function Page() {
   );
 }
 
+export function showOroJobsApp(email: string): boolean {
+  return email.trim().toLowerCase() === "pat.z@orosvc.com";
+}
+
 async function Hub() {
   const user = await requireUser();
   const recent = await recentReports();
@@ -27,8 +31,28 @@ async function Hub() {
           Jobs
         </Link>
       </div>
+      {showOroJobsApp(user.email) ? <OroJobsApp /> : null}
       <ReportsPanel recent={recent} />
     </PortalFrame>
+  );
+}
+
+function OroJobsApp() {
+  return (
+    <section className="mt-4">
+      <ul className="grid gap-3">
+        <li className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-base font-semibold text-brand-navy">ORO 工单 (Jobs)</h2>
+          <p className="mt-1 text-sm text-slate-600">Job web app</p>
+          <a
+            href="/jobs"
+            className="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
+          >
+            Open
+          </a>
+        </li>
+      </ul>
+    </section>
   );
 }
 
