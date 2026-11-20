@@ -47,6 +47,9 @@ export function HomeScreen() {
         <Link href="/jobs/new" className="flex min-h-16 items-center justify-center rounded-2xl bg-black text-xl font-semibold text-white">
           New job
         </Link>
+        <Link href="/jobs/voucher" className="flex min-h-16 items-center justify-center rounded-2xl bg-black text-xl font-semibold text-white">
+          Apply voucher
+        </Link>
       </div>
     </Screen>
   );

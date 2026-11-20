@@ -1,8 +1,9 @@
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
-import { cleanVoucherCode, voucherStatus } from "@/lib/jobs-app/voucher";
+import { applyVoucherStatus, cleanVoucherCode, notionPageId, voucherStatus } from "@/lib/jobs-app/voucher";
 import {
   isBusiness,
+  type ApplyVoucherResult,
   type Business,
   type Contact,
   type DepartResult,
@@ -448,6 +449,80 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
         voucherMessage: text(result.json.voucherMessage, 300, secret),
         voucherBusiness: text(result.json.voucherBusiness, 40, secret),
         voucherRedeemedDate: text(result.json.voucherRedeemedDate, 10, secret),
+      },
+    };
+  } catch {
+    return upstream();
+  }
+}
+
+function voucherAmount(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return 0;
+}
+
+export async function applyVoucher(
+  jobRef: string,
+  code: string,
+  business: Business,
+  fetchImpl?: FetchLike,
+): Promise<JobsResult<ApplyVoucherResult>> {
+  const config = makeConfig();
+  if (!config) return unconfigured();
+  const jobId = notionPageId(jobRef);
+  if (!jobId) {
+    return { status: 400, body: { ok: false, error: "bad_job", message: "Paste a Notion job link or pick a job." } };
+  }
+  const voucher = cleanVoucherCode(code);
+  if (!voucher) {
+    return { status: 400, body: { ok: false, error: "bad_code", message: "Enter a voucher code." } };
+  }
+  const call = fetchImpl ?? globalThis.fetch;
+  try {
+    const result = await postJson(
+      config.newJob,
+      { secret: config.secret, business, mode: "applyVoucher", jobId, voucher },
+      call,
+      JSON_TIMEOUT_MS,
+    );
+    if (result.status === 401 || result.json?.error === "unauthorized") {
+      const error = failure(401, result.json) ?? { ok: false as const, error: "webhook_unauthorized", message: "The server key was rejected." };
+      return { status: statusFor(error, result.status), body: error };
+    }
+    if (result.status === 502 || result.json?.error === "voucherUpdateFailed") {
+      return {
+        status: 502,
+        body: {
+          ok: false,
+          error: "voucherUpdateFailed",
+          message: text(result.json?.voucherMessage, 300, config.secret) || "The voucher could not be updated.",
+        },
+      };
+    }
+    const error = failure(result.status, result.json);
+    if (error || !result.json) {
+      const body = error ?? upstream().body;
+      return { status: statusFor(body, result.status), body };
+    }
+    const secret = config.secret;
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        mode: "applyVoucher",
+        business: isBusiness(result.json.business) ? result.json.business : business,
+        brand: text(result.json.brand, 80, secret),
+        jobId: notionPageId(text(result.json.jobId, 80, secret)) ?? jobId,
+        jobUrl: httpsUrl(result.json.jobUrl),
+        jobTitle: text(result.json.jobTitle, 200, secret),
+        voucherStatus: applyVoucherStatus(result.json.voucherStatus),
+        voucherCode: text(result.json.voucherCode, 40, secret),
+        voucherValue: voucherAmount(result.json.voucherValue),
+        voucherBusiness: text(result.json.voucherBusiness, 40, secret),
+        voucherRedeemedDate: text(result.json.voucherRedeemedDate, 10, secret),
+        voucherMessage: text(result.json.voucherMessage, 300, secret),
+        noteWritten: flag(result.json.noteWritten) ?? false,
       },
     };
   } catch {

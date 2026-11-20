@@ -1,4 +1,4 @@
-import type { VoucherStatus } from "@/lib/jobs-app/voucher";
+import type { ApplyVoucherStatus, VoucherStatus } from "@/lib/jobs-app/voucher";
 
 export type Business = "emoro" | "emporo";
 
@@ -93,6 +93,23 @@ export type NewJobResult = {
   voucherMessage: string;
   voucherBusiness: string;
   voucherRedeemedDate: string;
+};
+
+export type ApplyVoucherResult = {
+  ok: true;
+  mode: "applyVoucher";
+  business: Business;
+  brand: string;
+  jobId: string;
+  jobUrl: string;
+  jobTitle: string;
+  voucherStatus: ApplyVoucherStatus;
+  voucherCode: string;
+  voucherValue: number;
+  voucherBusiness: string;
+  voucherRedeemedDate: string;
+  voucherMessage: string;
+  noteWritten: boolean;
 };
 
 export type JobsResult<T> = { status: number; body: T | JobsError };
