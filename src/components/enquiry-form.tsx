@@ -7,6 +7,7 @@ import { sendEnquiry } from "@/app/contact/actions";
 import { AppointmentFields } from "@/components/appointment-fields";
 import { SuburbField } from "@/components/suburb-field";
 import { validateAppointmentForm, type AppointmentFieldErrors } from "@/lib/appointments";
+import { normaliseVoucherCode, voucherHint } from "@/lib/enquiry";
 import {
   brandLabel,
   corporateEmail,
@@ -38,6 +39,7 @@ export function EnquiryForm() {
   const [service, setService] = useState(() => initialService(brand, params.get("service")));
   const [photoMessage, setPhotoMessage] = useState<string | undefined>();
   const [appointmentErrors, setAppointmentErrors] = useState<AppointmentFieldErrors>({});
+  const [voucher, setVoucher] = useState("");
 
   const inbox = brand ? inboxFor(brand) : undefined;
   const services = brand && brand !== "general" ? getBrand(brand)?.services ?? [] : [];
@@ -138,6 +140,26 @@ export function EnquiryForm() {
           ))}
         </select>
       </Field>
+
+      {brand === "emoro" || brand === "emporo" ? (
+        <Field label="Voucher code (optional)" name="voucher">
+          <input
+            id="voucher"
+            name="voucher"
+            value={voucher}
+            onChange={(event) => setVoucher(normaliseVoucherCode(event.target.value))}
+            placeholder={brand === "emoro" ? "EMB-…" : "EMP-…"}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={40}
+            className={fieldClass}
+          />
+          {voucherHint(brand, voucher) ? (
+            <p className="text-sm text-slate-600">{voucherHint(brand, voucher)}</p>
+          ) : null}
+        </Field>
+      ) : null}
 
       {brand === "emporo" ? (
         <AppointmentFields errors={appointmentErrors} onEdit={() => setAppointmentErrors({})} />
