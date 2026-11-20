@@ -139,6 +139,7 @@ const sections: { heading: string; paragraphs: string[] }[] = [
       "One voucher per job. It can be used once, and can't be exchanged for cash, split or combined with other offers.",
       "Quote the code when booking. The voucher is used once it is applied to a new job and can't be reused, even if that job is cancelled or doesn't go ahead.",
       "The voucher is a thank-you and is not conditional on leaving a review.",
+      "We decide how these voucher terms apply in any particular case, acting reasonably and in line with Australian Consumer Law.",
     ],
   },
 ];
