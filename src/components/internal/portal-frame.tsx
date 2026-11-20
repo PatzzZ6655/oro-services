@@ -4,6 +4,11 @@ import { LogoImage } from "@/components/logo-image";
 import { oroLogo } from "@/lib/content";
 
 const publicHome = "https://www.orosvc.com/";
+const fieldJobs = "https://www.orosvc.com/jobs";
+
+export function showFieldJobs(email: string): boolean {
+  return email.trim().toLowerCase() === "pat.z@orosvc.com";
+}
 
 export function PortalFallback() {
   return (
@@ -53,6 +58,14 @@ export function PortalFrame({
             </a>
           </div>
           <div className="min-w-0 text-right">
+            {showFieldJobs(email) ? (
+              <a
+                href={fieldJobs}
+                className={`inline-flex min-h-11 items-center text-sm font-semibold underline ${showLogo ? "text-white" : "text-brand-navy"}`}
+              >
+                Jobs
+              </a>
+            ) : null}
             <p className="text-sm font-semibold">Staff portal</p>
             <p className={`truncate text-xs ${showLogo ? "text-slate-300" : "text-slate-500"}`}>{name || email}</p>
           </div>

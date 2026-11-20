@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/current";
-import { PortalFallback, PortalFrame } from "@/components/internal/portal-frame";
+import { PortalFallback, PortalFrame, showFieldJobs } from "@/components/internal/portal-frame";
 import { reportCards } from "@/lib/reports/catalog";
 import { safetyCards } from "@/lib/reports/safety";
 import { formatAuDate } from "@/lib/reports/dates";
@@ -13,10 +13,6 @@ export default function Page() {
       <Hub />
     </Suspense>
   );
-}
-
-export function showOroJobsApp(email: string): boolean {
-  return email.trim().toLowerCase() === "pat.z@orosvc.com";
 }
 
 async function Hub() {
@@ -31,21 +27,21 @@ async function Hub() {
           Jobs
         </Link>
       </div>
-      {showOroJobsApp(user.email) ? <OroJobsApp /> : null}
+      {showFieldJobs(user.email) ? <NewJobTile /> : null}
       <ReportsPanel recent={recent} />
     </PortalFrame>
   );
 }
 
-function OroJobsApp() {
+function NewJobTile() {
   return (
     <section className="mt-4">
       <ul className="grid gap-3">
         <li className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-base font-semibold text-brand-navy">ORO Jobs</h2>
-          <p className="mt-1 text-sm text-slate-600">Job web app</p>
+          <h2 className="text-base font-semibold text-brand-navy">New Job</h2>
+          <p className="mt-1 text-sm text-slate-600">Create a job</p>
           <a
-            href="https://www.orosvc.com/jobs"
+            href="https://www.orosvc.com/jobs/new"
             className="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white"
           >
             Open
