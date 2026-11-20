@@ -3,6 +3,12 @@ import Link from "next/link";
 import { LogoImage } from "@/components/logo-image";
 import { oroLogo } from "@/lib/content";
 
+const publicHome = "https://www.orosvc.com/";
+
+export function showFieldJobs(email: string): boolean {
+  return email.trim().toLowerCase() === "pat.z@orosvc.com";
+}
+
 export function PortalFallback() {
   return (
     <div className="min-h-screen bg-slate-50">
@@ -27,16 +33,16 @@ export function PortalFrame({
       <header className={showLogo ? "bg-brand-navy text-white" : "border-b border-slate-200 bg-white text-brand-navy"}>
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           {showLogo ? (
-            <Link href="/internal" className="inline-flex rounded-md bg-white px-2 py-1">
+            <a href={publicHome} className="inline-flex min-h-11 items-center rounded-md bg-white px-2 py-1">
               <LogoImage
                 src={oroLogo.src}
                 alt={oroLogo.alt}
                 width={oroLogo.width}
                 height={oroLogo.height}
                 sizes="96px"
-                className="h-10 w-auto"
+                className="pointer-events-none h-10 w-auto"
               />
-            </Link>
+            </a>
           ) : (
             <Link href="/internal" className="text-sm font-semibold text-brand-navy">
               All reports
