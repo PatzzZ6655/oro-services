@@ -51,7 +51,7 @@ const clauses = [
   "Valid for 3 months from the issue date shown on the voucher. The job must be booked within that time.",
   "It applies to jobs of $150 or more (before the voucher is applied).",
   "One voucher per job. It can't be exchanged for cash, split or combined with other offers.",
-  "Vouchers are single use only. Quote your voucher code when booking. Once applied to a booking, the voucher is redeemed and can't be reused or reissued, including if the booking is later cancelled or doesn't go ahead.",
+  "Vouchers are single use only. Quote your voucher code before your invoice is issued; vouchers can't be applied after an invoice has been issued. Once applied to a job, the voucher is redeemed and can't be reused or reissued, including if the job is later cancelled or doesn't go ahead.",
   "The voucher is a thank-you and is not conditional on leaving a review.",
   "Emoro Building and Emporo Plumbing reserve the right to determine how these terms apply, acting reasonably. Nothing in these terms limits your rights under the Australian Consumer Law.",
 ];
