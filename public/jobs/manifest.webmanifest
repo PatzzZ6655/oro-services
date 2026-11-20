@@ -1,0 +1,16 @@
+{
+  "id": "/jobs",
+  "name": "ORO 工单",
+  "short_name": "工单",
+  "description": "ORO Services field jobs",
+  "start_url": "/jobs",
+  "scope": "/jobs",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "zh-Hans",
+  "icons": [
+    { "src": "/jobs/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/jobs/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
