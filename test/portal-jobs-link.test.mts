@@ -14,7 +14,9 @@ test("the job web app entry is limited to Pat on the server", () => {
   assert.equal(show("staff.example@orosvc.com"), false);
   assert.equal(show(""), false);
   assert.match(source, /\{showFieldJobs\(user\.email\) \? <NewJobTile \/> : null\}/);
-  assert.match(headerSource, /\{showFieldJobs\(email\) \? \(/);
+  assert.match(source, /href="\/internal\/jobs"/);
+  assert.equal(headerSource.includes("showFieldJobs(email)"), false);
+  assert.equal(headerSource.includes("orosvc.com/jobs"), false);
   const start = source.indexOf("function NewJobTile");
   const tile = source.slice(start, source.indexOf("async function recentReports"));
   assert.match(tile, /href="https:\/\/www\.orosvc\.com\/jobs\/new"/);
@@ -24,7 +26,6 @@ test("the job web app entry is limited to Pat on the server", () => {
   assert.equal(/[\u3400-\u9fff]/.test(tile), false);
   assert.equal(tile.includes("tape.orosvc.com"), false);
   assert.equal(tile.includes("target="), false);
-  assert.match(headerSource, /href=\{fieldJobs\}[\s\S]*>\s*Jobs\s*</);
   assert.equal(/[\u3400-\u9fff]/.test(headerSource), false);
 });
 
