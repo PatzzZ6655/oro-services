@@ -60,19 +60,21 @@ export function normaliseVoucherCode(value: string): string {
 }
 
 export function acceptedVoucherCode(brand: EnquiryBrand, raw: string): string | null {
+  if (brand !== "emoro" && brand !== "emporo") return null;
   const code = normaliseVoucherCode(raw);
-  if (brand === "emoro" && /^EMB-[A-Z0-9]+$/.test(code)) return code;
-  if (brand === "emporo" && /^EMP-[A-Z0-9]+$/.test(code)) return code;
-  return null;
+  return /^(?:EMB|EMP)-[A-Z0-9]+$/.test(code) ? code : null;
+}
+
+export function voucherLine(code: string): string {
+  const issuer = code.startsWith("EMB-") ? "Emoro voucher" : "Emporo voucher";
+  return `Voucher code: ${code} (${issuer})`;
 }
 
 export function voucherHint(brand: EnquiryBrand, raw: string): string | null {
-  const prefix = brand === "emoro" ? "EMB-" : brand === "emporo" ? "EMP-" : null;
-  if (!prefix) return null;
-  const name = brand === "emoro" ? "Emoro" : "Emporo";
+  if (brand !== "emoro" && brand !== "emporo") return null;
   if (acceptedVoucherCode(brand, raw)) return null;
-  if (!normaliseVoucherCode(raw)) return `Optional. ${name} codes start with ${prefix}.`;
-  return `We'll send the enquiry without this code. ${name} codes start with ${prefix}.`;
+  if (!normaliseVoucherCode(raw)) return "Optional. Codes start with EMB- or EMP-.";
+  return "We'll send the enquiry without this code. Codes start with EMB- or EMP-.";
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -179,7 +181,7 @@ export function enquiryMailto(enquiry: ParsedEnquiry, note?: string): string {
     `Suburb / area: ${enquiry.suburb}`,
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
-    ...(enquiry.voucher ? [`Voucher code: ${enquiry.voucher}`] : []),
+    ...(enquiry.voucher ? [voucherLine(enquiry.voucher)] : []),
     ...appointmentLines(enquiry),
     "",
     enquiry.description.length > 1200
@@ -200,7 +202,7 @@ export function enquiryText(enquiry: ParsedEnquiry, photoName?: string): string 
     `Suburb / area: ${enquiry.suburb}`,
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
-    ...(enquiry.voucher ? [`Voucher code: ${enquiry.voucher}`] : []),
+    ...(enquiry.voucher ? [voucherLine(enquiry.voucher)] : []),
     photoName ? `Photo: ${photoName}` : "Photo: none",
     ...appointmentLines(enquiry),
     "",

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { addCalendarDays, appointmentBounds, windowsForDate } from "@/lib/appointments";
-import { acceptedVoucherCode, enquiryMailto, enquiryText, parseEnquiry, voucherHint } from "@/lib/enquiry";
+import { acceptedVoucherCode, enquiryMailto, enquiryText, parseEnquiry, voucherHint, voucherLine } from "@/lib/enquiry";
 
 function enquiry(brand: string, voucher = ""): FormData {
   const data = new FormData();
@@ -29,36 +29,43 @@ test("a matching code is normalised into the email and a bad code is left out", 
   assert.equal(emoro.ok, true);
   if (!emoro.ok) return;
   assert.equal(emoro.value.voucher, "EMB-123456");
-  assert.match(enquiryText(emoro.value), /Voucher code: EMB-123456/);
-  assert.match(decodeURIComponent(enquiryMailto(emoro.value).split("body=")[1] ?? ""), /Voucher code: EMB-123456/);
+  assert.match(enquiryText(emoro.value), /Voucher code: EMB-123456 \(Emoro voucher\)/);
+  assert.match(decodeURIComponent(enquiryMailto(emoro.value).split("body=")[1] ?? ""), /Voucher code: EMB-123456 \(Emoro voucher\)/);
 
-  const wrongPrefix = parseEnquiry(enquiry("emoro", "EMP-654321"));
+  const eitherBrand = parseEnquiry(enquiry("emoro", "EMP-654321"));
   const blank = parseEnquiry(enquiry("emoro"));
   const shapeless = parseEnquiry(enquiry("emporo", "hello"));
-  const emporo = parseEnquiry(enquiry("emporo", "emp-654321"));
+  const emporo = parseEnquiry(enquiry("emporo", "emb-123456"));
   const general = parseEnquiry(enquiry("general", "EMB-123456"));
-  for (const result of [wrongPrefix, blank, shapeless, general]) {
+  for (const result of [blank, shapeless, general]) {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.value.voucher, undefined);
     assert.equal(enquiryText(result.value).includes("Voucher code:"), false);
   }
+  assert.equal(eitherBrand.ok, true);
+  if (!eitherBrand.ok) return;
+  assert.equal(eitherBrand.value.voucher, "EMP-654321");
+  assert.match(enquiryText(eitherBrand.value), /Voucher code: EMP-654321 \(Emporo voucher\)/);
+  assert.equal(voucherLine("EMP-654321"), "Voucher code: EMP-654321 (Emporo voucher)");
   assert.equal(emporo.ok, true);
   if (!emporo.ok) return;
-  assert.equal(emporo.value.voucher, "EMP-654321");
+  assert.equal(emporo.value.voucher, "EMB-123456");
+  assert.match(enquiryText(emporo.value), /Voucher code: EMB-123456 \(Emoro voucher\)/);
   assert.equal(emporo.value.appointments?.length, 2);
 });
 
 test("hints stay gentle and follow the selected brand", () => {
-  assert.equal(voucherHint("emoro", ""), "Optional. Emoro codes start with EMB-.");
-  assert.equal(voucherHint("emporo", "EMB-123456"), "We'll send the enquiry without this code. Emporo codes start with EMP-.");
-  assert.equal(voucherHint("emoro", "EMB-123456"), null);
+  assert.equal(voucherHint("emoro", ""), "Optional. Codes start with EMB- or EMP-.");
+  assert.equal(voucherHint("emporo", "HELLO"), "We'll send the enquiry without this code. Codes start with EMB- or EMP-.");
+  assert.equal(voucherHint("emoro", "EMP-654321"), null);
   assert.equal(voucherHint("general", "EMB-123456"), null);
   assert.equal(acceptedVoucherCode("emoro", "EMB-"), null);
-  assert.equal(acceptedVoucherCode("emporo", "EMP-654321"), "EMP-654321");
+  assert.equal(acceptedVoucherCode("emporo", "EMB-123456"), "EMB-123456");
+  assert.equal(acceptedVoucherCode("general", "EMP-654321"), null);
 
   const form = readFileSync(new URL("../src/components/enquiry-form.tsx", import.meta.url), "utf8");
-  assert.match(form, /placeholder=\{brand === "emoro" \? "EMB-…" : "EMP-…"\}/);
+  assert.match(form, /placeholder="EMB- or EMP- code"/);
   assert.match(form, /brand === "emoro" \|\| brand === "emporo"/);
   assert.equal(form.includes("MAKE_"), false);
 });

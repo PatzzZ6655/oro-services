@@ -148,7 +148,7 @@ export function EnquiryForm() {
             name="voucher"
             value={voucher}
             onChange={(event) => setVoucher(normaliseVoucherCode(event.target.value))}
-            placeholder={brand === "emoro" ? "EMB-…" : "EMP-…"}
+            placeholder="EMB- or EMP- code"
             autoCapitalize="characters"
             autoCorrect="off"
             spellCheck={false}
