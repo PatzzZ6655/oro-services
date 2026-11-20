@@ -68,7 +68,7 @@ export function Screen({
 export function BackLink({ href }: { href: string }) {
   return (
     <a href={href} className={`min-h-11 text-base font-semibold underline ${focus}`}>
-      返回
+      Back
     </a>
   );
 }

@@ -8,11 +8,11 @@ import { Spinner } from "@/components/jobs/ui";
 import { jobsGoogleConfigured } from "@/lib/jobs-app/google";
 import { JOBS_COOKIE, readJobsSession } from "@/lib/jobs-app/session";
 
-export const metadata: Metadata = { title: "登录" };
+export const metadata: Metadata = { title: "Sign in" };
 
 export default function Page({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
-    <Suspense fallback={<Spinner label="正在打开" />}>
+    <Suspense fallback={<Spinner label="Opening" />}>
       <Gate searchParams={searchParams} />
     </Suspense>
   );

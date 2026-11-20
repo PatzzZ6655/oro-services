@@ -34,7 +34,7 @@ export function DepartScreen() {
           router.push("/jobs/login");
           return;
         }
-        setError(reason instanceof JobsClientError ? reason.message : "服务器没有返回内容。请稍后再试。");
+        setError(reason instanceof JobsClientError ? reason.message : "The server did not reply. Try again.");
       });
     return () => {
       cancel = true;
@@ -60,7 +60,7 @@ export function DepartScreen() {
         router.push("/jobs/login");
         return;
       }
-      setError(reason instanceof JobsClientError ? reason.message : "服务器没有返回内容。请稍后再试。");
+      setError(reason instanceof JobsClientError ? reason.message : "The server did not reply. Try again.");
     } finally {
       setPendingId("");
     }
@@ -70,12 +70,12 @@ export function DepartScreen() {
     const address = done.result.address || done.job.address;
     const title = done.result.jobTitle || done.job.title;
     return (
-      <Screen title="出发" back={<BackLink href="/jobs" />}>
+      <Screen title="Depart" back={<BackLink href="/jobs" />}>
         <div>
           <p className="text-sm">{done.result.brand || businessLabel(done.result.business)}</p>
           <h2 className="mt-1 text-2xl font-semibold">{title}</h2>
           <p className="mt-2 text-lg">{address}</p>
-          {done.result.visit ? <p className="mt-2 text-base">第 {done.result.visit} 趟</p> : null}
+          {done.result.visit ? <p className="mt-2 text-base">Visit {done.result.visit}</p> : null}
         </div>
         <SmsPicker
           jobId={done.job.jobId}
@@ -85,25 +85,25 @@ export function DepartScreen() {
           jobTitle={title}
           allowManual={done.result.contacts.length === 0}
         />
-        {done.result.sms ? null : <Alert>服务器没有返回短信内容。导航还可以用。</Alert>}
+        {done.result.sms ? null : <Alert>The server did not return a message. Navigation still works.</Alert>}
         {address ? (
           <JobsLink href={mapsHref(address)} variant="outline">
-            Google 地图导航
+            Google Maps
           </JobsLink>
         ) : null}
         <JobsButton type="button" variant="text" onClick={() => setDone(null)}>
-          选别的工单
+          Choose another job
         </JobsButton>
       </Screen>
     );
   }
 
   return (
-    <Screen title="出发" back={<BackLink href="/jobs" />}>
-      {visit ? <p className="text-base">还有一个工单没离开：{visit.title}。再点出发会换成这个工单。</p> : null}
+    <Screen title="Depart" back={<BackLink href="/jobs" />}>
+      {visit ? <p className="text-base">A visit is still open: {visit.title}. Departing again will switch to this job.</p> : null}
       {error ? <Alert>{error}</Alert> : null}
-      {jobs === null && !error ? <Spinner label="正在读取今天的工单" /> : null}
-      {jobs && jobs.length === 0 ? <p className="text-lg">今天没有排期工单</p> : null}
+      {jobs === null && !error ? <Spinner label="Loading today's jobs" /> : null}
+      {jobs && jobs.length === 0 ? <p className="text-lg">No jobs scheduled today</p> : null}
       <div className="flex flex-col gap-3">
         {jobs?.map((job) => (
           <button
@@ -116,7 +116,7 @@ export function DepartScreen() {
             <span className="block text-sm">{businessLabel(job.business)}</span>
             <span className="mt-1 block text-lg font-semibold">{job.title}</span>
             <span className="mt-1 block text-base">{job.address}</span>
-            {pendingId === job.jobId ? <span className="mt-2 block text-sm">正在登记出发</span> : null}
+            {pendingId === job.jobId ? <span className="mt-2 block text-sm">Recording departure</span> : null}
           </button>
         ))}
       </div>
@@ -130,7 +130,7 @@ export function DepartScreen() {
             setAttempt((value) => value + 1);
           }}
         >
-          再试一次
+          Try again
         </JobsButton>
       ) : null}
     </Screen>

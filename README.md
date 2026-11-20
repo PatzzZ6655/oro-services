@@ -84,7 +84,7 @@ Do not commit the client secret, session secret, or refresh token.
 
 ## Field app
 
-`/jobs` is a private phone app for depart, leave, and new work orders. It is not linked from the public site, not in the sitemap, and disallowed in `robots.txt`. Add it to the iPhone home screen from Safari. The installed name is ORO 工单.
+`/jobs` is a private phone app for depart, leave, and new work orders. It is not linked from the public site, not in the sitemap, and disallowed in `robots.txt`. Add it to the iPhone home screen from Safari. The installed name is ORO Jobs. The screens are in English. Job titles, addresses, summaries, and the SMS text itself still come from Make.
 
 Sign-in is Google only (authorization code, with `state` and PKCE). The button opens `/jobs/auth/google`. Google returns to `/jobs/auth/google/callback`. The redirect URI is the request host plus that path, so the same deployment works on the apex, www, and a preview host.
 

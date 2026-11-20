@@ -20,15 +20,15 @@ export function voucherNote(
   if (status === "none") return null;
   if (status === "redeemed") {
     const amount = value.startsWith("$") ? value : value ? `$${value}` : "";
-    return { tone: "ok", text: amount ? `已核销 ${code}，减 ${amount}` : `已核销 ${code}` };
+    return { tone: "ok", text: amount ? `Redeemed ${code}, less ${amount}` : `Redeemed ${code}` };
   }
   if (status === "alreadyRedeemed") {
-    const when = redeemedDate ? `已在 ${redeemedDate} ` : "已经";
-    return { tone: "warn", text: `这个券${when}核销过了。工单仍已创建。` };
+    const when = redeemedDate ? ` on ${redeemedDate}` : "";
+    return { tone: "warn", text: `This voucher was already redeemed${when}. The job was still created.` };
   }
   const warnings: Record<"notFound" | "expired", string> = {
-    notFound: "没找到这个券码。工单仍已创建。",
-    expired: "这个券已过期。工单仍已创建。",
+    notFound: "This voucher code was not found. The job was still created.",
+    expired: "This voucher has expired. The job was still created.",
   };
   return { tone: "warn", text: warnings[status] };
 }

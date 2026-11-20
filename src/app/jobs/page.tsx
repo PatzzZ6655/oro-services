@@ -4,11 +4,11 @@ import { Authed } from "@/app/jobs/authed";
 import { HomeScreen } from "@/components/jobs/home-screen";
 import { Screen, Spinner } from "@/components/jobs/ui";
 
-export const metadata: Metadata = { title: "工单" };
+export const metadata: Metadata = { title: "Jobs" };
 
 export default function Page() {
   return (
-    <Suspense fallback={<Screen title="工单"><Spinner label="正在打开" /></Screen>}>
+    <Suspense fallback={<Screen title="Jobs"><Spinner label="Opening" /></Screen>}>
       <Authed>
         <HomeScreen />
       </Authed>

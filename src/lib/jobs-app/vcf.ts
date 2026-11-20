@@ -13,7 +13,7 @@ function escapeVCard(value: string): string {
 }
 
 export function contactDisplayName(name: string, address: string): string {
-  const person = name.trim() || "租客";
+  const person = name.trim() || "Tenant";
   const place = shortAddress(address);
   if (!place) return person;
   return `${person} · ${place}`;
@@ -21,7 +21,7 @@ export function contactDisplayName(name: string, address: string): string {
 
 export function buildVCard(input: VCardInput): string {
   const display = contactDisplayName(input.name, input.address);
-  const note = `工单：${input.jobTitle.trim()}\nJob ID：${input.jobId.trim()}`;
+  const note = `Job: ${input.jobTitle.trim()}\nJob ID: ${input.jobId.trim()}`;
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
