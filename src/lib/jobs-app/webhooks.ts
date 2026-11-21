@@ -1,3 +1,4 @@
+import { newJobNeedDetail, newJobTextCoversScreenshots, newJobTextPayload, readNewJobText } from "@/lib/jobs-app/new-job-text";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
 import { applyVoucherStatus, cleanVoucherCode, notionPageId, voucherStatus } from "@/lib/jobs-app/voucher";
@@ -402,15 +403,16 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
   }
   const images = await readUpload(form, "images", NEW_JOB_MAX_IMAGES);
   if (!images.ok) return images;
-  if (images.files.length === 0) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose a screenshot." } };
+  const typed = readNewJobText(form);
+  if (images.files.length === 0 && !newJobTextCoversScreenshots(typed)) {
+    return { status: 400, body: { ok: false, error: "bad_request", message: newJobNeedDetail } };
   }
   const config = makeConfig();
   if (!config) return unconfigured();
   const call = fetchImpl ?? globalThis.fetch;
   try {
     const voucher = cleanVoucherCode(fieldText(form.get("voucher"), 40));
-    const fields: Record<string, string> = { secret: config.secret, business };
+    const fields: Record<string, string> = { secret: config.secret, business, ...newJobTextPayload(typed) };
     if (voucher) fields.voucher = voucher;
     const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
     const error = failure(result.status, result.json);

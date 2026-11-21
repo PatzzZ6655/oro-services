@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
+import {
+  newJobNeedDetail,
+  newJobTextCoversScreenshots,
+  newJobTextLimits,
+  readNewJobText,
+} from "@/lib/jobs-app/new-job-text";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
@@ -51,6 +57,12 @@ function Line({ label, value }: { label: string; value: string }) {
 export function NewJobScreen() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [tenantName, setTenantName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [description, setDescription] = useState("");
+  const [workOrderNumber, setWorkOrderNumber] = useState("");
+  const [notes, setNotes] = useState("");
   const [voucher, setVoucher] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -64,22 +76,36 @@ export function NewJobScreen() {
       setError("Choose Emoro or Emporo.");
       return;
     }
-    if (files.length === 0) {
-      setError("Choose a screenshot.");
+    const draft = new FormData();
+    draft.set("tenantName", tenantName);
+    draft.set("phone", phone);
+    draft.set("address", address);
+    draft.set("description", description);
+    draft.set("workOrderNumber", workOrderNumber);
+    draft.set("notes", notes);
+    const typed = readNewJobText(draft);
+    if (files.length === 0 && !newJobTextCoversScreenshots(typed)) {
+      setError(newJobNeedDetail);
       return;
     }
     pending.current = true;
     setError("");
     setBusy(true);
     try {
-      const compressed = await compressFiles(files.slice(0, NEW_JOB_MAX_IMAGES), NEW_JOB_MAX_EDGE, NEW_JOB_QUALITIES);
+      const compressed =
+        files.length === 0
+          ? []
+          : await compressFiles(files.slice(0, NEW_JOB_MAX_IMAGES), NEW_JOB_MAX_EDGE, NEW_JOB_QUALITIES);
       const count = keptCount(compressed.map((file) => file.size));
-      if (count === 0 || count < compressed.length) {
+      if (files.length > 0 && (count === 0 || count < compressed.length)) {
         setError("The photos are too large. Choose fewer.");
         return;
       }
       const form = new FormData();
       form.set("business", business);
+      for (const [key, value] of Object.entries(typed)) {
+        if (value) form.set(key, value);
+      }
       const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
       if (code) form.set("voucher", code);
       for (const file of compressed) form.append("images", file);
@@ -132,7 +158,7 @@ export function NewJobScreen() {
   return (
     <Screen title="New job" back={<BackLink href="/jobs" />}>
       {error ? <Alert>{error}</Alert> : null}
-      {busy ? <Spinner label="Reading the screenshot, about 10 seconds" /> : null}
+      {busy ? <Spinner label={files.length > 0 ? "Reading the screenshot, about 10 seconds" : "Creating the job"} /> : null}
       <div className={busy ? "hidden" : "contents"}>
           <div className="grid grid-cols-1 gap-3">
             {(["emoro", "emporo"] as const).map((id) => (
@@ -161,6 +187,66 @@ export function NewJobScreen() {
             />
           </label>
           <p className="text-base">{files.length > 0 ? `${files.length} selected, ${NEW_JOB_MAX_IMAGES} at most` : `Up to ${NEW_JOB_MAX_IMAGES} screenshots`}</p>
+          <p className="text-base text-neutral-700">A name or address, plus a description, is enough without a screenshot.</p>
+          <label className="flex flex-col gap-2 text-base">
+            Tenant / contact name
+            <input
+              value={tenantName}
+              onChange={(event) => setTenantName(event.target.value)}
+              maxLength={newJobTextLimits.tenantName}
+              autoComplete="name"
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Phone
+            <input
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              maxLength={newJobTextLimits.phone}
+              inputMode="tel"
+              autoComplete="tel"
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Property address
+            <input
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              maxLength={newJobTextLimits.address}
+              autoComplete="street-address"
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Job description
+            <input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={newJobTextLimits.description}
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            PM work order number
+            <input
+              value={workOrderNumber}
+              onChange={(event) => setWorkOrderNumber(event.target.value)}
+              maxLength={newJobTextLimits.workOrderNumber}
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Notes
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              maxLength={newJobTextLimits.notes}
+              rows={4}
+              className={`${fieldClass} min-h-32 py-3`}
+            />
+          </label>
           <label className="flex flex-col gap-2 text-base">
             Voucher code (optional)
             <input
