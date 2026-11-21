@@ -51,8 +51,31 @@ export type ParsedEnquiry = {
   serviceLabel: string;
   description: string;
   inbox: string;
+  voucher?: string;
   appointments?: AppointmentChoice[];
 };
+
+export function normaliseVoucherCode(value: string): string {
+  return value.trim().toUpperCase().replace(/\s+/g, "").slice(0, 40);
+}
+
+export function acceptedVoucherCode(brand: EnquiryBrand, raw: string): string | null {
+  if (brand !== "emoro" && brand !== "emporo") return null;
+  const code = normaliseVoucherCode(raw);
+  return /^(?:EMB|EMP)-[A-Z0-9]+$/.test(code) ? code : null;
+}
+
+export function voucherLine(code: string): string {
+  const issuer = code.startsWith("EMB-") ? "Emoro voucher" : "Emporo voucher";
+  return `Voucher code: ${code} (${issuer})`;
+}
+
+export function voucherHint(brand: EnquiryBrand, raw: string): string | null {
+  if (brand !== "emoro" && brand !== "emporo") return null;
+  if (acceptedVoucherCode(brand, raw)) return null;
+  if (!normaliseVoucherCode(raw)) return "Optional. Codes start with EMB- or EMP-.";
+  return "We'll send the enquiry without this code. Codes start with EMB- or EMP-.";
+}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[0-9+().\-\s]+$/;
@@ -113,6 +136,8 @@ export function parseEnquiry(formData: FormData):
     errors.description = "Describe the job in a few sentences (10 to 2000 characters).";
   }
 
+  const voucher = isEnquiryBrand(brandRaw) ? acceptedVoucherCode(brandRaw, readText(formData, "voucher")) ?? undefined : undefined;
+
   let appointments: AppointmentChoice[] | undefined;
   if (brandRaw === "emporo") {
     const arrival = validateAppointmentForm(formData);
@@ -136,6 +161,7 @@ export function parseEnquiry(formData: FormData):
       serviceLabel,
       description,
       inbox: inboxFor(brandRaw),
+      voucher,
       appointments,
     },
   };
@@ -155,6 +181,7 @@ export function enquiryMailto(enquiry: ParsedEnquiry, note?: string): string {
     `Suburb / area: ${enquiry.suburb}`,
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
+    ...(enquiry.voucher ? [voucherLine(enquiry.voucher)] : []),
     ...appointmentLines(enquiry),
     "",
     enquiry.description.length > 1200
@@ -175,6 +202,7 @@ export function enquiryText(enquiry: ParsedEnquiry, photoName?: string): string 
     `Suburb / area: ${enquiry.suburb}`,
     `Brand: ${brandLabel(enquiry.brand)}`,
     `Service: ${enquiry.serviceLabel}`,
+    ...(enquiry.voucher ? [voucherLine(enquiry.voucher)] : []),
     photoName ? `Photo: ${photoName}` : "Photo: none",
     ...appointmentLines(enquiry),
     "",
