@@ -522,6 +522,9 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
 test("the new job screen checks the details before it creates the job", () => {
   const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
   assert.match(page, /Read screenshots/);
+  assert.match(page, /Continue/);
+  assert.match(page, /Choose Emoro Building or Emporo Plumbing first/);
+  assert.match(page, /scrollIntoView/);
   assert.match(page, /title="Check job"/);
   assert.match(page, /Create job/);
   assert.match(page, /\/jobs\/api\/new\/read/);

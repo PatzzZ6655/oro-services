@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
-import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
+import { BackLink, JobsButton, JobsLink, Screen, fieldClass } from "@/components/jobs/ui";
 import {
   newJobNeedDetail,
   newJobTextCoversScreenshots,
@@ -56,6 +56,22 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
+const chooseCompany = "Choose Emoro Building or Emporo Plumbing first";
+
+function ActionNotice({ message, busyLabel }: { message: string; busyLabel: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!message && !busyLabel) return;
+    ref.current?.scrollIntoView({ block: "center" });
+  }, [message, busyLabel]);
+  if (!message && !busyLabel) return null;
+  return (
+    <p ref={ref} role={message && !busyLabel ? "alert" : "status"} className="rounded-2xl border border-black px-4 py-3 text-base">
+      {busyLabel || message}
+    </p>
+  );
+}
+
 function typedDraft(values: {
   tenantName: string;
   phone: string;
@@ -95,7 +111,7 @@ export function NewJobScreen() {
   async function continueToCheck() {
     if (pending.current) return;
     if (!isBusiness(business)) {
-      setError("Choose Emoro or Emporo.");
+      setError(chooseCompany);
       return;
     }
     if (files.length === 0) {
@@ -157,7 +173,7 @@ export function NewJobScreen() {
   async function submit() {
     if (pending.current) return;
     if (!isBusiness(business)) {
-      setError("Choose Emoro or Emporo.");
+      setError(chooseCompany);
       return;
     }
     const typed = typedDraft({ tenantName, phone, address, description, workOrderNumber, notes });
@@ -233,9 +249,7 @@ export function NewJobScreen() {
           </button>
         }
       >
-        {error ? <Alert>{error}</Alert> : null}
-        {busy === "create" ? <Spinner label="Creating the job" /> : null}
-        <div className={busy ? "hidden" : "contents"}>
+        <div className="contents">
           <p className="text-base text-neutral-700">{businessLabel(business)}</p>
           <p className="text-base text-neutral-700">
             {readyFiles.length > 0
@@ -259,6 +273,7 @@ export function NewJobScreen() {
             setVoucher={setVoucher}
           />
         </div>
+        <ActionNotice message={error} busyLabel={busy === "create" ? "Creating the job" : ""} />
         <JobsButton type="button" onClick={submit} disabled={busy !== null}>
           {busy === "create" ? "Creating" : "Create job"}
         </JobsButton>
@@ -268,9 +283,7 @@ export function NewJobScreen() {
 
   return (
     <Screen title="New job" back={<BackLink href="/jobs" />}>
-      {error ? <Alert>{error}</Alert> : null}
-        {busy === "read" ? <Spinner label="Reading the screenshot, about 10 seconds" /> : null}
-      <div className={busy ? "hidden" : "contents"}>
+      <div className="contents">
           <div className="grid grid-cols-1 gap-3">
             {(["emoro", "emporo"] as const).map((id) => (
               <button
@@ -316,8 +329,9 @@ export function NewJobScreen() {
             setVoucher={setVoucher}
           />
       </div>
+      <ActionNotice message={error} busyLabel={busy === "read" ? "Reading the screenshot, about 10 seconds" : ""} />
       <JobsButton type="button" onClick={continueToCheck} disabled={busy !== null}>
-        {files.length > 0 ? "Read screenshots" : "Continue"}
+        {busy === "read" ? "Reading" : files.length > 0 ? "Read screenshots" : "Continue"}
       </JobsButton>
     </Screen>
   );
