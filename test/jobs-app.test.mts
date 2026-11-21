@@ -519,6 +519,15 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
   }
 });
 
+test("the new job screen checks the details before it creates the job", () => {
+  const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
+  assert.match(page, /Read screenshots/);
+  assert.match(page, /title="Check job"/);
+  assert.match(page, /Create job/);
+  assert.equal(page.includes('form.set("mode"'), false);
+  assert.equal(page.includes("readScreenshots"), false);
+});
+
 test("the public site does not advertise /jobs and the source has no webhook URL", () => {
   assert.equal(indexablePaths().some((entry) => entry.path.startsWith("/jobs")), false);
   const robotsSource = readFileSync(new URL("../src/app/robots.ts", import.meta.url), "utf8");
