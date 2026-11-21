@@ -21,10 +21,17 @@ export function ServiceView({ brand, service }: { brand: Brand; service: Service
           { label: service.name },
         ]}
       >
-        {service.summary} This is part of {brand.name}. {brand.description}
+        {service.summary}
       </InteriorHero>
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <div className="flex flex-col items-start gap-3">
+        <p className="text-lg leading-relaxed text-slate-700">
+          This work is carried out by{" "}
+          <Link href={`/${brand.id}`} className="font-semibold text-brand-navy underline-offset-2 hover:underline">
+            {brand.name}
+          </Link>
+          .
+        </p>
+        <div className="mt-8 flex flex-col items-start gap-3">
           <Link
             href={contactHref(brand.id, service.slug)}
             className={`inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy ${tone.button}`}
@@ -41,12 +48,16 @@ export function ServiceView({ brand, service }: { brand: Brand; service: Service
         {others.length > 0 ? (
           <div className="mt-12">
             <h2 className="text-xl font-bold text-slate-900">Other {brand.name} services</h2>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-6 space-y-4">
               {others.map((item) => (
-                <li key={item.slug}>
-                  <Link href={`/${brand.id}/${item.slug}`} className="font-medium text-brand-navy hover:underline">
+                <li key={item.slug} className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <Link
+                    href={`/${brand.id}/${item.slug}`}
+                    className="text-lg font-semibold text-brand-navy hover:underline"
+                  >
                     {item.name}
                   </Link>
+                  <p className="mt-2 text-slate-600">{item.summary}</p>
                 </li>
               ))}
             </ul>

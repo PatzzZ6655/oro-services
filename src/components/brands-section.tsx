@@ -14,9 +14,6 @@ export function BrandsSection() {
         <h2 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
           Our brands
         </h2>
-        <p className="mx-auto mt-4 max-w-lg font-light text-slate-600">
-          Emoro Building for construction. Emporo Plumbing for plumbing.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-12">
