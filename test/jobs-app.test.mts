@@ -7,6 +7,7 @@ import { mapsHref, shortAddress } from "@/lib/jobs-app/address";
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
+import { newJobTextCoversScreenshots, preferTyped, readNewJobText, screenshotReadFallback } from "@/lib/jobs-app/new-job-text";
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
@@ -178,6 +179,73 @@ test("a new work order sends an optional EMB or EMP voucher code", async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("typed new job details are extra fields and can stand in for screenshots", async () => {
+  useEnv();
+  const { createJob } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  let sent: FormData | null = null;
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent = init?.body instanceof FormData ? init.body : null;
+    return jsonResponse({ jobUrl: "https://www.notion.so/job-typed", jobTitle: "Leak" });
+  }) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emoro");
+    form.set("tenantName", "  Sam Lee  ");
+    form.set("phone", "0412 345 678");
+    form.set("address", "12 Smith St");
+    form.set("description", "Leaking tap");
+    form.set("workOrderNumber", "WO-9");
+    form.set("notes", "Gate code 1234\nDog in yard");
+    form.set("voucher", " emb-123456 ");
+    const result = await createJob(form);
+    assert.equal(result.status, 200);
+    assert.ok(sent);
+    const body = sent as unknown as FormData;
+    assert.equal(body.get("secret"), SECRET);
+    assert.equal(body.get("business"), "emoro");
+    assert.equal(body.get("voucher"), "EMB-123456");
+    assert.equal(body.get("tenantName"), "Sam Lee");
+    assert.equal(body.get("phone"), "0412 345 678");
+    assert.equal(body.get("address"), "12 Smith St");
+    assert.equal(body.get("description"), "Leaking tap");
+    assert.equal(body.get("workOrderNumber"), "WO-9");
+    assert.equal(body.get("notes"), "Gate code 1234\nDog in yard");
+    assert.equal(body.getAll("images").length, 0);
+    assert.equal(body.has("mode"), false);
+    assert.equal(body.has("jobId"), false);
+
+    const withShot = new FormData();
+    withShot.set("business", "emporo");
+    withShot.set("address", "  4 Lane  ");
+    withShot.set("description", "  Hot water  ");
+    withShot.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const both = await createJob(withShot);
+    assert.equal(both.status, 200);
+    const bothBody = sent as unknown as FormData;
+    assert.equal(bothBody.get("address"), "4 Lane");
+    assert.equal(bothBody.get("description"), "Hot water");
+    assert.equal(bothBody.has("tenantName"), false);
+    assert.equal(bothBody.getAll("images").length, 1);
+    assert.equal(bothBody.get("business"), "emporo");
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  const onlyDescription = new FormData();
+  onlyDescription.set("business", "emoro");
+  onlyDescription.set("description", "Leaking tap");
+  const missing = await createJob(onlyDescription);
+  assert.equal(missing.status, 400);
+  if (missing.body.ok) throw new Error("expected a rejection");
+  assert.match(missing.body.message, /name or address/);
+
+  const typed = readNewJobText(onlyDescription);
+  assert.equal(newJobTextCoversScreenshots(typed), false);
+  assert.equal(newJobTextCoversScreenshots({ ...typed, tenantName: "Sam" }), true);
+  assert.equal(newJobTextCoversScreenshots({ ...typed, address: "12 Smith St", tenantName: "" }), true);
 });
 
 test("the last recipient ticks are remembered per job", () => {
@@ -446,6 +514,101 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
     assert.equal(readyBody.jobUrl, "https://www.notion.so/job-1");
     assert.equal(readyBody.workOrderNumber, "WO-9");
     assert.equal(readyBody.propertyCreated, false);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("the new job screen checks the details before it creates the job", () => {
+  const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
+  assert.match(page, /Read screenshots/);
+  assert.match(page, /title="Check job"/);
+  assert.match(page, /Create job/);
+  assert.match(page, /\/jobs\/api\/new\/read/);
+  assert.match(page, /screenshotReadFallback/);
+  assert.equal(screenshotReadFallback, "Couldn't read the screenshots — type the details in");
+  assert.equal(page.includes('form.set("mode"'), false);
+  assert.equal(page.includes("readScreenshots"), false);
+  assert.equal(page.includes("MAKE_SHORTCUTS_SECRET"), false);
+  assert.equal(preferTyped("Sam", "Lee"), "Sam");
+  assert.equal(preferTyped("  ", "12 Smith St"), "12 Smith St");
+  assert.equal(preferTyped("", "EMB-1"), "EMB-1");
+});
+
+test("reading screenshots uses the new-job webhook without creating fields", async () => {
+  useEnv();
+  const { readScreenshots } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  let sent: FormData | null = null;
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent = init?.body instanceof FormData ? init.body : null;
+    return jsonResponse({
+      ok: true,
+      mode: "readScreenshots",
+      business: "emoro",
+      businessGuess: "emoro",
+      tenantName: "Sam Lee",
+      phone: "0412345678",
+      email: "sam@example.com",
+      address: "12 Smith St",
+      description: "Leaking tap",
+      workOrderNumber: "WO-9",
+      voucher: "EMB-123456",
+      tenant2Name: "",
+      phone2: "",
+      email2: "",
+      pmName: "Pat PM",
+      pmAgency: "Agency",
+      pmEmail: "pm@agency.com",
+      pmPhone: "0400000000",
+    });
+  }) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emoro");
+    form.set("voucher", " emb-123456 ");
+    form.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const result = await readScreenshots(form);
+    assert.equal(result.status, 200);
+    assert.ok(sent);
+    const body = sent as unknown as FormData;
+    assert.equal(body.get("secret"), SECRET);
+    assert.equal(body.get("mode"), "readScreenshots");
+    assert.equal(body.get("business"), "emoro");
+    assert.equal(body.get("voucher"), "EMB-123456");
+    assert.equal(body.getAll("images").length, 1);
+    assert.equal(body.has("tenantName"), false);
+    if (!result.body.ok) throw new Error(result.body.message);
+    assert.equal(result.body.tenantName, "Sam Lee");
+    assert.equal(result.body.address, "12 Smith St");
+    assert.equal(result.body.voucher, "EMB-123456");
+    assert.equal(result.body.businessGuess, "emoro");
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  globalThis.fetch = (async () => new Response("not json", { status: 200, headers: { "content-type": "text/plain" } })) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emporo");
+    form.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const failed = await readScreenshots(form);
+    assert.equal(failed.status, 502);
+    if (failed.body.ok) throw new Error("expected a failed read");
+    assert.equal(failed.body.error, "unreadable");
+    assert.equal(failed.body.message, screenshotReadFallback);
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  globalThis.fetch = (async () => jsonResponse({ ok: false, error: "unauthorized" }, 401)) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emoro");
+    const denied = await readScreenshots(form);
+    assert.equal(denied.status, 502);
+    if (denied.body.ok) throw new Error("expected a rejected key");
+    assert.equal(denied.body.error, "webhook_unauthorized");
   } finally {
     globalThis.fetch = original;
   }

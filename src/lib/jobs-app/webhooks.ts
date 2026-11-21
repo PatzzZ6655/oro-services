@@ -1,3 +1,10 @@
+import {
+  newJobNeedDetail,
+  newJobTextCoversScreenshots,
+  newJobTextPayload,
+  readNewJobText,
+  screenshotReadFallback,
+} from "@/lib/jobs-app/new-job-text";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
 import { applyVoucherStatus, cleanVoucherCode, notionPageId, voucherStatus } from "@/lib/jobs-app/voucher";
@@ -395,6 +402,91 @@ export async function leaveJob(form: FormData, fetchImpl?: FetchLike): Promise<J
   }
 }
 
+export type ScreenshotRead = {
+  ok: true;
+  mode: string;
+  business: string;
+  businessGuess: string;
+  tenantName: string;
+  phone: string;
+  email: string;
+  address: string;
+  description: string;
+  workOrderNumber: string;
+  voucher: string;
+  tenant2Name: string;
+  phone2: string;
+  email2: string;
+  pmName: string;
+  pmAgency: string;
+  pmEmail: string;
+  pmPhone: string;
+};
+
+function readValue(json: Record<string, unknown>, key: string, max: number, secret: string): string {
+  return text(json[key], max, secret);
+}
+
+function businessGuess(value: string): string {
+  return value === "emoro" || value === "emporo" || value === "unclear" ? value : "";
+}
+
+export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Promise<JobsResult<ScreenshotRead>> {
+  const businessRaw = form.get("business");
+  const business = isBusiness(businessRaw) ? businessRaw : "";
+  const images = await readUpload(form, "images", NEW_JOB_MAX_IMAGES);
+  if (!images.ok) return images;
+  const config = makeConfig();
+  if (!config) return unconfigured();
+  const call = fetchImpl ?? globalThis.fetch;
+  try {
+    const voucher = cleanVoucherCode(fieldText(form.get("voucher"), 40));
+    const fields: Record<string, string> = { secret: config.secret, mode: "readScreenshots" };
+    if (business) fields.business = business;
+    if (voucher) fields.voucher = voucher;
+    const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
+    if (result.status === 401 || result.json?.error === "unauthorized") {
+      const error = failure(401, result.json) ?? {
+        ok: false as const,
+        error: "webhook_unauthorized",
+        message: "The server key was rejected.",
+      };
+      return { status: statusFor(error, result.status), body: error };
+    }
+    const accepted = result.status === 200 && (result.json?.ok === true || result.json?.ok === "true");
+    if (!accepted || !result.json) {
+      return { status: 502, body: { ok: false, error: "unreadable", message: screenshotReadFallback } };
+    }
+    const secret = config.secret;
+    const guess = businessGuess(readValue(result.json, "businessGuess", 20, secret));
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        mode: readValue(result.json, "mode", 40, secret),
+        business: readValue(result.json, "business", 20, secret),
+        businessGuess: guess,
+        tenantName: readValue(result.json, "tenantName", 80, secret),
+        phone: readValue(result.json, "phone", 40, secret),
+        email: readValue(result.json, "email", 120, secret),
+        address: readValue(result.json, "address", 300, secret),
+        description: readValue(result.json, "description", 2000, secret),
+        workOrderNumber: readValue(result.json, "workOrderNumber", 80, secret),
+        voucher: readValue(result.json, "voucher", 40, secret),
+        tenant2Name: readValue(result.json, "tenant2Name", 80, secret),
+        phone2: readValue(result.json, "phone2", 40, secret),
+        email2: readValue(result.json, "email2", 120, secret),
+        pmName: readValue(result.json, "pmName", 80, secret),
+        pmAgency: readValue(result.json, "pmAgency", 80, secret),
+        pmEmail: readValue(result.json, "pmEmail", 120, secret),
+        pmPhone: readValue(result.json, "pmPhone", 40, secret),
+      },
+    };
+  } catch {
+    return { status: 502, body: { ok: false, error: "unreadable", message: screenshotReadFallback } };
+  }
+}
+
 export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<JobsResult<NewJobResult>> {
   const business = form.get("business");
   if (!isBusiness(business)) {
@@ -402,15 +494,16 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
   }
   const images = await readUpload(form, "images", NEW_JOB_MAX_IMAGES);
   if (!images.ok) return images;
-  if (images.files.length === 0) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose a screenshot." } };
+  const typed = readNewJobText(form);
+  if (images.files.length === 0 && !newJobTextCoversScreenshots(typed)) {
+    return { status: 400, body: { ok: false, error: "bad_request", message: newJobNeedDetail } };
   }
   const config = makeConfig();
   if (!config) return unconfigured();
   const call = fetchImpl ?? globalThis.fetch;
   try {
     const voucher = cleanVoucherCode(fieldText(form.get("voucher"), 40));
-    const fields: Record<string, string> = { secret: config.secret, business };
+    const fields: Record<string, string> = { secret: config.secret, business, ...newJobTextPayload(typed) };
     if (voucher) fields.voucher = voucher;
     const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
     const error = failure(result.status, result.json);
