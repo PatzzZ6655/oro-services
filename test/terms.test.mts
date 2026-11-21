@@ -100,4 +100,7 @@ test("the terms page keeps the approved wording and stays public", () => {
   const footer = readFileSync(new URL("../src/components/site-footer.tsx", import.meta.url), "utf8");
   assert.match(footer, /href="\/terms"/);
   assert.match(footer, />\s*Terms\s*</);
+  assert.match(footer, /Emoro Building® is a registered trademark of Emoro Building Pty Ltd/);
+  assert.match(footer, /Emporo Plumbing® is a registered trademark of Emporo Plumbing Pty Ltd/);
+  assert.equal(footer.includes("trademarks of ORO Services"), false);
 });

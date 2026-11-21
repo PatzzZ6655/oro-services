@@ -33,4 +33,13 @@ test("Emporo copy no longer lists taps and toilets", () => {
   const hero = readFileSync(join(root, "src/components/hero.tsx"), "utf8");
   assert.equal(hero.includes(emporoLine), true);
   assert.equal(hero.includes("Emoro does construction, renovations, fit-outs, and project management."), true);
+
+  const about = readFileSync(join(root, "src/components/about-section.tsx"), "utf8");
+  assert.equal(about.includes("ORO Services runs two trades."), false);
+  const brandsSection = readFileSync(join(root, "src/components/brands-section.tsx"), "utf8");
+  assert.equal(brandsSection.includes("Emoro Building for construction."), false);
+
+  const serviceView = readFileSync(join(root, "src/components/service-view.tsx"), "utf8");
+  assert.equal(serviceView.includes("brand.description"), false);
+  assert.equal(serviceView.includes("This work is carried out by"), true);
 });
