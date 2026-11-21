@@ -47,6 +47,7 @@ export default function PrivacyPage() {
             <li>The brand and service you pick</li>
             <li>Your description of the job</li>
             <li>A photo, if you attach one</li>
+            <li>A voucher code, if you choose to give one. On an Emoro Building or Emporo Plumbing enquiry the form accepts a code starting with EMB- or EMP-. A blank or unusable code is not kept with the enquiry.</li>
           </ul>
           <p>If you email us yourself, we receive whatever you put in that email.</p>
           <p>
@@ -61,7 +62,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">Why we collect it</h2>
           <p>
-            We use these details to read your enquiry and reply about that job. We send the message to the inbox for the brand you pick:
+            We use these details to read your enquiry and reply about that job. We email the message to the inbox for the brand you pick. If you gave a usable voucher code, that code is included in the same email so it can be seen with the enquiry. Sending the form does not apply the voucher to a job.
           </p>
           <ul className="list-disc space-y-1 pl-5">
             {brands.map((brand) => (
@@ -77,7 +78,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">Who else sees it</h2>
           <p>
-            The people who handle enquiries for that brand can read the message. If the form sends the enquiry, it goes through Google Workspace (Gmail) to that inbox. Google handles the delivery and may process the message outside Australia. If you email us from your own email app, your email provider handles the message.
+            The people who handle enquiries for that brand can read the message. If the form sends the enquiry, it goes by email through Google Workspace (Gmail) to that inbox. The form does not send the enquiry into a job database. Google handles the delivery and may process the message outside Australia. If you email us from your own email app, your email provider handles the message.
           </p>
           <p>We do not sell personal information.</p>
         </section>
@@ -85,7 +86,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">How long we keep it</h2>
           <p>
-            We keep an enquiry for as long as we need it to deal with the job and any follow-up about that job. It stays in the email inbox it was sent to.
+            We keep an enquiry for as long as we need it to deal with the job and any follow-up about that job. The form sends it by email, through Google Workspace, to the inbox for the brand you pick, and it stays in that inbox.
           </p>
         </section>
 
@@ -114,7 +115,7 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        <p className="mt-16 text-xs text-slate-500">Last updated: 18 November 2026</p>
+        <p className="mt-16 text-xs text-slate-500">Last updated: 22 November 2026</p>
       </article>
     </SiteFrame>
   );
