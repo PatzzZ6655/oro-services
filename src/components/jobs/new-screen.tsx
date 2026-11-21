@@ -9,7 +9,9 @@ import {
   newJobNeedDetail,
   newJobTextCoversScreenshots,
   newJobTextLimits,
+  preferTyped,
   readNewJobText,
+  screenshotReadFallback,
 } from "@/lib/jobs-app/new-job-text";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
@@ -105,17 +107,47 @@ export function NewJobScreen() {
     pending.current = true;
     setError("");
     setBusy("read");
+    let compressed: File[] = [];
     try {
-      const compressed = await compressFiles(files.slice(0, NEW_JOB_MAX_IMAGES), NEW_JOB_MAX_EDGE, NEW_JOB_QUALITIES);
+      compressed = await compressFiles(files.slice(0, NEW_JOB_MAX_IMAGES), NEW_JOB_MAX_EDGE, NEW_JOB_QUALITIES);
       const count = keptCount(compressed.map((file) => file.size));
       if (count === 0 || count < compressed.length) {
         setError("The photos are too large. Choose fewer.");
         return;
       }
+      const form = new FormData();
+      form.set("business", business);
+      const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
+      if (code) form.set("voucher", code);
+      for (const file of compressed) form.append("images", file);
+      const read = await postJobsForm<{
+        tenantName: string;
+        phone: string;
+        address: string;
+        description: string;
+        workOrderNumber: string;
+        voucher: string;
+      }>("/jobs/api/new/read", form);
+      setTenantName(preferTyped(tenantName, read.tenantName));
+      setPhone(preferTyped(phone, read.phone));
+      setAddress(preferTyped(address, read.address));
+      setDescription(preferTyped(description, read.description));
+      setWorkOrderNumber(preferTyped(workOrderNumber, read.workOrderNumber));
+      setVoucher(preferTyped(voucher, read.voucher.toUpperCase()));
       setReadyFiles(compressed);
       setStep("check");
     } catch (reason) {
-      setError(reason instanceof Error ? "This screenshot could not be compressed. Use a JPEG." : "This screenshot could not be compressed. Use a JPEG.");
+      if (reason instanceof JobsClientError && reason.status === 401) {
+        router.push("/jobs/login");
+        return;
+      }
+      if (reason instanceof JobsClientError && reason.code === "unreadable") {
+        setReadyFiles(compressed);
+        setError(screenshotReadFallback);
+        setStep("check");
+        return;
+      }
+      setError(reason instanceof JobsClientError ? reason.message : "This screenshot could not be compressed. Use a JPEG.");
     } finally {
       pending.current = false;
       setBusy(null);
@@ -205,13 +237,11 @@ export function NewJobScreen() {
         {busy === "create" ? <Spinner label="Creating the job" /> : null}
         <div className={busy ? "hidden" : "contents"}>
           <p className="text-base text-neutral-700">{businessLabel(business)}</p>
-          {readyFiles.length > 0 ? (
-            <p className="text-base">
-              {readyFiles.length} screenshot{readyFiles.length === 1 ? "" : "s"} will be sent with the job. The words on them are not copied into these fields yet.
-            </p>
-          ) : (
-            <p className="text-base text-neutral-700">No screenshot. Check the details, then create the job.</p>
-          )}
+          <p className="text-base text-neutral-700">
+            {readyFiles.length > 0
+              ? `${readyFiles.length} screenshot${readyFiles.length === 1 ? "" : "s"} will be sent with the job.`
+              : "No screenshot. Check the details, then create the job."}
+          </p>
           <DetailFields
             tenantName={tenantName}
             setTenantName={setTenantName}
@@ -239,7 +269,7 @@ export function NewJobScreen() {
   return (
     <Screen title="New job" back={<BackLink href="/jobs" />}>
       {error ? <Alert>{error}</Alert> : null}
-      {busy === "read" ? <Spinner label="Preparing the screenshots" /> : null}
+        {busy === "read" ? <Spinner label="Reading the screenshot, about 10 seconds" /> : null}
       <div className={busy ? "hidden" : "contents"}>
           <div className="grid grid-cols-1 gap-3">
             {(["emoro", "emporo"] as const).map((id) => (

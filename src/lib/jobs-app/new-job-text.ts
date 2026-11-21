@@ -15,6 +15,12 @@ export type NewJobText = Record<NewJobTextField, string>;
 
 export const newJobNeedDetail = "Choose a screenshot, or enter a name or address and a description.";
 
+export const screenshotReadFallback = "Couldn't read the screenshots — type the details in";
+
+export function preferTyped(typed: string, read: string): string {
+  return typed.trim() ? typed : read.trim();
+}
+
 function oneLine(value: string, max: number): string {
   return value.replace(/[\u0000-\u001F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
