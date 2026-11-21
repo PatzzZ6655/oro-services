@@ -37,6 +37,12 @@ const sections: { heading: string; paragraphs: string[] }[] = [
     ],
   },
   {
+    heading: "Appointment times",
+    paragraphs: [
+      "Appointment times are our best estimate and are not guaranteed. We may need to delay, shorten or reschedule a visit because of emergency work (such as a gas leak or burst pipe), earlier jobs running over, traffic, accidents, vehicle breakdown, weather, illness or other events outside our reasonable control. If this happens, we'll let you or your property manager know as soon as we reasonably can and arrange a new time at no extra charge. To the extent permitted by law (including the Australian Consumer Law), we are not liable for any loss, cost or time off work caused by a delayed or rescheduled appointment.",
+    ],
+  },
+  {
     heading: "Payment",
     paragraphs: [
       "Payment is due within 30 days of the invoice date, or within 45 days if agreed in writing for an approved account.",
@@ -170,7 +176,7 @@ export default function TermsPage() {
             </section>
           ))}
         </div>
-        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 20 November 2026</p>
+        <p className="mt-16 text-xs text-slate-500 print:text-brand-navy">Last updated: 21 November 2026</p>
       </article>
     </SiteFrame>
   );
