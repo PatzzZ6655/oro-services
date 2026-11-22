@@ -87,8 +87,9 @@ test("the prompt keeps the tradie rules and only the facts Pat gave", () => {
   assert.equal(smsHref(["0412 345 678"], "Hi tenant, Tuesday afternoon works.")?.href, "sms:+61412345678&body=Hi%20tenant%2C%20Tuesday%20afternoon%20works.");
 
   const body = geminiSmsBody(prompt);
+  const textPart = body.contents[0]?.parts[0];
   assert.equal(body.systemInstruction.parts[0]?.text, prompt.system);
-  assert.equal(body.contents[0]?.parts[0]?.text, prompt.user);
+  assert.equal(textPart && "text" in textPart ? textPart.text : "", prompt.user);
   assert.equal(geminiSmsUrl().includes(SMS_GEMINI_MODEL), true);
   assert.equal(geminiSmsUrl().includes("key="), false);
   assert.equal(smsBodyHref("See you Tuesday."), "sms:&body=See%20you%20Tuesday.");
