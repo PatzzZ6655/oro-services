@@ -82,6 +82,7 @@ test("a job stage suggests a few templates, and the Chinese note can pick one", 
   assert.deepEqual(suggestTemplates("New Work Order").map((item) => item.id), ["first-visit", "follow-up"]);
   assert.deepEqual(suggestTemplates("Contacting Tenant 3 Cc PM").map((item) => item.id), ["cant-reach", "follow-up"]);
   assert.deepEqual(suggestTemplates("Time Confirming").map((item) => item.id), ["confirm", "arrival", "reschedule"]);
+  assert.deepEqual(suggestTemplates("In Progress").map((item) => item.id), ["arrival", "confirm"]);
   assert.equal(suggestTemplates("In Progress (Collect Key)")[0]?.variant, "collect");
   assert.equal(suggestTemplates("In Progress (Return Key)")[0]?.variant, "return");
   assert.equal(suggestTemplates("Job Key Appointing")[0]?.variant, "collect");

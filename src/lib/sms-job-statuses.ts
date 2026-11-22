@@ -9,6 +9,13 @@
  *
  * Closed options such as Complete, Cancelled, Draft, and Mark as Job Finish
  * are left out on purpose.
+ *
+ * Every Status option whose name starts with "In Progress" is included.
+ * Re-read from both Jobs databases on 22 Nov 2026:
+ * Emoro: In Progress (Collect Key), In Progress, In Progress (Waiting),
+ * In Progress (Purchase Material), In Progress (Customer Service),
+ * In Progress (Return Key).
+ * Emporo: In Progress, In Progress (Purchase Material).
  */
 
 export const smsJobStatuses = {
@@ -25,6 +32,10 @@ export const smsJobStatuses = {
     "Time Confirming",
     "Job Key Appointing",
     "In Progress (Collect Key)",
+    "In Progress",
+    "In Progress (Waiting)",
+    "In Progress (Purchase Material)",
+    "In Progress (Customer Service)",
     "In Progress (Return Key)",
   ],
   emporo: [
@@ -38,6 +49,8 @@ export const smsJobStatuses = {
     "Quote (Approved)",
     "Time Confirming",
     "Job Key Appointing",
+    "In Progress",
+    "In Progress (Purchase Material)",
   ],
 } as const;
 
@@ -55,6 +68,10 @@ export const smsJobStageOrder = [
   "Time Confirming",
   "Job Key Appointing",
   "In Progress (Collect Key)",
+  "In Progress",
+  "In Progress (Waiting)",
+  "In Progress (Purchase Material)",
+  "In Progress (Customer Service)",
   "In Progress (Return Key)",
 ] as const;
 
@@ -122,6 +139,22 @@ export const smsStageSuggestions: Record<string, Array<{ id: string; variant: st
   "In Progress (Collect Key)": [
     { id: "keys", variant: "collect" },
     { id: "arrival", variant: "today" },
+  ],
+  "In Progress": [
+    { id: "arrival", variant: "today" },
+    { id: "confirm", variant: "" },
+  ],
+  "In Progress (Waiting)": [
+    { id: "follow-up", variant: "" },
+    { id: "confirm", variant: "" },
+  ],
+  "In Progress (Purchase Material)": [
+    { id: "return-finish", variant: "" },
+    { id: "confirm", variant: "" },
+  ],
+  "In Progress (Customer Service)": [
+    { id: "follow-up", variant: "" },
+    { id: "confirm", variant: "" },
   ],
   "In Progress (Return Key)": [{ id: "keys", variant: "return" }],
 };
