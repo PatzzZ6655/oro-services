@@ -5,6 +5,7 @@ import { resizeToJpeg } from "@/components/jobs/resize-image";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { smsHref } from "@/lib/jobs-app/sms";
 import { smsBodyHref, smsReplyBrands, type SmsReplyBrand } from "@/lib/sms-reply-client";
+import type { SmsJobContact, SmsOpenJob } from "@/lib/sms-reply-jobs";
 
 const fieldClass =
   "mt-1 w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
@@ -60,10 +61,83 @@ export function SmsReplyForm() {
   const [phoneNote, setPhoneNote] = useState("");
   const [pending, setPending] = useState<"write" | "rewrite" | "">("");
   const [copied, setCopied] = useState(false);
+  const [jobs, setJobs] = useState<SmsOpenJob[] | null>(null);
+  const [jobsNote, setJobsNote] = useState("");
+  const [jobKey, setJobKey] = useState("");
+  const [contacts, setContacts] = useState<SmsJobContact[]>([]);
+  const [contactPhone, setContactPhone] = useState("");
 
   const phone = normalizePhone(mobile);
   const sendHref = phone && draft.trim() ? smsHref([phone], draft.trim())?.href ?? "" : "";
   const messagesHref = draft.trim() ? smsBodyHref(draft.trim()) : "";
+
+  function applyContact(contact: SmsJobContact, business: SmsReplyBrand) {
+    setBrand(business);
+    setMobile(contact.phone);
+    setCustomerName(contact.name);
+    setContactPhone(contact.phone);
+  }
+
+  async function loadJobs() {
+    setJobsNote("");
+    setError("");
+    try {
+      const response = await fetch("/internal/api/sms-reply/jobs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; jobs?: SmsOpenJob[]; message?: string } | null;
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.jobs)) {
+        setJobsNote(payload?.message || "Today's jobs could not be loaded.");
+        setJobs([]);
+        return;
+      }
+      setJobs(payload.jobs);
+      if (payload.jobs.length === 0) setJobsNote("No jobs scheduled today.");
+    } catch {
+      setJobs([]);
+      setJobsNote("Today's jobs could not be loaded.");
+    }
+  }
+
+  async function chooseJob(job: SmsOpenJob) {
+    const key = `${job.business}:${job.jobId}`;
+    setJobKey(key);
+    setContacts([]);
+    setContactPhone("");
+    setBrand(job.business);
+    setMobile("");
+    setCustomerName("");
+    setError("");
+    try {
+      const response = await fetch("/internal/api/sms-reply/jobs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ business: job.business, jobId: job.jobId }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; contacts?: SmsJobContact[]; message?: string } | null;
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.contacts)) {
+        setJobsNote(payload?.message || "The tenant number could not be read. Type it below.");
+        return;
+      }
+      setContacts(payload.contacts);
+      if (payload.contacts.length === 1) {
+        const only = payload.contacts[0];
+        if (only) applyContact(only, job.business);
+        setJobsNote("");
+        return;
+      }
+      if (payload.contacts.length === 0) {
+        setCustomerName("");
+        setJobsNote("No tenant mobile on this job. Type the number below.");
+        return;
+      }
+      setJobsNote("Choose the tenant.");
+    } catch {
+      setJobsNote("The tenant number could not be read. Type it below.");
+    }
+  }
 
   async function pasteInto(target: "message" | "phone") {
     if (target === "message") setPasteNote("");
@@ -161,6 +235,60 @@ export function SmsReplyForm() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-slate-800">Today&apos;s job (optional)</h2>
+          <button
+            type="button"
+            onClick={() => void loadJobs()}
+            className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-brand-navy"
+          >
+            {jobs === null ? "Show jobs" : "Refresh"}
+          </button>
+        </div>
+        {jobsNote ? <p className="mt-1 text-sm text-slate-600">{jobsNote}</p> : null}
+        {jobs && jobs.length > 0 ? (
+          <ul className="mt-2 space-y-2">
+            {jobs.map((job) => {
+              const key = `${job.business}:${job.jobId}`;
+              const on = jobKey === key;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => void chooseJob(job)}
+                    className={`w-full rounded-xl border px-3 py-3 text-left ${on ? "border-brand-navy bg-slate-50" : "border-slate-300 bg-white"}`}
+                  >
+                    <span className="block text-xs font-semibold text-slate-500">{smsReplyBrands[job.business]}</span>
+                    <span className="mt-1 block text-sm font-semibold text-slate-900">{job.title}</span>
+                    {job.address ? <span className="mt-1 block text-sm text-slate-600">{job.address}</span> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        {contacts.length > 1 ? (
+          <fieldset className="mt-3">
+            <legend className="text-sm font-medium text-slate-800">Tenant contact</legend>
+            <div className="mt-1 space-y-2">
+              {contacts.map((contact) => (
+                <button
+                  key={contact.phone}
+                  type="button"
+                  aria-pressed={contactPhone === contact.phone}
+                  onClick={() => applyContact(contact, jobKey.startsWith("emporo:") ? "emporo" : "emoro")}
+                  className={`flex min-h-12 w-full items-center justify-between rounded-xl border px-3 text-left text-sm ${contactPhone === contact.phone ? "border-brand-navy bg-slate-50" : "border-slate-300 bg-white"}`}
+                >
+                  <span className="font-semibold text-slate-900">{contact.name || "Tenant"}</span>
+                  <span className="text-slate-600">{contact.phone}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
+      </div>
       <div>
         <div className="flex items-center justify-between gap-3">
           <label htmlFor="customer-message" className="text-sm font-medium text-slate-800">
