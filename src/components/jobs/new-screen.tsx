@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
-import { BackLink, JobsButton, JobsLink, Screen, fieldClass } from "@/components/jobs/ui";
+import { BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
+import {
+  clearStoredNewJobDraft,
+  clearStoredNewJobIntro,
+  emptyNewJobDraft,
+  newJobDraftDirty,
+  parseNewJobDraft,
+  parseNewJobIntroHold,
+  parseReadSnapshot,
+  readNewJobSnapshot,
+  writeStoredNewJobDraft,
+  writeStoredNewJobIntro,
+  type NewJobDraft,
+  type NewJobReadSnapshot,
+} from "@/lib/jobs-app/new-job-draft";
 import {
   blankTenants,
   maxJobTenants,
@@ -63,7 +77,61 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ignoreDraftStore() {
+  return () => {};
+}
+
 const chooseCompany = "Choose Emoro Building or Emporo Plumbing first";
+const screenshotsClearedOnCheck = "The screenshots were cleared when the page reloaded. The recognised details are still here.";
+const screenshotsClearedOnCapture = "The screenshots were cleared when the page reloaded. Add them again if you still want them on the job.";
+
+function NewJobShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverscroll: html.style.overscrollBehaviorY,
+      bodyOverscroll: body.style.overscrollBehaviorY,
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+    };
+    html.style.overscrollBehaviorY = "none";
+    body.style.overscrollBehaviorY = "none";
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    let startY = 0;
+    const onStart = (event: TouchEvent) => {
+      startY = event.touches[0]?.clientY ?? 0;
+    };
+    const onMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? 0;
+      if (y <= startY + 8) return;
+      let node = event.target instanceof Element ? event.target : null;
+      while (node) {
+        if (node instanceof HTMLElement && node.scrollTop > 0) return;
+        node = node.parentElement;
+      }
+      if (event.cancelable) event.preventDefault();
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      html.style.overscrollBehaviorY = previous.htmlOverscroll;
+      body.style.overscrollBehaviorY = previous.bodyOverscroll;
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+    };
+  }, []);
+
+  return (
+    <div data-new-job-scroll className="fixed inset-0 overflow-y-auto overscroll-y-none bg-white text-black">
+      {children}
+    </div>
+  );
+}
 
 function ActionNotice({ message, busyLabel }: { message: string; busyLabel: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
@@ -106,10 +174,15 @@ export function NewJobScreen() {
   const [phone, setPhone] = useState("");
   const [tenants, setTenants] = useState<JobTenant[]>(blankTenants());
   const [address, setAddress] = useState("");
+  const [pmAgency, setPmAgency] = useState("");
   const [description, setDescription] = useState("");
   const [workOrderNumber, setWorkOrderNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [voucher, setVoucher] = useState("");
+  const [readSnapshot, setReadSnapshot] = useState<NewJobReadSnapshot | null>(null);
+  const [screenshotCount, setScreenshotCount] = useState(0);
+  const [screenshotsCleared, setScreenshotsCleared] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState<"read" | "create" | null>(null);
   const pending = useRef(false);
   const [error, setError] = useState("");
@@ -118,6 +191,81 @@ export function NewJobScreen() {
   const [introStatus, setIntroStatus] = useState<{ status: string; message: string; error: string } | null>(null);
   const [introBusy, setIntroBusy] = useState<"send" | "skip" | null>(null);
   const router = useRouter();
+  const draftCache = useRef<string | null>(null);
+  const stored = useSyncExternalStore(
+    ignoreDraftStore,
+    () => {
+      if (draftCache.current === null) draftCache.current = readNewJobSnapshot();
+      return draftCache.current;
+    },
+    () => "",
+  );
+  if (!hydrated && stored !== "") {
+    setHydrated(true);
+    if (stored.startsWith("intro\n")) {
+      const held = parseNewJobIntroHold(stored.slice(6));
+      if (held) {
+        setBusiness(held.business);
+        setTenants(held.tenants);
+        setResult(held.result);
+        setIntroPhase("preview");
+      }
+    } else if (stored.startsWith("draft\n")) {
+      const draft = parseNewJobDraft(stored.slice(6));
+      if (draft) {
+        setStep(draft.step);
+        setBusiness(draft.business || null);
+        setTenantName(draft.tenantName);
+        setPhone(draft.phone);
+        setTenants(draft.tenants);
+        setAddress(draft.address);
+        setPmAgency(draft.pmAgency);
+        setDescription(draft.description);
+        setNotes(draft.notes);
+        setWorkOrderNumber(draft.workOrderNumber);
+        setVoucher(draft.voucher);
+        setReadSnapshot(draft.read);
+        setScreenshotCount(draft.screenshotCount);
+        setScreenshotsCleared(draft.screenshotCount > 0);
+      }
+    }
+  }
+
+  const currentDraft = useCallback((): NewJobDraft => {
+    return {
+      ...emptyNewJobDraft(),
+      step,
+      business: business ?? "",
+      tenantName,
+      phone,
+      tenants,
+      address,
+      pmAgency,
+      description,
+      notes,
+      workOrderNumber,
+      voucher,
+      read: readSnapshot,
+      screenshotCount,
+    };
+  }, [step, business, tenantName, phone, tenants, address, pmAgency, description, notes, workOrderNumber, voucher, readSnapshot, screenshotCount]);
+
+  useEffect(() => {
+    if (!hydrated || result) return;
+    writeStoredNewJobDraft(currentDraft());
+  }, [hydrated, result, currentDraft]);
+
+  useEffect(() => {
+    if (!hydrated || result) return;
+    const dirty = newJobDraftDirty(currentDraft()) || files.length > 0;
+    if (!dirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hydrated, result, currentDraft, files.length]);
 
   async function continueToCheck() {
     if (pending.current) return;
@@ -159,14 +307,23 @@ export function NewJobScreen() {
         tenant2Name: string;
         phone2: string;
         email2: string;
+        pmName: string;
+        pmAgency: string;
+        pmEmail: string;
+        pmPhone: string;
         tenants?: JobTenant[];
       }>("/jobs/api/new/read", form);
+      const recognised = parseReadSnapshot(read);
+      setReadSnapshot(recognised);
       setTenants(tenantsFromRead(read, { name: tenantName, phone }));
       setAddress(preferTyped(address, read.address));
+      setPmAgency(preferTyped(pmAgency, read.pmAgency));
       setDescription(preferTyped(description, read.description));
       setWorkOrderNumber(preferTyped(workOrderNumber, read.workOrderNumber));
       setVoucher(preferTyped(voucher, read.voucher.toUpperCase()));
       setReadyFiles(compressed);
+      setScreenshotCount(compressed.length);
+      setScreenshotsCleared(false);
       setStep("check");
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
@@ -219,7 +376,10 @@ export function NewJobScreen() {
       const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
       if (code) form.set("voucher", code);
       for (const file of readyFiles) form.append("images", file);
-      setResult(await postJobsForm<NewJobResult>("/jobs/api/new", form));
+      const created = await postJobsForm<NewJobResult>("/jobs/api/new", form);
+      clearStoredNewJobDraft();
+      if (isBusiness(business)) writeStoredNewJobIntro({ business, tenants, result: created });
+      setResult(created);
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
         router.push("/jobs/login");
@@ -251,6 +411,8 @@ export function NewJobScreen() {
         pmAgency: result.pmAgency,
         tenants: people,
       });
+      clearStoredNewJobDraft();
+      clearStoredNewJobIntro();
       setIntroStatus({ status: outcome.status, message: outcome.message, error: "" });
       setIntroPhase("status");
     } catch (reason) {
@@ -260,12 +422,24 @@ export function NewJobScreen() {
       }
       const message = reason instanceof JobsClientError ? reason.message : "The intro email was not sent.";
       const code = reason instanceof JobsClientError ? reason.code : "upstream";
+      clearStoredNewJobDraft();
+      clearStoredNewJobIntro();
       setIntroStatus({ status: code === "upstream" ? "failed" : code, message, error: code });
       setIntroPhase("status");
     } finally {
       pending.current = false;
       setIntroBusy(null);
     }
+  }
+
+  if (!hydrated) {
+    return (
+      <NewJobShell>
+        <Screen title="New job">
+          <Spinner label="Opening" />
+        </Screen>
+      </NewJobShell>
+    );
   }
 
   if (result && isBusiness(business) && introPhase !== "done") {
@@ -284,16 +458,19 @@ export function NewJobScreen() {
     const named = people.find((row) => row.name.trim())?.name ?? "";
     if (introPhase === "status" && introStatus) {
       return (
-        <Screen title="Intro email" back={<BackLink href="/jobs" />}>
-          <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p>
-          <p className="text-base text-neutral-700">{introTestNote}</p>
-          <JobsButton type="button" variant="outline" onClick={() => setIntroPhase("done")}>
-            Done
-          </JobsButton>
-        </Screen>
+        <NewJobShell>
+          <Screen title="Intro email" back={<BackLink href="/jobs" />}>
+            <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p>
+            <p className="text-base text-neutral-700">{introTestNote}</p>
+            <JobsButton type="button" variant="outline" onClick={() => setIntroPhase("done")}>
+              Done
+            </JobsButton>
+          </Screen>
+        </NewJobShell>
       );
     }
     return (
+      <NewJobShell>
       <Screen title="Intro email" back={<BackLink href="/jobs" />}>
         <p className="text-base text-neutral-700">{introTestNote}</p>
         <p className="text-lg font-semibold">{introSubject(preview.address, preview.brand)}</p>
@@ -310,6 +487,7 @@ export function NewJobScreen() {
           {introBusy === "skip" ? "Skipping" : "Skip"}
         </JobsButton>
       </Screen>
+      </NewJobShell>
     );
   }
 
@@ -318,6 +496,7 @@ export function NewJobScreen() {
     const tenant2 = [result.tenant2, result.phone2].filter(Boolean).join(" ");
     const pm = [result.pmName, result.pmAgency, result.pmEmail, result.pmPhone].filter(Boolean).join(" / ");
     return (
+      <NewJobShell>
       <Screen title="New job" back={<BackLink href="/jobs" />}>
         <p className="text-lg font-semibold">Work order created</p>
         <Line label="Title" value={result.jobTitle} />
@@ -343,11 +522,13 @@ export function NewJobScreen() {
           </JobsLink>
         ) : null}
       </Screen>
+      </NewJobShell>
     );
   }
 
   if (step === "check" && isBusiness(business)) {
     return (
+      <NewJobShell>
       <Screen
         title="Check job"
         back={
@@ -361,7 +542,9 @@ export function NewJobScreen() {
           <p className="text-base text-neutral-700">
             {readyFiles.length > 0
               ? `${readyFiles.length} screenshot${readyFiles.length === 1 ? "" : "s"} will be sent with the job.`
-              : "No screenshot. Check the details, then create the job."}
+              : screenshotsCleared
+                ? screenshotsClearedOnCheck
+                : "No screenshot. Check the details, then create the job."}
           </p>
           <TenantList tenants={tenants} setTenants={setTenants} />
           <DetailFields
@@ -372,6 +555,8 @@ export function NewJobScreen() {
             setPhone={setPhone}
             address={address}
             setAddress={setAddress}
+            pmAgency={pmAgency}
+            setPmAgency={setPmAgency}
             description={description}
             setDescription={setDescription}
             workOrderNumber={workOrderNumber}
@@ -387,10 +572,12 @@ export function NewJobScreen() {
           {busy === "create" ? "Creating" : "Create job"}
         </JobsButton>
       </Screen>
+      </NewJobShell>
     );
   }
 
   return (
+    <NewJobShell>
     <Screen title="New job" back={<BackLink href="/jobs" />}>
       <div className="contents">
           <div className="grid grid-cols-1 gap-3">
@@ -416,11 +603,13 @@ export function NewJobScreen() {
                 const picked = [...(event.target.files ?? [])].slice(0, NEW_JOB_MAX_IMAGES);
                 setFiles(picked);
                 setReadyFiles([]);
+                setScreenshotCount(picked.length);
+                if (picked.length > 0) setScreenshotsCleared(false);
                 event.currentTarget.value = "";
               }}
             />
           </label>
-          <p className="text-base">{files.length > 0 ? `${files.length} selected, ${NEW_JOB_MAX_IMAGES} at most` : `Up to ${NEW_JOB_MAX_IMAGES} screenshots`}</p>
+          <p className="text-base">{files.length > 0 ? `${files.length} selected, ${NEW_JOB_MAX_IMAGES} at most` : screenshotsCleared ? screenshotsClearedOnCapture : `Up to ${NEW_JOB_MAX_IMAGES} screenshots`}</p>
           <DetailFields
             tenantName={tenantName}
             setTenantName={setTenantName}
@@ -428,6 +617,8 @@ export function NewJobScreen() {
             setPhone={setPhone}
             address={address}
             setAddress={setAddress}
+            pmAgency={pmAgency}
+            setPmAgency={setPmAgency}
             description={description}
             setDescription={setDescription}
             workOrderNumber={workOrderNumber}
@@ -443,6 +634,7 @@ export function NewJobScreen() {
         {busy === "read" ? "Reading" : files.length > 0 ? "Read screenshots" : "Continue"}
       </JobsButton>
     </Screen>
+    </NewJobShell>
   );
 }
 
@@ -454,6 +646,8 @@ function DetailFields({
   setPhone,
   address,
   setAddress,
+  pmAgency,
+  setPmAgency,
   description,
   setDescription,
   workOrderNumber,
@@ -470,6 +664,8 @@ function DetailFields({
   setPhone: (value: string) => void;
   address: string;
   setAddress: (value: string) => void;
+  pmAgency: string;
+  setPmAgency: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
   workOrderNumber: string;
@@ -496,6 +692,10 @@ function DetailFields({
       <label className="flex flex-col gap-2 text-base">
         Property address
         <input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={newJobTextLimits.address} autoComplete="street-address" className={fieldClass} />
+      </label>
+      <label className="flex flex-col gap-2 text-base">
+        PM agency
+        <input value={pmAgency} onChange={(event) => setPmAgency(event.target.value)} maxLength={80} className={fieldClass} />
       </label>
       <label className="flex flex-col gap-2 text-base">
         Job description

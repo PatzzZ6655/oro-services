@@ -8,6 +8,7 @@ import { introBody, introSubject, introTenantLine } from "@/lib/jobs-app/intro-e
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
+import { newJobDraftDirty, parseNewJobDraft, parseNewJobIntroHold } from "@/lib/jobs-app/new-job-draft";
 import {
   newJobTextCoversScreenshots,
   preferTyped,
@@ -687,13 +688,88 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /\/jobs\/api\/new\/read/);
   assert.match(page, /screenshotReadFallback/);
   assert.equal(screenshotReadFallback, "Couldn't read the screenshots — type the details in");
+  assert.match(page, /overscrollBehaviorY = "none"/);
+  assert.match(page, /data-new-job-scroll/);
+  assert.match(page, /beforeunload/);
+  assert.match(page, /writeStoredNewJobDraft/);
+  assert.match(page, /clearStoredNewJobIntro/);
+  assert.match(page, /PM agency/);
   assert.equal(page.includes('form.set("mode"'), false);
+  assert.equal(page.includes('form.set("pmAgency"'), false);
   assert.equal(page.includes("readScreenshots"), false);
   assert.equal(page.includes("MAKE_SHORTCUTS_SECRET"), false);
   assert.equal(page.includes("forceQueue"), false);
   assert.equal(preferTyped("Sam", "Lee"), "Sam");
   assert.equal(preferTyped("  ", "12 Smith St"), "12 Smith St");
   assert.equal(preferTyped("", "EMB-1"), "EMB-1");
+});
+
+test("a new job draft restores typed fields and the screenshot read, then drops after the intro", () => {
+  const draft = parseNewJobDraft(
+    JSON.stringify({
+      step: "check",
+      business: "emoro",
+      tenantName: "Sam",
+      phone: "0400000000",
+      tenants: [
+        { name: "Sam Lee", phone: "0400000000", email: "sam@example.com" },
+        { name: "Alex", phone: "", email: "alex@example.com" },
+      ],
+      address: "12 Smith St",
+      pmAgency: "Ray White",
+      description: "Leaking tap",
+      notes: "Dog in the yard",
+      workOrderNumber: "WO-9",
+      voucher: "emb-1",
+      screenshotCount: 2,
+      read: {
+        tenantName: "Sam Lee",
+        phone: "0400000000",
+        email: "sam@example.com",
+        address: "12 Smith St",
+        description: "Leaking tap",
+        workOrderNumber: "WO-9",
+        voucher: "EMB-1",
+        pmAgency: "Ray White",
+        pmName: "Pat Manager",
+        tenants: [{ name: "Sam Lee", phone: "0400000000", email: "sam@example.com" }],
+      },
+    }),
+  );
+  if (!draft) throw new Error("draft missing");
+  assert.equal(draft.step, "check");
+  assert.equal(draft.business, "emoro");
+  assert.equal(draft.tenants[1]?.email, "alex@example.com");
+  assert.equal(draft.pmAgency, "Ray White");
+  assert.equal(draft.voucher, "EMB-1");
+  assert.equal(draft.read?.pmName, "Pat Manager");
+  assert.equal(draft.screenshotCount, 2);
+  assert.equal(newJobDraftDirty(draft), true);
+  assert.equal(parseNewJobDraft("{"), null);
+  assert.equal(parseNewJobDraft(JSON.stringify({ step: "capture" })), null);
+  assert.equal(parseNewJobDraft(JSON.stringify({ step: "check", business: "", address: "1 Test St" }))?.step, "capture");
+
+  const hold = parseNewJobIntroHold(
+    JSON.stringify({
+      business: "emporo",
+      tenants: [{ name: "Sam", phone: "1", email: "sam@example.com" }],
+      result: {
+        ok: true,
+        jobId: "abc",
+        jobUrl: "https://www.notion.so/abc",
+        address: "12 Smith St",
+        desc: "Leaking tap",
+        pmAgency: "Ray White",
+        description: "Notion text",
+      },
+    }),
+  );
+  if (!hold) throw new Error("intro hold missing");
+  assert.equal(hold.business, "emporo");
+  assert.equal(hold.result.desc, "Leaking tap");
+  assert.equal(hold.result.pmAgency, "Ray White");
+  assert.equal(hold.result.description, "Notion text");
+  assert.equal(parseNewJobIntroHold(JSON.stringify({ business: "emoro", result: {} })), null);
 });
 
 test("reading screenshots uses the new-job webhook without creating fields", async () => {
