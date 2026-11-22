@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { mapsHref, shortAddress } from "@/lib/jobs-app/address";
+import { introBody, introSubject, introTenantLine } from "@/lib/jobs-app/intro-email";
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
@@ -596,6 +597,83 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
   }
 });
 
+test("the intro email uses only the confirmed job text", async () => {
+  const preview = {
+    business: "emoro" as const,
+    brand: "Emoro Building",
+    address: "12 Test Street",
+    pmAgency: "Test Agency",
+    desc: "Leaking kitchen tap",
+    tenants: [
+      { name: "Sam Lee", email: "sam@example.com" },
+      { name: "Jo Kim", email: "" },
+    ],
+  };
+  assert.equal(introSubject(preview.address, preview.brand), "Repair Request At 12 Test Street – Emoro Building");
+  const body = introBody(preview, "Sam Lee");
+  assert.equal(body.includes("Leaking kitchen tap"), true);
+  assert.equal(body.includes(" at Test Agency"), true);
+  assert.equal(body.includes("voucher"), false);
+  assert.equal(introTenantLine(preview.tenants[1]!), "Jo Kim — no email - not sent");
+  assert.equal(introBody({ ...preview, pmAgency: "  " }, "Sam Lee").includes("property manager at "), false);
+  assert.equal(body.includes("property manager at Test Agency"), true);
+
+  useEnv();
+  const { sendIntroEmail, createJob } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  let sent = "";
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent = String(init?.body ?? "");
+    return jsonResponse({ ok: true, mode: "sendIntroEmail", status: "queued", message: "queued", sendAt: "next 08:00 Australia/Melbourne" });
+  }) as typeof fetch;
+  try {
+    const result = await sendIntroEmail({
+      jobId: "abc",
+      business: "emporo",
+      desc: "Leaking kitchen tap",
+      address: "12 Test Street",
+      pmAgency: "",
+      tenants: [{ name: "Sam Lee", email: "sam@example.com" }],
+      action: "send",
+    });
+    assert.equal(result.status, 200);
+    const payload = JSON.parse(sent) as Record<string, unknown>;
+    assert.equal(payload.mode, "sendIntroEmail");
+    assert.equal(payload.action, "send");
+    assert.equal(payload.desc, "Leaking kitchen tap");
+    assert.equal(payload.pmAgency, "");
+    assert.equal("forceQueue" in payload, false);
+    assert.equal(typeof payload.secret, "string");
+    if (!result.body.ok) throw new Error(result.body.message);
+    assert.equal(result.body.status, "queued");
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  globalThis.fetch = (async () =>
+    jsonResponse({
+      ok: true,
+      jobUrl: "https://www.notion.so/job-1",
+      jobId: "abc123",
+      desc: "Confirmed tap",
+      description: "Notion job description",
+      address: "12 Test Street",
+    })) as typeof fetch;
+  try {
+    const form = new FormData();
+    form.set("business", "emoro");
+    form.set("address", "12 Test Street");
+    form.set("description", "Typed description");
+    form.append("images", new File([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)], "shot.jpg", { type: "image/jpeg" }));
+    const created = await createJob(form);
+    if (!created.body.ok) throw new Error(created.body.message);
+    assert.equal(created.body.desc, "Confirmed tap");
+    assert.equal(created.body.description, "Notion job description");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("the new job screen checks the details before it creates the job", () => {
   const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
   assert.match(page, /Read screenshots/);
@@ -612,6 +690,7 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.equal(page.includes('form.set("mode"'), false);
   assert.equal(page.includes("readScreenshots"), false);
   assert.equal(page.includes("MAKE_SHORTCUTS_SECRET"), false);
+  assert.equal(page.includes("forceQueue"), false);
   assert.equal(preferTyped("Sam", "Lee"), "Sam");
   assert.equal(preferTyped("  ", "12 Smith St"), "12 Smith St");
   assert.equal(preferTyped("", "EMB-1"), "EMB-1");

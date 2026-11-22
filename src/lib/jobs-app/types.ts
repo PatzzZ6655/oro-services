@@ -70,9 +70,11 @@ export type LeaveResult = {
 export type NewJobResult = {
   ok: true;
   jobUrl: string;
+  jobId: string;
   jobTitle: string;
   brand: string;
   address: string;
+  desc: string;
   tenant1: string;
   phone1: string;
   email1: string;
@@ -84,6 +86,7 @@ export type NewJobResult = {
   pmPhone: string;
   workOrderNumber: string;
   description: string;
+  tenants: { name: string; phone: string; email: string }[];
   propertyCreated: boolean | null;
   customerCreated: boolean | null;
   contact1Created: boolean | null;
