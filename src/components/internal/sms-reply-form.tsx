@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { smsJobSearchAfter } from "@/lib/sms-job-statuses";
 import { resizeToJpeg } from "@/components/jobs/resize-image";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { smsHref } from "@/lib/jobs-app/sms";
@@ -95,7 +96,16 @@ export function SmsReplyForm() {
   const [issue, setIssue] = useState("");
   const [pickedNote, setPickedNote] = useState("");
   const [jobStatus, setJobStatus] = useState("");
+  const [jobOpen, setJobOpen] = useState(false);
+  const [jobQuery, setJobQuery] = useState("");
+  const [matchNote, setMatchNote] = useState("");
+  const [phoneWarning, setPhoneWarning] = useState(false);
+  const [saveConfirm, setSaveConfirm] = useState(false);
+  const [saveNote, setSaveNote] = useState("");
+  const [shotPhone, setShotPhone] = useState("");
   const [draftEdited, setDraftEdited] = useState(false);
+  const jobKeyRef = useRef("");
+  const shotPhoneRef = useRef("");
   const fields = useRef({
     name: "",
     pmName: "",
@@ -158,20 +168,33 @@ export function SmsReplyForm() {
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; jobs?: SmsOpenJob[]; message?: string } | null;
       if (!response.ok || !payload?.ok || !Array.isArray(payload.jobs)) {
-        setJobsNote(payload?.message || "Today's jobs could not be loaded.");
+        setJobsNote(payload?.message || "Active jobs could not be loaded.");
         setJobs([]);
         return;
       }
       setJobs(payload.jobs);
-      if (payload.jobs.length === 0) setJobsNote("No jobs scheduled today.");
+      if (payload.jobs.length === 0) setJobsNote("No active jobs.");
     } catch {
       setJobs([]);
-      setJobsNote("Today's jobs could not be loaded.");
+      setJobsNote("Active jobs could not be loaded.");
     }
   }
 
-  async function chooseJob(job: SmsOpenJob) {
+  function clearJob() {
+    jobKeyRef.current = "";
+    setJobKey("");
+    setJobStatus("");
+    setContacts([]);
+    setContactPhone("");
+    setPhoneWarning(false);
+    setSaveConfirm(false);
+    setMatchNote("");
+    setJobOpen(false);
+  }
+
+  async function chooseJob(job: SmsOpenJob, fromShot = "") {
     const key = `${job.business}:${job.jobId}`;
+    jobKeyRef.current = key;
     setJobKey(key);
     setContacts([]);
     setContactPhone("");
@@ -180,6 +203,10 @@ export function SmsReplyForm() {
     setMobile("");
     setCustomerName("");
     setError("");
+    setPhoneWarning(false);
+    setSaveConfirm(false);
+    setSaveNote("");
+    setJobOpen(false);
     const slot = scheduleFromJob(job.scheduled);
     if (slot) {
       setDateKey(slot.dateKey);
@@ -215,6 +242,26 @@ export function SmsReplyForm() {
         return;
       }
       setContacts(payload.contacts);
+      const wanted = normalizePhone(fromShot || shotPhoneRef.current);
+      const hit = wanted ? payload.contacts.find((contact) => contact.phone === wanted) : undefined;
+      if (hit) {
+        applyContact(hit, job.business);
+        setPhoneWarning(false);
+        setJobsNote(payload.contacts.length > 1 ? "Choose the tenant." : "");
+        return;
+      }
+      if (wanted) {
+        setMobile(wanted);
+        setPhoneWarning(true);
+        const named = payload.contacts.find((contact) => contact.name);
+        if (payload.contacts.length === 1 && named) {
+          setCustomerName(named.name);
+          fields.current.name = named.name;
+          if (fields.current.templateId && !draftEdited) paintTemplate({ name: named.name, brand: job.business });
+        }
+        setJobsNote(payload.contacts.length > 1 ? "Choose the tenant." : "");
+        return;
+      }
       if (payload.contacts.length === 1) {
         const only = payload.contacts[0];
         if (only) applyContact(only, job.business);
@@ -246,6 +293,87 @@ export function SmsReplyForm() {
     }
   }
 
+  async function matchShot(next: Shot) {
+    if (jobKeyRef.current) return;
+    setMatchNote("");
+    setPhoneWarning(false);
+    try {
+      const response = await fetch("/internal/api/sms-reply/jobs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image: { mimeType: next.mimeType, data: next.data } }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+        address?: string;
+        phone?: string;
+        matchedBy?: string;
+        matches?: SmsOpenJob[];
+        jobs?: SmsOpenJob[];
+      } | null;
+      if (jobKeyRef.current) return;
+      if (!response.ok || !payload?.ok) {
+        setMatchNote(payload?.message || "The screenshot could not be read.");
+        return;
+      }
+      if (Array.isArray(payload.jobs)) setJobs(payload.jobs);
+      const seen = normalizePhone(payload.phone || "");
+      if (seen) {
+        shotPhoneRef.current = seen;
+        setShotPhone(seen);
+      }
+      const matches = Array.isArray(payload.matches) ? payload.matches : [];
+      if (matches.length === 1 && matches[0]) {
+        const job = matches[0];
+        setMatchNote(`Matched from screenshot: ${job.address || job.title} – ${job.status}`);
+        await chooseJob(job, seen || "");
+        return;
+      }
+      if (matches.length > 1) {
+        setMatchNote(payload.matchedBy === "phone" ? "Several active jobs use this number. Pick one." : "Several active jobs match this address. Pick one.");
+        setJobOpen(true);
+        return;
+      }
+      if (seen && !payload.address) {
+        setMobile(seen);
+        return;
+      }
+      if (seen) setMobile(seen);
+      setMatchNote("No active job found");
+    } catch {
+      setMatchNote("The screenshot could not be read.");
+    }
+  }
+
+  async function confirmSave() {
+    const job = jobs?.find((item) => `${item.business}:${item.jobId}` === jobKey);
+    const number = normalizePhone(shotPhone || mobile);
+    if (!job || !number) return;
+    setSaveNote("");
+    setError("");
+    try {
+      const response = await fetch("/internal/api/sms-reply/jobs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ save: true, business: job.business, jobId: job.jobId, phone: number, name: customerName }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; message?: string; action?: string; phone?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        setSaveNote(payload?.message || "The tenant contact could not be saved.");
+        return;
+      }
+      setPhoneWarning(false);
+      setSaveConfirm(false);
+      setSaveNote(payload.action === "created" ? "Saved a new tenant contact on this job." : "Saved the number on this job's tenant.");
+      if (payload.phone && !contacts.some((contact) => contact.phone === payload.phone)) {
+        setContacts((current) => [...current, { name: customerName, phone: payload.phone || number }]);
+      }
+    } catch {
+      setSaveNote("The tenant contact could not be saved.");
+    }
+  }
+
   async function choosePhoto(file: File | undefined) {
     setError("");
     if (!file) return;
@@ -255,6 +383,7 @@ export function SmsReplyForm() {
         if (current) URL.revokeObjectURL(current.preview);
         return next;
       });
+      if (!jobKeyRef.current) void matchShot(next);
     } catch {
       setError("Couldn't read that photo. Paste the text instead.");
     }
@@ -387,11 +516,20 @@ export function SmsReplyForm() {
     }
   }
 
+  const selectedJob = jobs?.find((job) => `${job.business}:${job.jobId}` === jobKey) ?? null;
+  const jobText = jobQuery.trim().toLowerCase();
+  const visibleJobs = (jobs ?? []).filter((job) => {
+    if (!jobText) return true;
+    return `${smsReplyBrands[job.business]} ${job.address} ${job.title} ${job.status}`.toLowerCase().includes(jobText);
+  });
+
   return (
     <div className="space-y-4">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-slate-800">Today&apos;s job (optional)</h2>
+          <label id="sms-job-label" className="text-sm font-medium text-slate-800">
+            Job (optional)
+          </label>
           <button
             type="button"
             onClick={() => void loadJobs()}
@@ -400,29 +538,95 @@ export function SmsReplyForm() {
             {jobs === null ? "Show jobs" : "Refresh"}
           </button>
         </div>
-        {jobsNote ? <p className="mt-1 text-sm text-slate-600">{jobsNote}</p> : null}
-        {jobs && jobs.length > 0 ? (
-          <ul className="mt-2 space-y-2">
-            {jobs.map((job) => {
-              const key = `${job.business}:${job.jobId}`;
-              const on = jobKey === key;
-              return (
-                <li key={key}>
+        <button
+          type="button"
+          aria-labelledby="sms-job-label"
+          aria-expanded={jobOpen}
+          aria-haspopup="listbox"
+          onClick={() => {
+            setJobOpen((open) => !open);
+            if (jobs === null) void loadJobs();
+          }}
+          className="mt-1 flex min-h-12 w-full items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-left"
+        >
+          {selectedJob ? (
+            <>
+              <span className={`size-2.5 shrink-0 rounded-full ${selectedJob.business === "emoro" ? "bg-brand-orange" : "bg-brand-blue"}`} aria-hidden />
+              <span className="sr-only">{smsReplyBrands[selectedJob.business]}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{selectedJob.address || selectedJob.title}</span>
+              <span className="shrink-0 text-xs text-slate-500">{selectedJob.status}</span>
+            </>
+          ) : (
+            <span className="text-base text-slate-500">Choose a job</span>
+          )}
+        </button>
+        {jobOpen ? (
+          <div className="mt-2 rounded-xl border border-slate-300 bg-white p-2">
+            {jobs && jobs.length > smsJobSearchAfter ? (
+              <input
+                type="search"
+                value={jobQuery}
+                onChange={(event) => setJobQuery(event.target.value)}
+                placeholder="Search address or status"
+                aria-label="Filter jobs"
+                className="mb-2 w-full min-h-11 rounded-lg border border-slate-300 px-3 text-base"
+              />
+            ) : null}
+            <div role="listbox" aria-labelledby="sms-job-label" className="max-h-64 space-y-1 overflow-y-auto">
+              <button type="button" onClick={clearJob} className="w-full rounded-lg px-2 py-2 text-left text-sm text-slate-600">
+                No job
+              </button>
+              {visibleJobs.map((job) => {
+                const key = `${job.business}:${job.jobId}`;
+                const on = jobKey === key;
+                return (
                   <button
+                    key={key}
                     type="button"
-                    aria-pressed={on}
+                    role="option"
+                    aria-selected={on}
                     onClick={() => void chooseJob(job)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left ${on ? "border-brand-navy bg-slate-50" : "border-slate-300 bg-white"}`}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left ${on ? "bg-slate-100" : ""}`}
                   >
-                    <span className="block text-xs font-semibold text-slate-500">{smsReplyBrands[job.business]}</span>
-                    <span className="mt-1 block text-sm font-semibold text-slate-900">{job.title}</span>
-                    {job.address ? <span className="mt-1 block text-sm text-slate-600">{job.address}</span> : null}
+                    <span className={`size-2.5 shrink-0 rounded-full ${job.business === "emoro" ? "bg-brand-orange" : "bg-brand-blue"}`} aria-hidden />
+                    <span className="sr-only">{smsReplyBrands[job.business]}</span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-slate-900">{job.address || job.title}</span>
+                    <span className="shrink-0 text-xs text-slate-500">{job.status}</span>
                   </button>
-                </li>
-              );
-            })}
-          </ul>
+                );
+              })}
+              {jobs && visibleJobs.length === 0 ? <p className="px-2 py-2 text-sm text-slate-600">No matching job.</p> : null}
+            </div>
+          </div>
         ) : null}
+        {matchNote ? <p className="mt-1 text-sm text-slate-700">{matchNote}</p> : null}
+        {jobsNote ? <p className="mt-1 text-sm text-slate-600">{jobsNote}</p> : null}
+        {phoneWarning && selectedJob ? (
+          <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+            <p className="text-sm font-medium text-slate-900">{"This number isn't in Notion for this job"}</p>
+            {saveConfirm ? (
+              <div className="mt-2">
+                <p className="text-sm text-slate-700">
+                  {`Add ${shotPhone || phone} to this job's tenant contact? This does not change the property, and it will not replace a number that is already there.`}
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => void confirmSave()} className="min-h-11 rounded-xl bg-brand-navy px-3 text-sm font-semibold text-white">
+                    Confirm save
+                  </button>
+                  <button type="button" onClick={() => setSaveConfirm(false)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setSaveConfirm(true)} className="mt-2 min-h-11 rounded-xl border border-brand-navy bg-white px-3 text-sm font-semibold text-brand-navy">
+                {"Save to this job's tenant"}
+              </button>
+            )}
+            {saveNote ? <p className="mt-2 text-sm text-slate-700">{saveNote}</p> : null}
+          </div>
+        ) : null}
+        {saveNote && !phoneWarning ? <p className="mt-1 text-sm text-slate-700">{saveNote}</p> : null}
         {contacts.length > 1 ? (
           <fieldset className="mt-3">
             <legend className="text-sm font-medium text-slate-800">Tenant contact</legend>

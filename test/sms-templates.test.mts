@@ -79,6 +79,12 @@ test("the ten templates keep Pat's English and drop empty brackets", () => {
 });
 
 test("a job stage suggests a few templates, and the Chinese note can pick one", () => {
+  assert.deepEqual(suggestTemplates("New Work Order").map((item) => item.id), ["first-visit", "follow-up"]);
+  assert.deepEqual(suggestTemplates("Contacting Tenant 3 Cc PM").map((item) => item.id), ["cant-reach", "follow-up"]);
+  assert.deepEqual(suggestTemplates("Time Confirming").map((item) => item.id), ["confirm", "arrival", "reschedule"]);
+  assert.equal(suggestTemplates("In Progress (Collect Key)")[0]?.variant, "collect");
+  assert.equal(suggestTemplates("In Progress (Return Key)")[0]?.variant, "return");
+  assert.equal(suggestTemplates("Job Key Appointing")[0]?.variant, "collect");
   assert.deepEqual(suggestTemplates("Contacting tenant").map((item) => item.id), ["first-visit", "follow-up", "cant-reach"]);
   assert.deepEqual(suggestTemplates("Scheduled").map((item) => item.id), ["confirm", "arrival", "keys"]);
   assert.equal(suggestTemplates("On the way")[0]?.variant, "enroute");

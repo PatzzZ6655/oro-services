@@ -4,6 +4,8 @@
  * Anything else that cannot be filled is removed, and brackets never stay in the text.
  */
 
+import { smsStageSuggestions } from "@/lib/sms-job-statuses";
+
 export const smsTemplateGroups = ["约时间", "到场", "钥匙·物业", "特殊"] as const;
 
 export type SmsTemplateGroup = (typeof smsTemplateGroups)[number];
@@ -253,8 +255,10 @@ export function scheduleFromJob(scheduled: string, now = new Date()): JobSchedul
 
 export type SmsSuggestion = { id: string; variant: string };
 
-/** Two or three templates for the job's current stage. */
+/** Two or three templates for the job's current stage. Exact Notion statuses win. */
 export function suggestTemplates(status: string): SmsSuggestion[] {
+  const exact = smsStageSuggestions[status.trim()];
+  if (exact) return exact;
   const text = status.trim().toLowerCase();
   if (/complete|completed|done|finished|closed|完工/.test(text)) {
     return [
