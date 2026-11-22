@@ -11,7 +11,7 @@ import {
 } from "@/lib/jobs-app/new-job-text";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
-import { isAmountLayout, isInvoiceType, isNotesMode, isQaChoice, type AmountLayout, type InvoiceTask, type InvoiceType, type NotesMode, type QaChoice } from "@/lib/jobs-app/invoice";
+import { existingInvoiceMessage, isAmountLayout, isInvoiceType, isNotesMode, isQaChoice, type AmountLayout, type InvoiceTask, type InvoiceType, type NotesMode, type QaChoice } from "@/lib/jobs-app/invoice";
 import { applyVoucherStatus, cleanVoucherCode, notionPageId, voucherStatus } from "@/lib/jobs-app/voucher";
 import {
   isBusiness,
@@ -760,10 +760,22 @@ function clipLine(value: unknown, max: number): string {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ").trim().slice(0, max);
 }
 
+function clipNote(value: unknown, max: number): string {
+  if (typeof value === "string") return clipLine(value, max);
+  if (!value || typeof value !== "object") return "";
+  const row = value as Record<string, unknown>;
+  const item = clipLine(row.item, max);
+  const why = clipLine(row.why, max);
+  if (!item) return "";
+  if (!why) return item;
+  const joined = `${item} — ${why}`;
+  return joined.length > max ? joined.slice(0, max) : joined;
+}
+
 function clipList(value: unknown, maxItems: number, maxLen: number): string[] {
   if (!Array.isArray(value)) return [];
   return value
-    .map((item) => clipLine(item, maxLen))
+    .map((item) => clipNote(item, maxLen))
     .filter(Boolean)
     .slice(0, maxItems);
 }
@@ -1047,7 +1059,7 @@ export async function invoiceCreate(input: InvoiceCreateInput, fetchImpl?: Fetch
       docUrl: httpsUrl(json.docUrl),
       templateCheck: text(json.templateCheck, 200, secret),
       isTest: flag(json.isTest) === true,
-      message: created === "exists" ? "This invoice number is already there." : "Word draft is ready.",
+      message: created === "exists" ? existingInvoiceMessage(text(json.invoiceNumber, 40, secret) || clipLine(input.invoiceNumber, 40)) : "Word draft is ready.",
     },
   };
 }

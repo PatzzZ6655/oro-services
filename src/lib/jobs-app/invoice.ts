@@ -57,6 +57,15 @@ export function isAmountLayout(value: unknown): value is AmountLayout {
   return amountLayouts.includes(value as AmountLayout);
 }
 
+export function invoiceNumberToShow(existing: string, typed: string, suggested: string): string {
+  return existing.trim() || typed.trim() || suggested.trim();
+}
+
+export function existingInvoiceMessage(number: string): string {
+  const shown = number.trim() || "the current one";
+  return `This job already has a draft invoice (${shown}). Your new wording was not written — open the existing doc to edit it.`;
+}
+
 export function amountLayoutLabel(layout: AmountLayout): string {
   if (layout === "asQuoted") return "As quoted";
   if (layout === "keepAll") return "Keep all";
