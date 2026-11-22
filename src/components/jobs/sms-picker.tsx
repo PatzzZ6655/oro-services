@@ -5,7 +5,8 @@ import { useClientReady } from "@/components/jobs/client-ready";
 import { downloadText } from "@/components/jobs/download";
 import { JobsButton } from "@/components/jobs/ui";
 import { formatPhone, normalizePhone } from "@/lib/jobs-app/phones";
-import { sharedSms, smsHref, tenantSms, type SmsContact } from "@/lib/jobs-app/sms";
+import { nextVisitBody } from "@/lib/jobs-app/next-visit";
+import { messageBody, sharedSms, smsHref, tenantSms, type SmsContact } from "@/lib/jobs-app/sms";
 import { browserSmsMemory, rememberSelection, tickedFromMemory } from "@/lib/jobs-app/sms-memory";
 import type { Contact } from "@/lib/jobs-app/types";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -18,6 +19,7 @@ export function SmsPicker({
   jobTitle,
   allowManual,
   verbatim = false,
+  nextVisit = null,
 }: {
   jobId: string;
   contacts: Contact[];
@@ -26,6 +28,14 @@ export function SmsPicker({
   jobTitle: string;
   allowManual: boolean;
   verbatim?: boolean;
+  nextVisit?: {
+    brand: string;
+    address: string;
+    date: string;
+    time: string;
+    onDate: (value: string) => void;
+    onTime: (value: string) => void;
+  } | null;
 }) {
   const [manual, setManual] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
@@ -98,7 +108,14 @@ export function SmsPicker({
   }
 
   const selected = recipients.filter((recipient) => ticked?.includes(recipient.phone));
-  const body = ticked ? (verbatim ? tenantSms(topSms, recipients, ticked) : sharedSms(topSms, recipients, ticked)) : "";
+  const scheduled = !verbatim && nextVisit ? nextVisitBody(nextVisit) : null;
+  const body = !ticked
+    ? ""
+    : scheduled
+      ? messageBody(scheduled, selected.map((recipient) => recipient.name), selected.length)
+      : verbatim
+        ? tenantSms(topSms, recipients, ticked)
+        : sharedSms(topSms, recipients, ticked);
   const link = body ? smsHref(selected.map((recipient) => recipient.phone), body) : null;
 
   function remember() {
@@ -160,6 +177,18 @@ export function SmsPicker({
         <p role="alert" className="text-base">
           {manualError}
         </p>
+      ) : null}
+      {nextVisit ? (
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-2 text-base">
+            Next visit date
+            <input type="date" value={nextVisit.date} onChange={(event) => nextVisit.onDate(event.target.value)} className="min-h-14 w-full rounded-2xl border border-black bg-white px-4 text-lg text-black" />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Next visit time
+            <input type="time" value={nextVisit.time} onChange={(event) => nextVisit.onTime(event.target.value)} className="min-h-14 w-full rounded-2xl border border-black bg-white px-4 text-lg text-black" />
+          </label>
+        </div>
       ) : null}
       {body ? <p className="whitespace-pre-wrap rounded-2xl bg-neutral-100 px-4 py-3 text-base">{body}</p> : null}
       {selected.length > 1 ? <p className="text-base">One message to {selected.length} people, so replies stay in one thread.</p> : null}
