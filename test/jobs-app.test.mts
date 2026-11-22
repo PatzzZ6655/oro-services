@@ -8,6 +8,7 @@ import { introBody, introSubject, introTenantLine } from "@/lib/jobs-app/intro-e
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
+import { leaveDraftDirty, parseLeaveDraft } from "@/lib/jobs-app/leave-draft";
 import { newJobDraftDirty, parseNewJobDraft, parseNewJobIntroHold } from "@/lib/jobs-app/new-job-draft";
 import {
   newJobTextCoversScreenshots,
@@ -688,9 +689,25 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /\/jobs\/api\/new\/read/);
   assert.match(page, /screenshotReadFallback/);
   assert.equal(screenshotReadFallback, "Couldn't read the screenshots — type the details in");
-  assert.match(page, /overscrollBehaviorY = "none"/);
-  assert.match(page, /data-new-job-scroll/);
+  const lock = readFileSync(new URL("../src/components/jobs/keep-page.tsx", import.meta.url), "utf8");
+  const depart = readFileSync(new URL("../src/components/jobs/depart-screen.tsx", import.meta.url), "utf8");
+  const leave = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
+  assert.match(lock, /overscrollBehaviorY = "none"/);
+  assert.match(lock, /data-jobs-scroll/);
+  assert.match(page, /KeepPage/);
   assert.match(page, /beforeunload/);
+  assert.match(depart, /KeepPage/);
+  assert.equal(depart.includes('postJobs<DepartResult>("/jobs/api/depart"'), true);
+  assert.match(leave, /KeepPage/);
+  assert.match(leave, /beforeunload/);
+  assert.match(leave, /clearStoredLeaveDraft/);
+  assert.equal(leave.includes('form.set("business"'), true);
+  assert.equal(leave.includes('form.set("jobId"'), true);
+  assert.equal(leave.includes('form.set("outcome"'), true);
+  assert.equal(leave.includes('form.set("notes"'), true);
+  assert.equal(leave.includes('form.set("issues"'), true);
+  assert.equal(leave.includes('form.set("checklist"'), true);
+  assert.equal(leave.includes('form.append("photos"'), true);
   assert.match(page, /writeStoredNewJobDraft/);
   assert.match(page, /clearStoredNewJobIntro/);
   assert.match(page, /PM agency/);
@@ -770,6 +787,29 @@ test("a new job draft restores typed fields and the screenshot read, then drops 
   assert.equal(hold.result.pmAgency, "Ray White");
   assert.equal(hold.result.description, "Notion text");
   assert.equal(parseNewJobIntroHold(JSON.stringify({ business: "emoro", result: {} })), null);
+});
+
+test("a leave draft keeps the checklist for the same visit", () => {
+  const draft = parseLeaveDraft(
+    JSON.stringify({
+      jobId: "job-1",
+      step: "details",
+      checked: ["Before-and-after photos taken", "Not a real item"],
+      outcome: "return",
+      notes: "Gate code 1234",
+      issues: "Loose tile",
+      photoCount: 2,
+    }),
+  );
+  if (!draft) throw new Error("leave draft missing");
+  assert.equal(draft.step, "details");
+  assert.equal(draft.outcome, "return");
+  assert.deepEqual(draft.checked, ["Before-and-after photos taken"]);
+  assert.equal(draft.notes, "Gate code 1234");
+  assert.equal(draft.photoCount, 2);
+  assert.equal(leaveDraftDirty(draft), true);
+  assert.equal(parseLeaveDraft("{"), null);
+  assert.equal(parseLeaveDraft(JSON.stringify({ jobId: "job-1", step: "checklist" })), null);
 });
 
 test("reading screenshots uses the new-job webhook without creating fields", async () => {

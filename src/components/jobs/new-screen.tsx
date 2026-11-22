@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs, postJobsForm } from "@/components/jobs/api";
+import { KeepPage } from "@/components/jobs/keep-page";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import {
@@ -84,54 +85,6 @@ function ignoreDraftStore() {
 const chooseCompany = "Choose Emoro Building or Emporo Plumbing first";
 const screenshotsClearedOnCheck = "The screenshots were cleared when the page reloaded. The recognised details are still here.";
 const screenshotsClearedOnCapture = "The screenshots were cleared when the page reloaded. Add them again if you still want them on the job.";
-
-function NewJobShell({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const previous = {
-      htmlOverscroll: html.style.overscrollBehaviorY,
-      bodyOverscroll: body.style.overscrollBehaviorY,
-      htmlOverflow: html.style.overflow,
-      bodyOverflow: body.style.overflow,
-    };
-    html.style.overscrollBehaviorY = "none";
-    body.style.overscrollBehaviorY = "none";
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-
-    let startY = 0;
-    const onStart = (event: TouchEvent) => {
-      startY = event.touches[0]?.clientY ?? 0;
-    };
-    const onMove = (event: TouchEvent) => {
-      const y = event.touches[0]?.clientY ?? 0;
-      if (y <= startY + 8) return;
-      let node = event.target instanceof Element ? event.target : null;
-      while (node) {
-        if (node instanceof HTMLElement && node.scrollTop > 0) return;
-        node = node.parentElement;
-      }
-      if (event.cancelable) event.preventDefault();
-    };
-    document.addEventListener("touchstart", onStart, { passive: true });
-    document.addEventListener("touchmove", onMove, { passive: false });
-    return () => {
-      html.style.overscrollBehaviorY = previous.htmlOverscroll;
-      body.style.overscrollBehaviorY = previous.bodyOverscroll;
-      html.style.overflow = previous.htmlOverflow;
-      body.style.overflow = previous.bodyOverflow;
-      document.removeEventListener("touchstart", onStart);
-      document.removeEventListener("touchmove", onMove);
-    };
-  }, []);
-
-  return (
-    <div data-new-job-scroll className="fixed inset-0 overflow-y-auto overscroll-y-none bg-white text-black">
-      {children}
-    </div>
-  );
-}
 
 function ActionNotice({ message, busyLabel }: { message: string; busyLabel: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
@@ -434,11 +387,11 @@ export function NewJobScreen() {
 
   if (!hydrated) {
     return (
-      <NewJobShell>
+      <KeepPage>
         <Screen title="New job">
           <Spinner label="Opening" />
         </Screen>
-      </NewJobShell>
+      </KeepPage>
     );
   }
 
@@ -458,7 +411,7 @@ export function NewJobScreen() {
     const named = people.find((row) => row.name.trim())?.name ?? "";
     if (introPhase === "status" && introStatus) {
       return (
-        <NewJobShell>
+        <KeepPage>
           <Screen title="Intro email" back={<BackLink href="/jobs" />}>
             <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p>
             <p className="text-base text-neutral-700">{introTestNote}</p>
@@ -466,11 +419,11 @@ export function NewJobScreen() {
               Done
             </JobsButton>
           </Screen>
-        </NewJobShell>
+        </KeepPage>
       );
     }
     return (
-      <NewJobShell>
+      <KeepPage>
       <Screen title="Intro email" back={<BackLink href="/jobs" />}>
         <p className="text-base text-neutral-700">{introTestNote}</p>
         <p className="text-lg font-semibold">{introSubject(preview.address, preview.brand)}</p>
@@ -487,7 +440,7 @@ export function NewJobScreen() {
           {introBusy === "skip" ? "Skipping" : "Skip"}
         </JobsButton>
       </Screen>
-      </NewJobShell>
+      </KeepPage>
     );
   }
 
@@ -496,7 +449,7 @@ export function NewJobScreen() {
     const tenant2 = [result.tenant2, result.phone2].filter(Boolean).join(" ");
     const pm = [result.pmName, result.pmAgency, result.pmEmail, result.pmPhone].filter(Boolean).join(" / ");
     return (
-      <NewJobShell>
+      <KeepPage>
       <Screen title="New job" back={<BackLink href="/jobs" />}>
         <p className="text-lg font-semibold">Work order created</p>
         <Line label="Title" value={result.jobTitle} />
@@ -522,13 +475,13 @@ export function NewJobScreen() {
           </JobsLink>
         ) : null}
       </Screen>
-      </NewJobShell>
+      </KeepPage>
     );
   }
 
   if (step === "check" && isBusiness(business)) {
     return (
-      <NewJobShell>
+      <KeepPage>
       <Screen
         title="Check job"
         back={
@@ -572,12 +525,12 @@ export function NewJobScreen() {
           {busy === "create" ? "Creating" : "Create job"}
         </JobsButton>
       </Screen>
-      </NewJobShell>
+      </KeepPage>
     );
   }
 
   return (
-    <NewJobShell>
+    <KeepPage>
     <Screen title="New job" back={<BackLink href="/jobs" />}>
       <div className="contents">
           <div className="grid grid-cols-1 gap-3">
@@ -634,7 +587,7 @@ export function NewJobScreen() {
         {busy === "read" ? "Reading" : files.length > 0 ? "Read screenshots" : "Continue"}
       </JobsButton>
     </Screen>
-    </NewJobShell>
+    </KeepPage>
   );
 }
 

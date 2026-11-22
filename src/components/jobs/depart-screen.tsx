@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs } from "@/components/jobs/api";
 import { useClientReady } from "@/components/jobs/client-ready";
+import { KeepPage } from "@/components/jobs/keep-page";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner } from "@/components/jobs/ui";
 import { mapsHref } from "@/lib/jobs-app/address";
@@ -70,6 +71,7 @@ export function DepartScreen() {
     const address = done.result.address || done.job.address;
     const title = done.result.jobTitle || done.job.title;
     return (
+      <KeepPage>
       <Screen title="Depart" back={<BackLink href="/jobs" />}>
         <div>
           <p className="text-sm">{done.result.brand || businessLabel(done.result.business)}</p>
@@ -95,10 +97,12 @@ export function DepartScreen() {
           Choose another job
         </JobsButton>
       </Screen>
+      </KeepPage>
     );
   }
 
   return (
+    <KeepPage>
     <Screen title="Depart" back={<BackLink href="/jobs" />}>
       {visit ? <p className="text-base">A visit is still open: {visit.title}. Departing again will switch to this job.</p> : null}
       {error ? <Alert>{error}</Alert> : null}
@@ -134,5 +138,6 @@ export function DepartScreen() {
         </JobsButton>
       ) : null}
     </Screen>
+    </KeepPage>
   );
 }
