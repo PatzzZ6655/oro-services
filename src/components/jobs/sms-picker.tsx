@@ -5,7 +5,7 @@ import { useClientReady } from "@/components/jobs/client-ready";
 import { downloadText } from "@/components/jobs/download";
 import { JobsButton } from "@/components/jobs/ui";
 import { formatPhone, normalizePhone } from "@/lib/jobs-app/phones";
-import { nextVisitBody } from "@/lib/jobs-app/next-visit";
+import { arrivalBody, nextVisitBody } from "@/lib/jobs-app/next-visit";
 import { messageBody, sharedSms, smsHref, tenantSms, type SmsContact } from "@/lib/jobs-app/sms";
 import { browserSmsMemory, rememberSelection, tickedFromMemory } from "@/lib/jobs-app/sms-memory";
 import type { Contact } from "@/lib/jobs-app/types";
@@ -20,6 +20,7 @@ export function SmsPicker({
   allowManual,
   verbatim = false,
   nextVisit = null,
+  arrival = null,
 }: {
   jobId: string;
   contacts: Contact[];
@@ -34,6 +35,13 @@ export function SmsPicker({
     date: string;
     time: string;
     onDate: (value: string) => void;
+    onTime: (value: string) => void;
+  } | null;
+  arrival?: {
+    brand: string;
+    address: string;
+    visit: string;
+    time: string;
     onTime: (value: string) => void;
   } | null;
 }) {
@@ -109,13 +117,16 @@ export function SmsPicker({
 
   const selected = recipients.filter((recipient) => ticked?.includes(recipient.phone));
   const scheduled = !verbatim && nextVisit ? nextVisitBody(nextVisit) : null;
+  const arriving = !verbatim && !scheduled && arrival ? arrivalBody(arrival) : null;
   const body = !ticked
     ? ""
     : scheduled
       ? messageBody(scheduled, selected.map((recipient) => recipient.name), selected.length)
-      : verbatim
-        ? tenantSms(topSms, recipients, ticked)
-        : sharedSms(topSms, recipients, ticked);
+      : arriving
+        ? messageBody(arriving, selected.map((recipient) => recipient.name), selected.length)
+        : verbatim
+          ? tenantSms(topSms, recipients, ticked)
+          : sharedSms(topSms, recipients, ticked);
   const link = body ? smsHref(selected.map((recipient) => recipient.phone), body) : null;
 
   function remember() {
@@ -177,6 +188,12 @@ export function SmsPicker({
         <p role="alert" className="text-base">
           {manualError}
         </p>
+      ) : null}
+      {arrival ? (
+        <label className="flex flex-col gap-2 text-base">
+          Arrival time
+          <input type="time" value={arrival.time} onChange={(event) => arrival.onTime(event.target.value)} className="min-h-14 w-full rounded-2xl border border-black bg-white px-4 text-lg text-black" />
+        </label>
       ) : null}
       {nextVisit ? (
         <div className="flex flex-col gap-3">

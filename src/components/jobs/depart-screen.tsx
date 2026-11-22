@@ -8,6 +8,7 @@ import { KeepPage } from "@/components/jobs/keep-page";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner } from "@/components/jobs/ui";
 import { mapsHref } from "@/lib/jobs-app/address";
+import { parseDepartArrival, readDepartArrival, writeDepartArrival } from "@/lib/jobs-app/next-visit";
 import { businessLabel, type DepartResult, type TodayJob } from "@/lib/jobs-app/types";
 import { loadVisit, saveVisit } from "@/lib/jobs-app/visit";
 
@@ -22,6 +23,14 @@ export function DepartScreen() {
   const ready = useClientReady();
   const visit = ready ? loadVisit() : null;
   const [done, setDone] = useState<{ job: TodayJob; result: DepartResult } | null>(null);
+  const [arrivalTime, setArrivalTime] = useState("");
+  const [arrivalFor, setArrivalFor] = useState("");
+  if (done && arrivalFor !== done.job.jobId) {
+    setArrivalFor(done.job.jobId);
+    const raw = readDepartArrival();
+    const saved = parseDepartArrival(raw === "\0" ? null : raw);
+    setArrivalTime(saved?.jobId === done.job.jobId ? saved.time : "");
+  }
 
   useEffect(() => {
     let cancel = false;
@@ -41,6 +50,11 @@ export function DepartScreen() {
       cancel = true;
     };
   }, [attempt, router]);
+
+  useEffect(() => {
+    if (!done || arrivalFor !== done.job.jobId) return;
+    writeDepartArrival({ jobId: done.job.jobId, time: arrivalTime });
+  }, [done, arrivalFor, arrivalTime]);
 
   async function depart(job: TodayJob) {
     setPendingId(job.jobId);
@@ -86,6 +100,13 @@ export function DepartScreen() {
           address={address}
           jobTitle={title}
           allowManual={done.result.contacts.length === 0}
+          arrival={{
+            brand: done.result.brand || businessLabel(done.result.business),
+            address,
+            visit: done.result.visit,
+            time: arrivalTime,
+            onTime: setArrivalTime,
+          }}
         />
         {done.result.sms ? null : <Alert>The server did not return a message. Navigation still works.</Alert>}
         {address ? (

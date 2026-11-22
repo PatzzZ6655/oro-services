@@ -117,3 +117,71 @@ export function clearLeaveNext(): void {
     // Ignore a blocked store.
   }
 }
+
+export const departArrivalKey = "oro.jobs.depart.arrival";
+
+export type DepartArrival = {
+  jobId: string;
+  time: string;
+};
+
+export function formatArrivalTime(value: string): string | null {
+  return wallTime(value);
+}
+
+export function arrivalBody(input: { brand: string; address: string; visit: string; time: string }): string | null {
+  const clock = wallTime(input.time);
+  if (!clock) return null;
+  const brand = input.brand.trim();
+  const address = input.address.trim();
+  if (!brand || !address) return null;
+  const again = Number(input.visit) >= 2;
+  if (again) {
+    return `${brand} here. We're on our way back to ${address} and should be there around ${clock} to continue the job. See you soon. Thanks! - ${brand}`;
+  }
+  return `${brand} here. We're on our way to ${address} and should be there around ${clock}. Thanks! - ${brand}`;
+}
+
+export function arrivalSms(input: { name: string; brand: string; address: string; visit: string; time: string }): string | null {
+  const body = arrivalBody(input);
+  if (!body) return null;
+  const name = input.name.trim();
+  return `${name ? `Hi ${name},` : "Hi,"} ${body}`;
+}
+
+export function parseDepartArrival(raw: string | null): DepartArrival | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    if (!value || typeof value !== "object") return null;
+    const jobId = typeof value.jobId === "string" ? value.jobId.trim().slice(0, 120) : "";
+    const time = typeof value.time === "string" && wallTime(value.time) ? value.time.trim() : "";
+    if (!jobId || !time) return null;
+    return { jobId, time };
+  } catch {
+    return null;
+  }
+}
+
+export function readDepartArrival(): string {
+  try {
+    const raw = store()?.getItem(departArrivalKey);
+    return raw && raw.length > 0 ? raw : "\0";
+  } catch {
+    return "\0";
+  }
+}
+
+export function writeDepartArrival(arrival: DepartArrival): void {
+  const memory = store();
+  if (!memory) return;
+  try {
+    if (!arrival.time) {
+      memory.removeItem(departArrivalKey);
+      return;
+    }
+    memory.setItem(departArrivalKey, JSON.stringify({ jobId: arrival.jobId, time: arrival.time }));
+  } catch {
+    // A blocked store must not stop the SMS preview.
+  }
+}
