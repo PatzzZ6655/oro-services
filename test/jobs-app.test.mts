@@ -1156,7 +1156,9 @@ test("the public site does not advertise /jobs and the source has no webhook URL
   const header = readFileSync(new URL("../src/components/site-header.tsx", import.meta.url), "utf8");
   const footer = readFileSync(new URL("../src/components/site-footer.tsx", import.meta.url), "utf8");
   assert.equal(header.includes("/jobs"), false);
+  assert.equal(header.includes('role="separator"'), true);
   assert.equal(footer.includes("/jobs"), false);
+  assert.equal(footer.includes("Internal Login"), false);
 });
 
 function walk(dir: string): string[] {

@@ -164,8 +164,8 @@ export const barLinks = [
 
 export const menuLinks = [
   ...barLinks,
-  { href: dashboardHref, label: "Dashboard" },
   { href: staffPortalHref, label: "Staff Portal" },
+  { href: dashboardHref, label: "Dashboard" },
 ] as const;
 
 export function absoluteUrl(path: string): string {
