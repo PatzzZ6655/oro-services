@@ -21,11 +21,16 @@ async function Hub() {
 
   return (
     <PortalFrame email={user.email} name={user.name}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-brand-navy">Staff portal</h1>
-        <Link href="/internal/jobs" className="text-sm font-semibold text-brand-navy underline">
-          Jobs
-        </Link>
+        <div className="flex shrink-0 items-center gap-4">
+          <Link href="/internal/sms-reply" className="text-sm font-semibold text-brand-navy underline">
+            SMS reply
+          </Link>
+          <Link href="/internal/jobs" className="text-sm font-semibold text-brand-navy underline">
+            Jobs
+          </Link>
+        </div>
       </div>
       {showFieldJobs(user.email) ? <FieldJobTiles /> : null}
       <ReportsPanel recent={recent} />
