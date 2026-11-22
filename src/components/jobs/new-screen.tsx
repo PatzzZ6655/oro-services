@@ -6,12 +6,18 @@ import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { BackLink, JobsButton, JobsLink, Screen, fieldClass } from "@/components/jobs/ui";
 import {
+  blankTenants,
+  maxJobTenants,
   newJobNeedDetail,
   newJobTextCoversScreenshots,
   newJobTextLimits,
   preferTyped,
   readNewJobText,
   screenshotReadFallback,
+  tenantLimits,
+  tenantsFromRead,
+  tenantsFromTyped,
+  type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
@@ -97,6 +103,7 @@ export function NewJobScreen() {
   const [readyFiles, setReadyFiles] = useState<File[]>([]);
   const [tenantName, setTenantName] = useState("");
   const [phone, setPhone] = useState("");
+  const [tenants, setTenants] = useState<JobTenant[]>(blankTenants());
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
   const [workOrderNumber, setWorkOrderNumber] = useState("");
@@ -116,6 +123,7 @@ export function NewJobScreen() {
     }
     if (files.length === 0) {
       setReadyFiles([]);
+      setTenants(tenantsFromTyped(tenantName, phone));
       setError("");
       setStep("check");
       return;
@@ -139,13 +147,17 @@ export function NewJobScreen() {
       const read = await postJobsForm<{
         tenantName: string;
         phone: string;
+        email: string;
         address: string;
         description: string;
         workOrderNumber: string;
         voucher: string;
+        tenant2Name: string;
+        phone2: string;
+        email2: string;
+        tenants?: JobTenant[];
       }>("/jobs/api/new/read", form);
-      setTenantName(preferTyped(tenantName, read.tenantName));
-      setPhone(preferTyped(phone, read.phone));
+      setTenants(tenantsFromRead(read, { name: tenantName, phone }));
       setAddress(preferTyped(address, read.address));
       setDescription(preferTyped(description, read.description));
       setWorkOrderNumber(preferTyped(workOrderNumber, read.workOrderNumber));
@@ -159,6 +171,7 @@ export function NewJobScreen() {
       }
       if (reason instanceof JobsClientError && reason.code === "unreadable") {
         setReadyFiles(compressed);
+        setTenants(tenantsFromTyped(tenantName, phone));
         setError(screenshotReadFallback);
         setStep("check");
         return;
@@ -176,7 +189,14 @@ export function NewJobScreen() {
       setError(chooseCompany);
       return;
     }
-    const typed = typedDraft({ tenantName, phone, address, description, workOrderNumber, notes });
+    const typed = typedDraft({
+      tenantName: tenants.find((row) => row.name.trim())?.name ?? "",
+      phone: "",
+      address,
+      description,
+      workOrderNumber,
+      notes,
+    });
     if (readyFiles.length === 0 && !newJobTextCoversScreenshots(typed)) {
       setError(newJobNeedDetail);
       return;
@@ -187,8 +207,10 @@ export function NewJobScreen() {
     try {
       const form = new FormData();
       form.set("business", business);
+      form.set("tenants", JSON.stringify(tenants));
       for (const [key, value] of Object.entries(typed)) {
-        if (value) form.set(key, value);
+        if (key === "tenantName" || key === "phone" || !value) continue;
+        form.set(key, value);
       }
       const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
       if (code) form.set("voucher", code);
@@ -256,7 +278,9 @@ export function NewJobScreen() {
               ? `${readyFiles.length} screenshot${readyFiles.length === 1 ? "" : "s"} will be sent with the job.`
               : "No screenshot. Check the details, then create the job."}
           </p>
+          <TenantList tenants={tenants} setTenants={setTenants} />
           <DetailFields
+            showContact={false}
             tenantName={tenantName}
             setTenantName={setTenantName}
             phone={phone}
@@ -338,6 +362,7 @@ export function NewJobScreen() {
 }
 
 function DetailFields({
+  showContact = true,
   tenantName,
   setTenantName,
   phone,
@@ -353,6 +378,7 @@ function DetailFields({
   voucher,
   setVoucher,
 }: {
+  showContact?: boolean;
   tenantName: string;
   setTenantName: (value: string) => void;
   phone: string;
@@ -370,14 +396,18 @@ function DetailFields({
 }) {
   return (
     <>
-      <label className="flex flex-col gap-2 text-base">
-        Tenant / contact name
-        <input value={tenantName} onChange={(event) => setTenantName(event.target.value)} maxLength={newJobTextLimits.tenantName} autoComplete="name" className={fieldClass} />
-      </label>
-      <label className="flex flex-col gap-2 text-base">
-        Phone
-        <input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={newJobTextLimits.phone} inputMode="tel" autoComplete="tel" className={fieldClass} />
-      </label>
+      {showContact ? (
+        <>
+          <label className="flex flex-col gap-2 text-base">
+            Tenant / contact name
+            <input value={tenantName} onChange={(event) => setTenantName(event.target.value)} maxLength={newJobTextLimits.tenantName} autoComplete="name" className={fieldClass} />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Phone
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={newJobTextLimits.phone} inputMode="tel" autoComplete="tel" className={fieldClass} />
+          </label>
+        </>
+      ) : null}
       <label className="flex flex-col gap-2 text-base">
         Property address
         <input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={newJobTextLimits.address} autoComplete="street-address" className={fieldClass} />
@@ -407,5 +437,52 @@ function DetailFields({
         <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={newJobTextLimits.notes} rows={4} className={`${fieldClass} min-h-32 py-3`} />
       </label>
     </>
+  );
+}
+
+function TenantList({ tenants, setTenants }: { tenants: JobTenant[]; setTenants: (next: JobTenant[]) => void }) {
+  function update(index: number, patch: Partial<JobTenant>) {
+    setTenants(tenants.map((row, item) => (item === index ? { ...row, ...patch } : row)));
+  }
+
+  function remove(index: number) {
+    if (tenants.length === 1) {
+      setTenants(blankTenants());
+      return;
+    }
+    setTenants(tenants.filter((_, item) => item !== index));
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="text-lg font-semibold">Tenants</h2>
+      {tenants.map((row, index) => (
+        <div key={index} className="flex flex-col gap-3 rounded-2xl border border-black p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-base font-semibold">Tenant {index + 1}</p>
+            <button type="button" onClick={() => remove(index)} className="min-h-11 px-1 text-base font-semibold underline">
+              Remove
+            </button>
+          </div>
+          <label className="flex flex-col gap-2 text-base">
+            Name
+            <input value={row.name} onChange={(event) => update(index, { name: event.target.value })} maxLength={tenantLimits.name} autoComplete="name" className={fieldClass} />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Phone
+            <input value={row.phone} onChange={(event) => update(index, { phone: event.target.value })} maxLength={tenantLimits.phone} inputMode="tel" autoComplete="tel" className={fieldClass} />
+          </label>
+          <label className="flex flex-col gap-2 text-base">
+            Email
+            <input value={row.email} onChange={(event) => update(index, { email: event.target.value })} maxLength={tenantLimits.email} inputMode="email" autoComplete="email" className={fieldClass} />
+          </label>
+        </div>
+      ))}
+      {tenants.length < maxJobTenants ? (
+        <button type="button" onClick={() => setTenants([...tenants, { name: "", phone: "", email: "" }])} className="min-h-14 rounded-2xl border border-black text-lg font-semibold">
+          Add tenant
+        </button>
+      ) : null}
+    </div>
   );
 }

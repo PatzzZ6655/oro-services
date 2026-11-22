@@ -2,8 +2,12 @@ import {
   newJobNeedDetail,
   newJobTextCoversScreenshots,
   newJobTextPayload,
+  parseTenantList,
   readNewJobText,
+  readTenantsField,
   screenshotReadFallback,
+  tenantPayload,
+  type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
@@ -421,6 +425,7 @@ export type ScreenshotRead = {
   pmAgency: string;
   pmEmail: string;
   pmPhone: string;
+  tenants: JobTenant[];
 };
 
 function readValue(json: Record<string, unknown>, key: string, max: number, secret: string): string {
@@ -480,6 +485,11 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
         pmAgency: readValue(result.json, "pmAgency", 80, secret),
         pmEmail: readValue(result.json, "pmEmail", 120, secret),
         pmPhone: readValue(result.json, "pmPhone", 40, secret),
+        tenants: parseTenantList(result.json.tenants).map((row) => ({
+          name: text(row.name, 80, secret),
+          phone: text(row.phone, 40, secret),
+          email: text(row.email, 120, secret),
+        })),
       },
     };
   } catch {
@@ -495,7 +505,10 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
   const images = await readUpload(form, "images", NEW_JOB_MAX_IMAGES);
   if (!images.ok) return images;
   const typed = readNewJobText(form);
-  if (images.files.length === 0 && !newJobTextCoversScreenshots(typed)) {
+  const listed = typeof form.get("tenants") === "string";
+  const tenants = listed ? readTenantsField(form.get("tenants")) : [];
+  const named = tenants.find((row) => row.name)?.name ?? "";
+  if (images.files.length === 0 && !newJobTextCoversScreenshots({ ...typed, tenantName: typed.tenantName || named })) {
     return { status: 400, body: { ok: false, error: "bad_request", message: newJobNeedDetail } };
   }
   const config = makeConfig();
@@ -503,7 +516,13 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
   const call = fetchImpl ?? globalThis.fetch;
   try {
     const voucher = cleanVoucherCode(fieldText(form.get("voucher"), 40));
-    const fields: Record<string, string> = { secret: config.secret, business, ...newJobTextPayload(typed) };
+    const details = newJobTextPayload(typed);
+    if (listed) {
+      delete details.tenantName;
+      delete details.phone;
+      Object.assign(details, tenantPayload(tenants));
+    }
+    const fields: Record<string, string> = { secret: config.secret, business, ...details };
     if (voucher) fields.voucher = voucher;
     const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
     const error = failure(result.status, result.json);
