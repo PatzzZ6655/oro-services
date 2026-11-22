@@ -36,6 +36,7 @@ export function LeaveScreen() {
   const [outcome, setOutcome] = useState<"return" | "complete" | null>(null);
   const [notes, setNotes] = useState("");
   const [issues, setIssues] = useState("");
+  const [includeVoucher, setIncludeVoucher] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCount, setPhotoCount] = useState(0);
   const [photosCleared, setPhotosCleared] = useState(false);
@@ -67,6 +68,7 @@ export function LeaveScreen() {
         setOutcome(draft.outcome || null);
         setNotes(draft.notes);
         setIssues(draft.issues);
+        setIncludeVoucher(draft.includeVoucher);
         setPhotoCount(draft.photoCount);
         setPhotosCleared(draft.photoCount > 0);
       }
@@ -82,8 +84,9 @@ export function LeaveScreen() {
       notes,
       issues,
       photoCount,
+      includeVoucher,
     };
-  }, [visit?.jobId, step, checked, outcome, notes, issues, photoCount]);
+  }, [visit?.jobId, step, checked, outcome, notes, issues, photoCount, includeVoucher]);
 
   useEffect(() => {
     if (!ready || !hydrated || result || !visit) return;
@@ -236,6 +239,7 @@ export function LeaveScreen() {
     form.set("notes", notes);
     form.set("issues", issues);
     form.set("checklist", review.text);
+    form.set("includeVoucher", outcome === "complete" && includeVoucher ? "1" : "0");
     for (const file of files) form.append("photos", file);
     try {
       const next = await postJobsForm<LeaveResult>("/jobs/api/leave", form);
@@ -353,6 +357,12 @@ export function LeaveScreen() {
 
       {step === "details" && !busy ? (
         <div className="flex flex-col gap-4">
+          {outcome === "complete" ? (
+            <label className="flex min-h-14 items-center gap-3 text-base">
+              <input type="checkbox" className="h-6 w-6 accent-black" checked={includeVoucher} onChange={(event) => setIncludeVoucher(event.target.checked)} />
+              Include $60 voucher
+            </label>
+          ) : null}
           <label className="flex flex-col gap-2 text-base">
             Notes (optional, dictation works)
             <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className={`${fieldClass} py-3`} />

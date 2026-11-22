@@ -96,8 +96,10 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
   const { leaveJob } = await import("@/lib/jobs-app/webhooks");
   const original = globalThis.fetch;
   const tenantText = "Hi Sam, thanks for having us. Your $60 voucher is EMB-123456, valid to 31 Jan 2027. Review: https://g.page/r/example";
-  globalThis.fetch = (async () =>
-    jsonResponse({
+  const sent: { body: FormData | null } = { body: null };
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent.body = init?.body instanceof FormData ? init.body : null;
+    return jsonResponse({
       ok: true,
       business: "emoro",
       brand: "Emoro Building",
@@ -115,7 +117,8 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
       voucherCode: "EMB-123456",
       voucherExpiry: "2027-01-31",
       driveLink: "https://drive.google.com/drive/folders/example",
-    })) as typeof fetch;
+    });
+  }) as typeof fetch;
   try {
     const form = new FormData();
     form.set("business", "emoro");
@@ -126,6 +129,16 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
     form.set("issues", "");
     const result = await leaveJob(form);
     assert.equal(result.status, 200);
+    assert.equal(sent.body?.get("includeVoucher"), "0");
+    form.set("includeVoucher", "1");
+    const withVoucher = await leaveJob(form);
+    assert.equal(withVoucher.status, 200);
+    assert.equal(sent.body?.get("includeVoucher"), "1");
+    form.set("outcome", "return");
+    form.set("includeVoucher", "1");
+    const comingBack = await leaveJob(form);
+    assert.equal(comingBack.status, 200);
+    assert.equal(sent.body?.get("includeVoucher"), "0");
     if (!result.body.ok) throw new Error(result.body.message);
     assert.equal(result.body.voucherCode, "EMB-123456");
     assert.equal(result.body.voucherExpiry, "2027-01-31");
@@ -769,6 +782,7 @@ test("api routes proxy the webhooks and keep the secret on the server", async ()
     assert.ok(leaveCall?.body instanceof FormData);
     assert.equal(leaveCall.body.get("secret"), SECRET);
     assert.equal(leaveCall.body.get("outcome"), "complete");
+    assert.equal(leaveCall.body.get("includeVoucher"), "0");
     assert.equal(leaveCall.body.getAll("photos").length, 1);
 
     const images = new FormData();
@@ -1021,17 +1035,20 @@ test("a leave draft keeps the checklist for the same visit", () => {
       notes: "Gate code 1234",
       issues: "Loose tile",
       photoCount: 2,
+      includeVoucher: "1",
     }),
   );
   if (!draft) throw new Error("leave draft missing");
   assert.equal(draft.step, "details");
   assert.equal(draft.outcome, "return");
+  assert.equal(draft.includeVoucher, true);
   assert.deepEqual(draft.checked, ["Before-and-after photos taken"]);
   assert.equal(draft.notes, "Gate code 1234");
   assert.equal(draft.photoCount, 2);
   assert.equal(leaveDraftDirty(draft), true);
   assert.equal(parseLeaveDraft("{"), null);
-  assert.equal(parseLeaveDraft(JSON.stringify({ jobId: "job-1", step: "checklist" })), null);
+    assert.equal(parseLeaveDraft(JSON.stringify({ jobId: "job-1", step: "checklist" })), null);
+    assert.equal(parseLeaveDraft(JSON.stringify({ jobId: "job-1", step: "details", outcome: "complete" }))?.includeVoucher, false);
 });
 
 test("reading screenshots uses the new-job webhook without creating fields", async () => {
