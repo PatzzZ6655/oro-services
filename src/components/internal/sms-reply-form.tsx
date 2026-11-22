@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { resizeToJpeg } from "@/components/jobs/resize-image";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { smsHref } from "@/lib/jobs-app/sms";
 import { smsBodyHref, smsReplyBrands, type SmsReplyBrand } from "@/lib/sms-reply-client";
 import type { SmsJobContact, SmsOpenJob } from "@/lib/sms-reply-jobs";
+import { fillSmsTemplate, smsTemplateById, smsTemplates, templateBrand } from "@/lib/sms-templates";
 
 const fieldClass =
   "mt-1 w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
@@ -66,16 +67,44 @@ export function SmsReplyForm() {
   const [jobKey, setJobKey] = useState("");
   const [contacts, setContacts] = useState<SmsJobContact[]>([]);
   const [contactPhone, setContactPhone] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [day, setDay] = useState("");
+  const [visitTime, setVisitTime] = useState("");
+  const [draftEdited, setDraftEdited] = useState(false);
+  const fields = useRef({ name: "", address: "", day: "", time: "", brand: "" as SmsReplyBrand | "", templateId: "" });
 
   const phone = normalizePhone(mobile);
   const sendHref = phone && draft.trim() ? smsHref([phone], draft.trim())?.href ?? "" : "";
   const messagesHref = draft.trim() ? smsBodyHref(draft.trim()) : "";
+
+  function paintTemplate(next: { templateId?: string; name?: string; address?: string; day?: string; time?: string; brand?: SmsReplyBrand | "" }) {
+    if (next.templateId !== undefined) fields.current.templateId = next.templateId;
+    if (next.name !== undefined) fields.current.name = next.name;
+    if (next.address !== undefined) fields.current.address = next.address;
+    if (next.day !== undefined) fields.current.day = next.day;
+    if (next.time !== undefined) fields.current.time = next.time;
+    if (next.brand !== undefined) fields.current.brand = next.brand;
+    const template = smsTemplateById(fields.current.templateId);
+    if (!template) return;
+    const current = fields.current;
+    setDraft(
+      fillSmsTemplate(template.english, {
+        name: current.name,
+        address: current.address,
+        day: current.day,
+        time: current.time,
+        brand: templateBrand(current.brand),
+      }),
+    );
+    setReady(true);
+  }
 
   function applyContact(contact: SmsJobContact, business: SmsReplyBrand) {
     setBrand(business);
     setMobile(contact.phone);
     setCustomerName(contact.name);
     setContactPhone(contact.phone);
+    if (fields.current.templateId && !draftEdited) paintTemplate({ name: contact.name, brand: business });
   }
 
   async function loadJobs() {
@@ -110,6 +139,7 @@ export function SmsReplyForm() {
     setMobile("");
     setCustomerName("");
     setError("");
+    if (fields.current.templateId && !draftEdited) paintTemplate({ address: job.address, brand: job.business, name: "" });
     try {
       const response = await fetch("/internal/api/sms-reply/jobs", {
         method: "POST",
@@ -175,7 +205,18 @@ export function SmsReplyForm() {
   }
 
   function chooseBrand(next: SmsReplyBrand) {
-    setBrand((current) => (current === next ? "" : next));
+    const chosen = brand === next ? "" : next;
+    setBrand(chosen);
+    if (fields.current.templateId && !draftEdited) paintTemplate({ brand: chosen });
+  }
+
+  function chooseTemplate(id: string) {
+    setTemplateId(id);
+    setDraftEdited(false);
+    const template = smsTemplateById(id);
+    if (!template) return;
+    setIntent(template.intent);
+    paintTemplate({ templateId: id });
   }
 
   async function ask(nextRevision: string) {
@@ -214,6 +255,7 @@ export function SmsReplyForm() {
         return;
       }
       setDraft(payload.sms);
+      setDraftEdited(true);
       setReady(true);
       if (nextRevision) setRevision("");
     } catch {
@@ -344,6 +386,62 @@ export function SmsReplyForm() {
       </div>
 
       <div>
+        <label htmlFor="sms-template" className="block text-sm font-medium text-slate-800">
+          Template (optional)
+        </label>
+        <select
+          id="sms-template"
+          value={templateId}
+          onChange={(event) => chooseTemplate(event.target.value)}
+          className={fieldClass}
+        >
+          <option value="">None</option>
+          {smsTemplates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+        </select>
+        {templateId ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="visit-day" className="block text-sm font-medium text-slate-800">
+                Day
+              </label>
+              <input
+                id="visit-day"
+                value={day}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setDay(value);
+                  if (fields.current.templateId && !draftEdited) paintTemplate({ day: value });
+                }}
+                placeholder="Tuesday"
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="visit-time" className="block text-sm font-medium text-slate-800">
+                Time
+              </label>
+              <input
+                id="visit-time"
+                value={visitTime}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setVisitTime(value);
+                  if (fields.current.templateId && !draftEdited) paintTemplate({ time: value });
+                }}
+                placeholder="9am"
+                className={fieldClass}
+              />
+            </div>
+            <p className="col-span-2 text-sm text-slate-600">Dictate the day and time. The draft fills them in from the job as well.</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div>
         <label htmlFor="reply-intent" className="block text-sm font-medium text-slate-800">
           What you want to say
         </label>
@@ -378,7 +476,11 @@ export function SmsReplyForm() {
         <input
           id="customer-name"
           value={customerName}
-          onChange={(event) => setCustomerName(event.target.value)}
+          onChange={(event) => {
+            const value = event.target.value;
+            setCustomerName(value);
+            if (fields.current.templateId && !draftEdited) paintTemplate({ name: value });
+          }}
           maxLength={80}
           autoComplete="off"
           placeholder="Leave blank to say Hi tenant"
@@ -443,6 +545,7 @@ export function SmsReplyForm() {
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value);
+              setDraftEdited(true);
               setCopied(false);
             }}
             rows={5}
