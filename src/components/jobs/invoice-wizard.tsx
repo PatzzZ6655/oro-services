@@ -9,6 +9,7 @@ import {
   amountLayouts,
   invoiceDictationHint,
   invoiceDraftKey,
+  invoiceNumberToShow,
   invoiceTypeLabel,
   invoiceTypes,
   isAmountLayout,
@@ -220,7 +221,7 @@ export function InvoiceWizard({
         : "";
       patch({
         step: "context",
-        invoiceNumber: form.invoiceNumber || context.suggestedNumber,
+        invoiceNumber: invoiceNumberToShow(context.existingInvoice?.number ?? "", form.invoiceNumber, context.suggestedNumber),
         clientName: context.customer?.name || form.clientName,
         address: context.property?.name || form.address,
         numberNote: context.numberNote,

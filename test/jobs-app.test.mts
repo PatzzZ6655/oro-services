@@ -22,6 +22,7 @@ import {
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { completeJobSms, groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
+import { existingInvoiceMessage, invoiceNumberToShow } from "@/lib/jobs-app/invoice";
 import { invoiceContext, invoiceCreate, invoiceCreateBody, invoiceDraft } from "@/lib/jobs-app/webhooks";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
@@ -179,7 +180,16 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
         secret: SECRET,
       });
     }
-    if (body.mode === "invoiceCreate" && sent.filter((item) => item.mode === "invoiceCreate").length === 1) {
+    if (body.mode === "invoiceCreate" && body.invoiceNumber === "INV-1001") {
+      return jsonResponse({
+        ok: true,
+        status: "exists",
+        invoiceNumber: "INV-1001",
+        notionUrl: "https://www.notion.so/old",
+        docUrl: "https://docs.google.com/document/d/old",
+      });
+    }
+    if (body.mode === "invoiceCreate" && sent.filter((item) => item.mode === "invoiceCreate" && item.invoiceNumber !== "INV-1001").length === 1) {
       return jsonResponse({ ok: false, status: "pending" }, 202);
     }
     if (body.mode === "invoiceCreate") {
@@ -195,7 +205,17 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
         isTest: true,
       });
     }
-    return jsonResponse({ ok: true, draft: { primaryObjective: "Fix the tap", tasks: [{ label: "Tap", text: "Replace the washer" }], suggestedClauses: ["GST inclusive"], missing: ["Test result"], questions: ["How many visits?"], amountLayoutSuggestion: "combined" } });
+    return jsonResponse({
+      ok: true,
+      draft: {
+        primaryObjective: "Fix the tap",
+        tasks: [{ label: "Tap", text: "Replace the washer" }],
+        suggestedClauses: ["GST inclusive"],
+        missing: [{ item: "Test result", why: "Not dictated" }, { item: "Parts" }],
+        questions: [{ item: "How many visits?", why: "Needed for the scope" }, "Any warranty?"],
+        amountLayoutSuggestion: "combined",
+      },
+    });
   }) as typeof fetch;
   try {
     const payload = invoiceCreateBody({
@@ -261,6 +281,31 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     if (!created.body.ok) throw new Error(created.body.message);
     assert.equal(created.body.docUrl, "https://docs.google.com/document/d/doc-9");
     assert.equal(created.body.isTest, true);
+    assert.equal(created.body.message, "Word draft is ready.");
+
+    const exists = await invoiceCreate({
+      business: "emoro",
+      type: "general",
+      jobId: "abc",
+      invoiceNumber: "INV-1001",
+      primaryObjective: "Fix the tap",
+      tasks: [],
+      recommendation: "",
+      notesMode: "remove",
+      notesText: "",
+      qaBox: "keep",
+      amountLayout: "combined",
+    });
+    if (!exists.body.ok) throw new Error(exists.body.message);
+    assert.equal(exists.body.status, "exists");
+    assert.equal(exists.body.docUrl, "https://docs.google.com/document/d/old");
+    assert.equal(
+      exists.body.message,
+      "This job already has a draft invoice (INV-1001). Your new wording was not written — open the existing doc to edit it.",
+    );
+    const existsSent = sent.find((item) => item.mode === "invoiceCreate" && item.invoiceNumber === "INV-1001");
+    assert.equal(existsSent?.overwrite, undefined);
+    assert.equal("force" in (existsSent ?? {}), false);
 
     const callsBeforeFinish = sent.length;
     const { POST } = await import("@/app/jobs/api/invoice/route");
@@ -281,6 +326,15 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     if (!drafted.body.ok) throw new Error(drafted.body.message);
     assert.equal(drafted.body.draft.primaryObjective, "Fix the tap");
     assert.equal(drafted.body.draft.tasks[0]?.label, "Tap");
+    assert.deepEqual(drafted.body.draft.missing, ["Test result — Not dictated", "Parts"]);
+    assert.deepEqual(drafted.body.draft.questions, ["How many visits? — Needed for the scope", "Any warranty?"]);
+    assert.equal(invoiceNumberToShow("INV-1001", "", "EMB_INV_0162"), "INV-1001");
+    assert.equal(invoiceNumberToShow("", "TYPED", "EMB_INV_0162"), "TYPED");
+    assert.equal(invoiceNumberToShow("", "", "EMB_INV_0162"), "EMB_INV_0162");
+    assert.equal(
+      existingInvoiceMessage("EMB_INV_0162"),
+      "This job already has a draft invoice (EMB_INV_0162). Your new wording was not written — open the existing doc to edit it.",
+    );
 
     const page = readFileSync(new URL("../src/components/jobs/invoice-wizard.tsx", import.meta.url), "utf8");
     const leave = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
@@ -288,6 +342,7 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     assert.match(page, /Create Tax Invoice|Draft with AI/);
     assert.equal(page.includes("patch({ clientName"), false);
     assert.equal(page.includes("patch({ address"), false);
+    assert.match(page, /invoiceNumberToShow\(context\.existingInvoice\?\.number/);
     assert.match(page, /Invoice number/);
     assert.match(page, /Generate Word \(Draft\)/);
     assert.equal(page.includes("Finish: PDF to Recently"), false);
