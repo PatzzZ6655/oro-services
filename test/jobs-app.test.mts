@@ -21,8 +21,9 @@ import {
 } from "@/lib/jobs-app/new-job-text";
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
-import { completeJobSms, groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
 import { existingInvoiceMessage, invoiceNumberToShow } from "@/lib/jobs-app/invoice";
+import { arrivalSms, formatNextVisit, nextVisitBody, nextVisitSms } from "@/lib/jobs-app/next-visit";
+import { completeJobSms, groupGreeting, messageBody, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
 import { invoiceContext, invoiceCreate, invoiceCreateBody, invoiceDraft } from "@/lib/jobs-app/webhooks";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
@@ -370,6 +371,65 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("a return visit sms names the Melbourne day and a 12-hour time", () => {
+  const both = nextVisitSms({
+    name: "Sam",
+    brand: "Emoro Building",
+    address: "12 Smith Street",
+    date: "2025-11-25",
+    time: "09:00",
+  });
+  assert.equal(
+    both,
+    "Hi Sam, Emoro Building here. Today's work at 12 Smith Street is done. We'll be back on Tue 25/11 at 9:00am to continue. See you then, thanks! - Emoro Building",
+  );
+  assert.equal(
+    nextVisitSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", date: "2025-11-25", time: "" }),
+    "Hi Sam, Emoro Building here. Today's work at 12 Smith Street is done. We'll be back on Tue 25/11 to continue. See you then, thanks! - Emoro Building",
+  );
+  assert.equal(formatNextVisit("2025-11-25", "13:30"), "Tue 25/11 at 1:30pm");
+  assert.equal(formatNextVisit("2025-11-25", "00:05"), "Tue 25/11 at 12:05am");
+  assert.equal(formatNextVisit("2025-11-25", "12:00"), "Tue 25/11 at 12:00pm");
+  assert.equal(nextVisitSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", date: "", time: "09:00" }), null);
+  assert.equal(formatNextVisit("2025-02-31", "09:00"), null);
+  const body = nextVisitBody({ brand: "Emoro Building", address: "12 Smith Street", date: "2025-11-25", time: "09:00" });
+  if (!body) throw new Error("next visit body missing");
+  assert.equal(messageBody(body, ["Sam", "Lee"], 2), `Hi Sam and Lee, ${body}`);
+  assert.equal(sharedSms("Hi Sam, We're on the way.", [{ name: "Sam", phone: "+61411111111", sms: "" }], ["+61411111111"]), "Hi Sam, We're on the way.");
+  const picker = readFileSync(new URL("../src/components/jobs/sms-picker.tsx", import.meta.url), "utf8");
+  const leave = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
+  const depart = readFileSync(new URL("../src/components/jobs/depart-screen.tsx", import.meta.url), "utf8");
+  assert.match(picker, /Next visit date/);
+  assert.match(picker, /Next visit time/);
+  assert.match(picker, /type="date"/);
+  assert.match(picker, /type="time"/);
+  assert.match(leave, /outcome === "return"/);
+  assert.equal(leave.includes('form.set("date"'), false);
+  assert.equal(depart.includes("Next visit date"), false);
+});
+
+test("a depart sms names the arrival time and leaves the vague text alone", () => {
+  const first = "Hi Sam, Emoro Building here. We're on our way to 12 Smith Street and should be there around 9:30am. Thanks! - Emoro Building";
+  const again = "Hi Sam, Emoro Building here. We're on our way back to 12 Smith Street and should be there around 1:00pm to continue the job. See you soon. Thanks! - Emoro Building";
+  assert.equal(arrivalSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", visit: "1", time: "09:30" }), first);
+  assert.equal(arrivalSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", visit: "", time: "09:30" }), first);
+  assert.equal(arrivalSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", visit: "2", time: "13:00" }), again);
+  assert.equal(arrivalSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", visit: "3", time: "13:00" }), again);
+  assert.equal(arrivalSms({ name: "Sam", brand: "Emoro Building", address: "12 Smith Street", visit: "2", time: "" }), null);
+  const vagueFirst = "Hi Sam, this is Emoro Building. Your repair job at 12 Smith Street is up next on our schedule today, and we'll visit you shortly. Thank you. - Emoro Building";
+  const vagueAgain = "Hi Sam, this is Emoro Building. Your job at 12 Smith Street is up next on our schedule today, and we'll be back shortly to continue the work. Thank you. - Emoro Building";
+  const contact = [{ name: "Sam", phone: "+61411111111", sms: "" }];
+  assert.equal(sharedSms(vagueFirst, contact, ["+61411111111"]), vagueFirst);
+  assert.equal(sharedSms(vagueAgain, contact, ["+61411111111"]), vagueAgain);
+  const picker = readFileSync(new URL("../src/components/jobs/sms-picker.tsx", import.meta.url), "utf8");
+  const depart = readFileSync(new URL("../src/components/jobs/depart-screen.tsx", import.meta.url), "utf8");
+  assert.match(picker, /Arrival time/);
+  assert.match(picker, /type="time"/);
+  assert.match(picker, /review it before sending/);
+  assert.match(depart, /arrival=\{\{/);
+  assert.match(depart, /postJobs<DepartResult>\("\/jobs\/api\/depart", \{ business: job\.business, jobId: job\.jobId \}\)/);
 });
 
 test("a new work order sends an optional EMB or EMP voucher code", async () => {

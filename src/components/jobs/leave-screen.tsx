@@ -20,6 +20,7 @@ import {
   writeStoredLeaveDraft,
   type LeaveDraft,
 } from "@/lib/jobs-app/leave-draft";
+import { clearLeaveNext, parseLeaveNext, readLeaveNext, writeLeaveNext } from "@/lib/jobs-app/next-visit";
 import { keptCount, LEAVE_MAX_EDGE, LEAVE_QUALITIES } from "@/lib/jobs-app/photos";
 import type { LeaveResult } from "@/lib/jobs-app/types";
 import { clearVisit, loadVisit, type ActiveVisit } from "@/lib/jobs-app/visit";
@@ -48,13 +49,25 @@ export function LeaveScreen() {
   const [result, setResult] = useState<LeaveResult | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [finished, setFinished] = useState<ActiveVisit | null>(null);
+  const [nextDate, setNextDate] = useState("");
+  const [nextTime, setNextTime] = useState("");
+  const [nextReady, setNextReady] = useState(false);
   const current = finished ?? visit;
   const draftCache = useRef<string | null>(null);
+  const nextCache = useRef<string | null>(null);
   const stored = useSyncExternalStore(
     () => () => {},
     () => {
       if (draftCache.current === null) draftCache.current = readLeaveSnapshot();
       return draftCache.current;
+    },
+    () => "",
+  );
+  const nextStored = useSyncExternalStore(
+    () => () => {},
+    () => {
+      if (nextCache.current === null) nextCache.current = readLeaveNext();
+      return nextCache.current;
     },
     () => "",
   );
@@ -72,6 +85,14 @@ export function LeaveScreen() {
         setPhotoCount(draft.photoCount);
         setPhotosCleared(draft.photoCount > 0);
       }
+    }
+  }
+  if (hydrated && result?.outcome === "return" && current && !nextReady && nextStored !== "") {
+    setNextReady(true);
+    const saved = nextStored === "\0" ? null : parseLeaveNext(nextStored);
+    if (saved?.jobId === current.jobId) {
+      setNextDate(saved.date);
+      setNextTime(saved.time);
     }
   }
 
@@ -110,9 +131,15 @@ export function LeaveScreen() {
     } catch {
       // Ignore a blocked store.
     }
+    clearLeaveNext();
     router.push("/jobs");
     router.refresh();
   }
+
+  useEffect(() => {
+    if (!nextReady || result?.outcome !== "return" || !current) return;
+    writeLeaveNext({ jobId: current.jobId, date: nextDate, time: nextTime });
+  }, [nextReady, result, current, nextDate, nextTime]);
 
   if (!ready || !hydrated) {
     return (
@@ -165,6 +192,18 @@ export function LeaveScreen() {
           jobTitle={result.jobTitle || current.title}
           allowManual={result.contacts.length === 0}
           verbatim={result.outcome === "complete"}
+          nextVisit={
+            result.outcome === "return"
+              ? {
+                  brand: result.brand,
+                  address: result.address || current.address,
+                  date: nextDate,
+                  time: nextTime,
+                  onDate: setNextDate,
+                  onTime: setNextTime,
+                }
+              : null
+          }
         />
         {result.outcome === "complete" ? (
           <>
@@ -176,14 +215,7 @@ export function LeaveScreen() {
             </JobsButton>
           </>
         ) : (
-          <JobsButton
-            type="button"
-            variant="outline"
-            onClick={() => {
-              router.push("/jobs");
-              router.refresh();
-            }}
-          >
+          <JobsButton type="button" variant="outline" onClick={leaveDone}>
             Done
           </JobsButton>
         )}
