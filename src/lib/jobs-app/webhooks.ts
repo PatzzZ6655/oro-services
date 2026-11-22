@@ -373,6 +373,7 @@ export async function leaveJob(form: FormData, fetchImpl?: FetchLike): Promise<J
           notes: fieldText(form.get("notes"), 4000),
           checklist: fieldText(form.get("checklist"), 4000),
           issues: fieldText(form.get("issues"), 4000),
+          includeVoucher: outcome === "complete" && form.get("includeVoucher") === "1" ? "1" : "0",
         },
         photos.files,
         "photos",

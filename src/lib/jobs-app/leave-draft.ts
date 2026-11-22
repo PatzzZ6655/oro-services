@@ -13,6 +13,7 @@ export type LeaveDraft = {
   notes: string;
   issues: string;
   photoCount: number;
+  includeVoucher: boolean;
 };
 
 function clip(value: unknown, max: number): string {
@@ -44,6 +45,7 @@ export function parseLeaveDraft(raw: string | null): LeaveDraft | null {
       notes: clip(value.notes, noteLimit),
       issues: clip(value.issues, noteLimit),
       photoCount: Number.isFinite(count) ? Math.max(0, Math.min(20, Math.floor(count))) : 0,
+      includeVoucher: value.includeVoucher === true || value.includeVoucher === "1",
     };
     return leaveDraftDirty(draft) ? draft : null;
   } catch {
