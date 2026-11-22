@@ -7,7 +7,15 @@ import { mapsHref, shortAddress } from "@/lib/jobs-app/address";
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
-import { newJobTextCoversScreenshots, preferTyped, readNewJobText, screenshotReadFallback } from "@/lib/jobs-app/new-job-text";
+import {
+  newJobTextCoversScreenshots,
+  preferTyped,
+  readNewJobText,
+  screenshotReadFallback,
+  tenantPayload,
+  tenantsFromRead,
+  tenantsFromTyped,
+} from "@/lib/jobs-app/new-job-text";
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
@@ -246,6 +254,75 @@ test("typed new job details are extra fields and can stand in for screenshots", 
   assert.equal(newJobTextCoversScreenshots(typed), false);
   assert.equal(newJobTextCoversScreenshots({ ...typed, tenantName: "Sam" }), true);
   assert.equal(newJobTextCoversScreenshots({ ...typed, address: "12 Smith St", tenantName: "" }), true);
+});
+
+test("a new job sends every tenant and the first two in the old fields", async () => {
+  useEnv();
+  const { createJob } = await import("@/lib/jobs-app/webhooks");
+  const original = globalThis.fetch;
+  let sent: FormData | null = null;
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent = init?.body instanceof FormData ? init.body : null;
+    return jsonResponse({ jobUrl: "https://www.notion.so/job-tenants", jobTitle: "Leak" });
+  }) as typeof fetch;
+  try {
+    const rows = [
+      { name: "Sam Lee", phone: "0412000001", email: "sam@example.com" },
+      { name: "Jo Kim", phone: "0412000002", email: "jo@example.com" },
+      { name: "Pat Wu", phone: "0412000003", email: "" },
+      { name: "", phone: "", email: "" },
+    ];
+    const form = new FormData();
+    form.set("business", "emoro");
+    form.set("address", "12 Smith St");
+    form.set("description", "Leaking tap");
+    form.set("tenants", JSON.stringify(rows));
+    const result = await createJob(form);
+    assert.equal(result.status, 200);
+    const body = sent as unknown as FormData;
+    assert.deepEqual(JSON.parse(String(body.get("tenants"))), rows.slice(0, 3));
+    assert.equal(body.get("tenantName"), "Sam Lee");
+    assert.equal(body.get("phone"), "0412000001");
+    assert.equal(body.get("email"), "sam@example.com");
+    assert.equal(body.get("tenant2Name"), "Jo Kim");
+    assert.equal(body.get("phone2"), "0412000002");
+    assert.equal(body.get("email2"), "jo@example.com");
+    assert.equal(body.has("mode"), false);
+    assert.equal(tenantPayload(rows).tenants, body.get("tenants"));
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  const fromPairs = tenantsFromRead(
+    {
+      tenantName: "From photo",
+      phone: "0400000000",
+      email: "photo@example.com",
+      tenant2Name: "Second",
+      phone2: "0400000001",
+      email2: "second@example.com",
+    },
+    { name: "Typed", phone: "" },
+  );
+  assert.equal(fromPairs[0]?.name, "Typed");
+  assert.equal(fromPairs[0]?.phone, "0400000000");
+  assert.equal(fromPairs[0]?.email, "photo@example.com");
+  assert.equal(fromPairs[1]?.name, "Second");
+
+  const fromList = tenantsFromRead(
+    {
+      tenants: [
+        { name: "One", phone: "1", email: "one@example.com" },
+        { name: "Two", phone: "2", email: "two@example.com" },
+        { name: "Three", phone: "3", email: "three@example.com" },
+      ],
+      tenantName: "Ignored",
+    },
+    { name: "", phone: "" },
+  );
+  assert.equal(fromList.length, 3);
+  assert.equal(fromList[2]?.email, "three@example.com");
+  assert.deepEqual(tenantsFromTyped("", ""), [{ name: "", phone: "", email: "" }]);
 });
 
 test("the last recipient ticks are remembered per job", () => {
@@ -523,6 +600,8 @@ test("the new job screen checks the details before it creates the job", () => {
   const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
   assert.match(page, /Read screenshots/);
   assert.match(page, /Continue/);
+  assert.match(page, /Add tenant/);
+  assert.match(page, /Tenants/);
   assert.match(page, /Choose Emoro Building or Emporo Plumbing first/);
   assert.match(page, /scrollIntoView/);
   assert.match(page, /title="Check job"/);
