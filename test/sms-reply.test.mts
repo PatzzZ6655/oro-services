@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
+import { smsHref } from "@/lib/jobs-app/sms";
 import {
   SMS_GEMINI_MODEL,
   SMS_REPLY_LIMIT,
@@ -9,6 +10,7 @@ import {
   cleanSmsDraft,
   geminiSmsBody,
   geminiSmsUrl,
+  greetTenant,
   parseSmsReply,
   readGeminiSms,
   resetSmsReplyLimits,
@@ -41,6 +43,7 @@ test("the prompt keeps the tradie rules and only the facts Pat gave", () => {
   assert.match(prompt.system, /Never invent/);
   assert.match(prompt.system, /Output only the SMS text/);
   assert.match(prompt.system, /You never send a message/);
+  assert.match(prompt.system, /Hi tenant,/);
   assert.equal(prompt.system.includes("Can you come Tuesday?"), false);
   assert.match(prompt.user, /Can you come Tuesday\?/);
   assert.match(prompt.user, /说明周二下午可以，不要报价/);
@@ -53,9 +56,35 @@ test("the prompt keeps the tradie rules and only the facts Pat gave", () => {
   assert.match(blank.user, /\(none pasted\)/);
   assert.match(blank.user, /回他明天再联系/);
   assert.match(blank.user, /Brand: not specified/);
-  assert.match(blank.user, /Customer name: not given/);
+  assert.match(blank.user, /Customer name: tenant/);
   assert.equal(blank.user.includes("Emoro"), false);
   assert.equal(blank.user.includes("Emporo"), false);
+  assert.equal(greetTenant("Tuesday afternoon works.", ""), "Hi tenant, Tuesday afternoon works.");
+  assert.equal(greetTenant("Hi Sam, Tuesday afternoon works.", ""), "Hi tenant, Tuesday afternoon works.");
+  assert.equal(greetTenant("Hi tenant, Tuesday afternoon works.", ""), "Hi tenant, Tuesday afternoon works.");
+  assert.equal(greetTenant("Hi Sam, Tuesday afternoon works.", "Sam"), "Hi Sam, Tuesday afternoon works.");
+
+  const revised = smsReplyPrompt({
+    customerMessage: "Can you come Tuesday?",
+    intent: "说明周二下午可以",
+    brand: "",
+    customerName: "",
+    draft: "Hi tenant, Tuesday afternoon works.",
+    revision: "更短一点",
+  });
+  assert.match(revised.user, /Can you come Tuesday\?/);
+  assert.match(revised.user, /说明周二下午可以/);
+  assert.match(revised.user, /Current draft:\nHi tenant, Tuesday afternoon works\./);
+  assert.match(revised.user, /How to change it \(Chinese\):\n更短一点/);
+
+  const shot = { mimeType: "image/jpeg" as const, data: "abcdabcdabcdabcd" };
+  const seen = smsReplyPrompt({ customerMessage: "", intent: "回他可以", brand: "emporo", customerName: "", image: shot });
+  assert.match(seen.user, /screenshot of the text conversation is attached/);
+  assert.match(seen.user, /\(see the attached screenshot\)/);
+  const withImage = geminiSmsBody(seen, shot);
+  assert.equal(withImage.contents[0]?.parts[0] && "inlineData" in withImage.contents[0].parts[0] ? withImage.contents[0].parts[0].inlineData.mimeType : "", "image/jpeg");
+  assert.equal(withImage.contents[0]?.parts[1] && "text" in withImage.contents[0].parts[1] ? withImage.contents[0].parts[1].text : "", seen.user);
+  assert.equal(smsHref(["0412 345 678"], "Hi tenant, Tuesday afternoon works.")?.href, "sms:+61412345678&body=Hi%20tenant%2C%20Tuesday%20afternoon%20works.");
 
   const body = geminiSmsBody(prompt);
   assert.equal(body.systemInstruction.parts[0]?.text, prompt.system);
@@ -89,6 +118,11 @@ test("draft text drops labels, quotes, thoughts, and a runaway reply", () => {
   assert.equal(readGeminiSms({ candidates: [{ content: { parts: [{ thought: true, text: "hidden" }] } }] }), null);
   assert.equal(parseSmsReply({ intent: "  " }).ok, false);
   assert.equal(parseSmsReply({ intent: "回他", brand: "other" }).ok, false);
+  assert.equal(parseSmsReply({ intent: "回他" }).ok, false);
+  assert.equal(parseSmsReply({ intent: "回他", image: { mimeType: "image/gif", data: "abcd" } }).ok, false);
+  const pictured = parseSmsReply({ intent: "回他可以", image: { mimeType: "image/jpeg", data: "a".repeat(48) } });
+  assert.equal(pictured.ok, true);
+  if (pictured.ok) assert.equal(pictured.value.image?.mimeType, "image/jpeg");
   const parsed = parseSmsReply({ intent: "回他可以", brand: "emporo", customerName: " Lee ", customerMessage: "When?" });
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
@@ -152,21 +186,37 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     assert.match(calls[0]?.body ?? "", /说明周二下午可以/);
     assert.match(calls[0]?.body ?? "", /Emoro Building/);
 
+    const rewritten = await ask(
+      { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
+      {
+        customerMessage: "Can you come Tuesday?",
+        intent: "说明周二下午可以",
+        draft: "Hi tenant, Tuesday afternoon works.",
+        revision: "更短一点",
+        image: { mimeType: "image/jpeg", data: "a".repeat(48) },
+      },
+    );
+    assert.equal(rewritten.status, 200);
+    assert.match(calls[1]?.body ?? "", /Current draft/);
+    assert.match(calls[1]?.body ?? "", /更短一点/);
+    assert.match(calls[1]?.body ?? "", /inlineData/);
+    assert.equal((calls[1]?.body ?? "").includes(KEY), false);
+
     delete process.env.GEMINI_SMS_API_KEY;
     const unconfigured = await ask(
       { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
-      { intent: "回他一声" },
+      { customerMessage: "When?", intent: "回他一声" },
     );
     const unconfiguredBody = (await unconfigured.json()) as { message: string };
     assert.equal(unconfigured.status, 503);
     assert.equal(unconfiguredBody.message.includes(KEY), false);
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
     process.env.GEMINI_SMS_API_KEY = KEY;
 
     globalThis.fetch = async () => new Response("no", { status: 500 });
     const failed = await ask(
       { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
-      { intent: "回他一声" },
+      { customerMessage: "When?", intent: "回他一声" },
     );
     const failedBody = (await failed.json()) as { message: string };
     assert.equal(failed.status, 502);
@@ -176,7 +226,7 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     for (let i = 0; i < SMS_REPLY_LIMIT; i += 1) assert.equal(allowSmsReply("pat.z@orosvc.com"), true);
     const limited = await ask(
       { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
-      { intent: "再写一次" },
+      { customerMessage: "When?", intent: "再写一次" },
     );
     assert.equal(limited.status, 429);
 
@@ -194,7 +244,12 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     assert.match(form, /Write English/);
     assert.match(form, /Open in Messages/);
     assert.match(form, /smsBodyHref/);
+    assert.match(form, /smsHref\(/);
+    assert.match(form, />\s*Send\s*</);
+    assert.match(form, /Rewrite/);
+    assert.match(form, /accept="image\/\*"/);
     assert.equal(form.includes("GEMINI"), false);
+    assert.equal(form.includes("shortcuts://"), false);
   } finally {
     globalThis.fetch = original;
     resetSmsReplyLimits();
