@@ -55,17 +55,19 @@ export function SiteHeader() {
               <X className="hidden h-6 w-6 group-open:block" aria-hidden="true" />
             </summary>
             <div id="site-menu" className="absolute inset-x-0 top-24 border-b border-slate-800 bg-brand-navy px-6 py-6">
-              <div className="mx-auto max-w-6xl space-y-4">
+              <div className="mx-auto max-w-6xl">
                 {menuLinks.map((link, index) => (
-                  <MenuLink
-                    key={link.href}
-                    href={link.href}
-                    className={`block py-2 font-medium text-slate-300 hover:text-white ${
-                      index < menuLinks.length - 1 ? "border-b border-slate-800" : ""
-                    }`}
-                  >
-                    {link.label}
-                  </MenuLink>
+                  <div key={link.href}>
+                    {index === barLinks.length ? <div role="separator" className="my-3 border-t border-white/20" /> : null}
+                    <MenuLink
+                      href={link.href}
+                      className={`block py-2 font-medium text-slate-300 hover:text-white ${
+                        index < menuLinks.length - 1 && index !== barLinks.length - 1 ? "border-b border-slate-800" : ""
+                      }`}
+                    >
+                      {link.label}
+                    </MenuLink>
+                  </div>
                 ))}
               </div>
             </div>

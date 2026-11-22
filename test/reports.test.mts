@@ -139,7 +139,7 @@ test("the public menu links to the dashboard and the staff portal", () => {
   );
   assert.deepEqual(
     menuLinks.map((link) => link.label),
-    ["Emoro Building", "Emporo Plumbing", "Contact", "Dashboard", "Staff Portal"],
+    ["Emoro Building", "Emporo Plumbing", "Contact", "Staff Portal", "Dashboard"],
   );
   assert.equal(menuLinks.find((link) => link.label === "Dashboard")?.href, dashboardHref);
   assert.equal(dashboardHref, "https://tape.orosvc.com");
