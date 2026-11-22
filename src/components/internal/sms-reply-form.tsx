@@ -6,7 +6,23 @@ import { normalizePhone } from "@/lib/jobs-app/phones";
 import { smsHref } from "@/lib/jobs-app/sms";
 import { smsBodyHref, smsReplyBrands, type SmsReplyBrand } from "@/lib/sms-reply-client";
 import type { SmsJobContact, SmsOpenJob } from "@/lib/sms-reply-jobs";
-import { fillSmsTemplate, smsTemplateById, smsTemplates, templateBrand } from "@/lib/sms-templates";
+import {
+  dateFromChip,
+  defaultVariant,
+  fillSmsTemplate,
+  highlightSchedule,
+  matchSmsTemplate,
+  scheduleConflict,
+  scheduleFromJob,
+  smsDateChips,
+  smsMinuteChips,
+  smsTemplateById,
+  smsTemplateGroups,
+  smsTemplates,
+  smsTimeChips,
+  suggestTemplates,
+  templateEnglish,
+} from "@/lib/sms-templates";
 
 const fieldClass =
   "mt-1 w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy";
@@ -68,32 +84,54 @@ export function SmsReplyForm() {
   const [contacts, setContacts] = useState<SmsJobContact[]>([]);
   const [contactPhone, setContactPhone] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const [day, setDay] = useState("");
+  const [variant, setVariant] = useState("");
+  const [dateKey, setDateKey] = useState("");
+  const [dateLabel, setDateLabel] = useState("");
   const [visitTime, setVisitTime] = useState("");
+  const [mins, setMins] = useState("");
+  const [agency, setAgency] = useState("");
+  const [pmName, setPmName] = useState("");
+  const [reason, setReason] = useState("");
+  const [issue, setIssue] = useState("");
+  const [pickedNote, setPickedNote] = useState("");
+  const [jobStatus, setJobStatus] = useState("");
   const [draftEdited, setDraftEdited] = useState(false);
-  const fields = useRef({ name: "", address: "", day: "", time: "", brand: "" as SmsReplyBrand | "", templateId: "" });
+  const fields = useRef({
+    name: "",
+    pmName: "",
+    address: "",
+    day: "",
+    time: "",
+    mins: "",
+    reason: "",
+    issue: "",
+    agency: "",
+    brand: "" as SmsReplyBrand | "",
+    templateId: "",
+    variant: "",
+  });
 
   const phone = normalizePhone(mobile);
   const sendHref = phone && draft.trim() ? smsHref([phone], draft.trim())?.href ?? "" : "";
   const messagesHref = draft.trim() ? smsBodyHref(draft.trim()) : "";
 
-  function paintTemplate(next: { templateId?: string; name?: string; address?: string; day?: string; time?: string; brand?: SmsReplyBrand | "" }) {
-    if (next.templateId !== undefined) fields.current.templateId = next.templateId;
-    if (next.name !== undefined) fields.current.name = next.name;
-    if (next.address !== undefined) fields.current.address = next.address;
-    if (next.day !== undefined) fields.current.day = next.day;
-    if (next.time !== undefined) fields.current.time = next.time;
-    if (next.brand !== undefined) fields.current.brand = next.brand;
+  function paintTemplate(next: Partial<typeof fields.current>) {
+    Object.assign(fields.current, next);
     const template = smsTemplateById(fields.current.templateId);
     if (!template) return;
     const current = fields.current;
     setDraft(
-      fillSmsTemplate(template.english, {
+      fillSmsTemplate(templateEnglish(template, current.variant), {
         name: current.name,
+        pmName: current.pmName,
+        brand: current.brand ? smsReplyBrands[current.brand] : "",
+        agency: current.agency,
         address: current.address,
         day: current.day,
         time: current.time,
-        brand: templateBrand(current.brand),
+        mins: current.mins,
+        reason: current.reason,
+        issue: current.issue,
       }),
     );
     setReady(true);
@@ -103,6 +141,8 @@ export function SmsReplyForm() {
     setBrand(business);
     setMobile(contact.phone);
     setCustomerName(contact.name);
+    fields.current.name = contact.name;
+    fields.current.brand = business;
     setContactPhone(contact.phone);
     if (fields.current.templateId && !draftEdited) paintTemplate({ name: contact.name, brand: business });
   }
@@ -136,10 +176,33 @@ export function SmsReplyForm() {
     setContacts([]);
     setContactPhone("");
     setBrand(job.business);
+    setJobStatus(job.status);
     setMobile("");
     setCustomerName("");
     setError("");
-    if (fields.current.templateId && !draftEdited) paintTemplate({ address: job.address, brand: job.business, name: "" });
+    const slot = scheduleFromJob(job.scheduled);
+    if (slot) {
+      setDateKey(slot.dateKey);
+      setDateLabel(slot.dateLabel);
+      setVisitTime(slot.time);
+    }
+    if (fields.current.templateId && !draftEdited) {
+      paintTemplate({
+        address: job.address,
+        brand: job.business,
+        name: "",
+        day: slot?.dateLabel ?? fields.current.day,
+        time: slot?.time ?? fields.current.time,
+      });
+    } else if (slot) {
+      fields.current.address = job.address;
+      fields.current.brand = job.business;
+      fields.current.day = slot.dateLabel;
+      fields.current.time = slot.time;
+    } else {
+      fields.current.address = job.address;
+      fields.current.brand = job.business;
+    }
     try {
       const response = await fetch("/internal/api/sms-reply/jobs", {
         method: "POST",
@@ -207,16 +270,23 @@ export function SmsReplyForm() {
   function chooseBrand(next: SmsReplyBrand) {
     const chosen = brand === next ? "" : next;
     setBrand(chosen);
+    fields.current.brand = chosen;
     if (fields.current.templateId && !draftEdited) paintTemplate({ brand: chosen });
   }
 
-  function chooseTemplate(id: string) {
+  function chooseTemplate(id: string, nextVariant = "") {
+    setPickedNote("");
     setTemplateId(id);
     setDraftEdited(false);
     const template = smsTemplateById(id);
-    if (!template) return;
+    if (!template) {
+      paintTemplate({ templateId: "" });
+      return;
+    }
+    const chosen = nextVariant || defaultVariant(template);
+    setVariant(chosen);
     setIntent(template.intent);
-    paintTemplate({ templateId: id });
+    paintTemplate({ templateId: id, variant: chosen });
   }
 
   async function ask(nextRevision: string) {
@@ -230,7 +300,48 @@ export function SmsReplyForm() {
       setError("There is no draft to revise.");
       return;
     }
-    if (!nextRevision && !customerMessage.trim() && !shot) {
+    let base = "";
+    if (!nextRevision && !fields.current.templateId) {
+      const picked = matchSmsTemplate(intent);
+      if (picked) {
+        const template = smsTemplateById(picked.id);
+        const chosen = picked.variant || (template ? defaultVariant(template) : "");
+        setTemplateId(picked.id);
+        setVariant(chosen);
+        setPickedNote(template ? `Picked from what you said: ${template.label}` : "");
+        setDraftEdited(false);
+        paintTemplate({ templateId: picked.id, variant: chosen });
+        base = template ? fillSmsTemplate(templateEnglish(template, chosen), {
+          name: fields.current.name,
+          pmName: fields.current.pmName,
+          brand: fields.current.brand ? smsReplyBrands[fields.current.brand] : "",
+          agency: fields.current.agency,
+          address: fields.current.address,
+          day: fields.current.day,
+          time: fields.current.time,
+          mins: fields.current.mins,
+          reason: fields.current.reason,
+          issue: fields.current.issue,
+        }) : "";
+      }
+    } else if (fields.current.templateId && !draftEdited) {
+      const template = smsTemplateById(fields.current.templateId);
+      base = template ? fillSmsTemplate(templateEnglish(template, fields.current.variant), {
+        name: fields.current.name,
+        pmName: fields.current.pmName,
+        brand: fields.current.brand ? smsReplyBrands[fields.current.brand] : "",
+        agency: fields.current.agency,
+        address: fields.current.address,
+        day: fields.current.day,
+        time: fields.current.time,
+        mins: fields.current.mins,
+        reason: fields.current.reason,
+        issue: fields.current.issue,
+      }) : "";
+    } else if (draftEdited) {
+      base = draft;
+    }
+    if (!nextRevision && !customerMessage.trim() && !shot && !base) {
       setError("Paste the customer's text or add a screenshot.");
       return;
     }
@@ -247,6 +358,7 @@ export function SmsReplyForm() {
           image: shot ? { mimeType: shot.mimeType, data: shot.data } : null,
           draft: nextRevision ? draft : "",
           revision: nextRevision,
+          base: nextRevision ? "" : base,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; sms?: string; message?: string } | null;
@@ -389,54 +501,151 @@ export function SmsReplyForm() {
         <label htmlFor="sms-template" className="block text-sm font-medium text-slate-800">
           Template (optional)
         </label>
-        <select
-          id="sms-template"
-          value={templateId}
-          onChange={(event) => chooseTemplate(event.target.value)}
-          className={fieldClass}
-        >
+        {jobStatus || jobKey ? (
+          <div className="mt-2">
+            <p className="text-sm text-slate-600">Suggested for this job</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {suggestTemplates(jobStatus).map((item) => {
+                const template = smsTemplateById(item.id);
+                const variantLabel = template?.variants?.find((option) => option.id === item.variant)?.label;
+                return (
+                  <button
+                    key={`${item.id}:${item.variant}`}
+                    type="button"
+                    onClick={() => chooseTemplate(item.id, item.variant)}
+                    className="min-h-11 rounded-full border border-brand-navy bg-white px-3 text-sm font-semibold text-brand-navy"
+                  >
+                    {template?.label}
+                    {variantLabel ? ` · ${variantLabel}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        <select id="sms-template" value={templateId} onChange={(event) => chooseTemplate(event.target.value)} className={fieldClass}>
           <option value="">None</option>
-          {smsTemplates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.label}
-            </option>
+          {smsTemplateGroups.map((group) => (
+            <optgroup key={group} label={group}>
+              {smsTemplates
+                .filter((template) => template.group === group)
+                .map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}
+                  </option>
+                ))}
+            </optgroup>
           ))}
         </select>
-        {templateId ? (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div>
-              <label htmlFor="visit-day" className="block text-sm font-medium text-slate-800">
-                Day
-              </label>
-              <input
-                id="visit-day"
-                value={day}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setDay(value);
-                  if (fields.current.templateId && !draftEdited) paintTemplate({ day: value });
+        {pickedNote ? <p className="mt-1 text-sm text-slate-600">{pickedNote}</p> : null}
+        {smsTemplateById(templateId)?.variants ? (
+          <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label="Template option">
+            {smsTemplateById(templateId)?.variants?.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={variant === option.id}
+                onClick={() => {
+                  setVariant(option.id);
+                  setDraftEdited(false);
+                  paintTemplate({ variant: option.id });
                 }}
-                placeholder="Tuesday"
-                className={fieldClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="visit-time" className="block text-sm font-medium text-slate-800">
-                Time
-              </label>
-              <input
-                id="visit-time"
-                value={visitTime}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setVisitTime(value);
-                  if (fields.current.templateId && !draftEdited) paintTemplate({ time: value });
+                className={brandClass(variant === option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-3 space-y-2">
+          <p className="text-sm font-medium text-slate-800">Date</p>
+          {dateLabel ? <p className="text-base font-semibold text-brand-navy">{dateLabel}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            {smsDateChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                aria-pressed={dateKey === chip.key}
+                onClick={() => {
+                  const label = dateFromChip(chip.key);
+                  setDateKey(chip.key);
+                  setDateLabel(label);
+                  if (fields.current.templateId && !draftEdited) paintTemplate({ day: label });
+                  else fields.current.day = label;
                 }}
-                placeholder="9am"
-                className={fieldClass}
-              />
-            </div>
-            <p className="col-span-2 text-sm text-slate-600">Dictate the day and time. The draft fills them in from the job as well.</p>
+                className={`min-h-11 rounded-full border px-3 text-sm font-semibold ${dateKey === chip.key ? "border-brand-navy bg-brand-navy text-white" : "border-slate-300 bg-white text-slate-800"}`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm font-medium text-slate-800">Time</p>
+          <div className="flex flex-wrap gap-2">
+            {smsTimeChips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                aria-pressed={visitTime === chip}
+                onClick={() => {
+                  setVisitTime(chip);
+                  if (fields.current.templateId && !draftEdited) paintTemplate({ time: chip });
+                  else fields.current.time = chip;
+                }}
+                className={`min-h-11 rounded-full border px-3 text-sm font-semibold ${visitTime === chip ? "border-brand-navy bg-brand-navy text-white" : "border-slate-300 bg-white text-slate-800"}`}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm font-medium text-slate-800">About</p>
+          <div className="flex flex-wrap gap-2">
+            {smsMinuteChips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                aria-pressed={mins === chip}
+                onClick={() => {
+                  setMins(chip);
+                  if (fields.current.templateId && !draftEdited) paintTemplate({ mins: chip });
+                  else fields.current.mins = chip;
+                }}
+                className={`min-h-11 rounded-full border px-3 text-sm font-semibold ${mins === chip ? "border-brand-navy bg-brand-navy text-white" : "border-slate-300 bg-white text-slate-800"}`}
+              >
+                {chip} mins
+              </button>
+            ))}
+          </div>
+          {scheduleConflict(intent, { dateKey, time: visitTime }) ? (
+            <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-slate-800">
+              {scheduleConflict(intent, { dateKey, time: visitTime })}
+            </p>
+          ) : null}
+        </div>
+        {templateId === "first-visit" ? (
+          <label className="mt-3 block text-sm font-medium text-slate-800">
+            Agency
+            <input value={agency} onChange={(event) => { setAgency(event.target.value); if (!draftEdited) paintTemplate({ agency: event.target.value }); }} className={fieldClass} />
+          </label>
+        ) : null}
+        {smsTemplateById(templateId)?.audience === "pm" ? (
+          <label className="mt-3 block text-sm font-medium text-slate-800">
+            PM name
+            <input value={pmName} onChange={(event) => { setPmName(event.target.value); if (!draftEdited) paintTemplate({ pmName: event.target.value }); }} className={fieldClass} />
+          </label>
+        ) : null}
+        {templateId === "reschedule" ? (
+          <label className="mt-3 block text-sm font-medium text-slate-800">
+            Reason
+            <input value={reason} onChange={(event) => { setReason(event.target.value); if (!draftEdited) paintTemplate({ reason: event.target.value }); }} className={fieldClass} />
+          </label>
+        ) : null}
+        {templateId === "emergency" ? (
+          <div className="mt-3 flex gap-2">
+            {["water", "gas"].map((kind) => (
+              <button key={kind} type="button" aria-pressed={issue === kind} onClick={() => { setIssue(kind); if (!draftEdited) paintTemplate({ issue: kind }); }} className={brandClass(issue === kind)}>
+                {kind}
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
@@ -479,6 +688,7 @@ export function SmsReplyForm() {
           onChange={(event) => {
             const value = event.target.value;
             setCustomerName(value);
+            fields.current.name = value;
             if (fields.current.templateId && !draftEdited) paintTemplate({ name: value });
           }}
           maxLength={80}
@@ -539,6 +749,17 @@ export function SmsReplyForm() {
           <label htmlFor="english-draft" className="block text-sm font-medium text-slate-800">
             English SMS
           </label>
+          <p className="rounded-xl bg-slate-50 px-3 py-3 text-base leading-relaxed text-slate-900">
+            {highlightSchedule(draft).map((part, index) =>
+              part.mark ? (
+                <mark key={index} className="rounded bg-amber-200 px-0.5 text-slate-900">
+                  {part.text}
+                </mark>
+              ) : (
+                <span key={index}>{part.text}</span>
+              ),
+            )}
+          </p>
           <textarea
             id="english-draft"
             lang="en-AU"

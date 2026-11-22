@@ -1,69 +1,100 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { fillSmsTemplate, smsTemplates } from "@/lib/sms-templates";
+import {
+  dateFromChip,
+  fillSmsTemplate,
+  highlightSchedule,
+  matchSmsTemplate,
+  scheduleConflict,
+  scheduleFromJob,
+  smsTemplateGroups,
+  smsTemplates,
+  suggestTemplates,
+} from "@/lib/sms-templates";
 
-const sample = {
+const now = new Date("2026-11-22T01:00:00.000Z");
+const full = {
   name: "Test Tenant",
-  address: "12 Test Street",
-  day: "Tuesday",
-  time: "9am",
+  pmName: "Test PM",
   brand: "Emoro Building",
+  agency: "Test Agency",
+  address: "12 Test Street",
+  day: "Wed 25/11",
+  time: "9am",
+  mins: "30",
+  reason: "the part has not arrived",
+  issue: "water",
 };
 
-test("the starter templates keep a Chinese label and an English base", () => {
+test("the ten templates keep Pat's English and drop empty brackets", () => {
+  assert.deepEqual(smsTemplateGroups, ["约时间", "到场", "钥匙·物业", "特殊"]);
   assert.deepEqual(
     smsTemplates.map((template) => template.label),
-    ["第一次约时间", "第二次约时间/再次确认", "去办公室取钥匙", "还钥匙", "明天到达提醒", "改期"],
+    ["首次约时间", "跟进没回复", "确认预约", "到场提醒", "改期", "回来继续", "法规说明", "钥匙", "联系不上租客", "紧急报修"],
   );
-  for (const template of smsTemplates) {
-    assert.equal(template.intent.includes(template.label.split("/")[0] ?? template.label) || template.label.startsWith(template.intent) || template.intent.length > 0, true);
-    assert.match(template.english, /\{name\}/);
-    assert.match(template.english, /\{address\}/);
-    assert.match(template.english, /\{brand\}/);
-    assert.equal(template.english.includes("Dear"), false);
-  }
-  assert.equal(fillSmsTemplate(smsTemplates[0].english, sample), "Hi Test Tenant, Emoro Building here. We can come to 12 Test Street on Tuesday at 9am. Does that suit? Thanks! - Emoro Building");
+  const text = (id: string, variant = "") => {
+    const template = smsTemplates.find((item) => item.id === id);
+    if (!template) throw new Error(id);
+    const english = template.variants?.find((item) => item.id === variant)?.english ?? template.english ?? "";
+    return fillSmsTemplate(english, full);
+  };
   assert.equal(
-    fillSmsTemplate(smsTemplates[1].english, sample),
-    "Hi Test Tenant, Emoro Building here. Just checking again, as I haven't heard back. We can still come to 12 Test Street on Tuesday at 9am. Let me know, thanks! - Emoro Building",
+    text("first-visit"),
+    "Hi Test Tenant, Pat from Emoro Building here. We've got a work order from Test Agency for 12 Test Street. When suits you for us to come by? Happy to work around you, including after 5pm or weekends. Thanks!",
   );
   assert.equal(
-    fillSmsTemplate(smsTemplates[2].english, sample),
-    "Hi Test Tenant, Emoro Building here. We'll pick the keys up from the office for 12 Test Street on Tuesday at 9am. Thanks! - Emoro Building",
-  );
-  assert.equal(fillSmsTemplate(smsTemplates[3].english, sample), "Hi Test Tenant, Emoro Building here. The keys for 12 Test Street are back at the office. Thanks! - Emoro Building");
-  assert.equal(
-    fillSmsTemplate(smsTemplates[4].english, sample),
-    "Hi Test Tenant, Emoro Building here. Just a reminder we'll be at 12 Test Street tomorrow at 9am. See you then, thanks! - Emoro Building",
+    text("follow-up"),
+    "Hi Test Tenant, Pat from Emoro Building again. Just following up on the repair at 12 Test Street. Sorry if I've called a few times. When's a good time to come by? Thanks!",
   );
   assert.equal(
-    fillSmsTemplate(smsTemplates[5].english, sample),
-    "Hi Test Tenant, Emoro Building here. We need to move the visit at 12 Test Street to Tuesday at 9am. Sorry about the change. Thanks! - Emoro Building",
+    text("confirm"),
+    "Hi Test Tenant, confirming we'll be at 12 Test Street on Wed 25/11 around 9am. Please reply YES, or let me know if another time suits better. Thanks, Pat – Emoro Building",
   );
+  assert.equal(text("arrival", "today"), "Hi Test Tenant, Pat here. We'll be there today around 9am. See you soon!");
+  assert.equal(text("arrival", "enroute"), "Hi Test Tenant, Pat here. I'm on my way, about 30 mins away. See you soon!");
+  assert.equal(
+    text("reschedule"),
+    "Hi Test Tenant, sorry for the short notice. We can't make it today as the part has not arrived. Could we come Wed 25/11 instead: morning, early afternoon, or after 4pm? Sorry again and thanks for your patience! Pat – Emoro Building",
+  );
+  assert.equal(
+    text("return-finish"),
+    "Hi Test Tenant, we'll be back on Wed 25/11 around 9am to finish the job at 12 Test Street. Thanks for your patience! Pat – Emoro Building",
+  );
+  assert.equal(text("rental-law"), "Hi Test Tenant, this is required under the new Victorian rental laws, so the owner needs to have it fixed. Thanks for understanding.");
+  assert.equal(text("keys", "collect"), "Hi Test PM, when's a good time to pick up the keys for 12 Test Street? Thanks, Pat – Emoro Building");
+  assert.equal(text("keys", "return"), "Hi Test PM, the job at 12 Test Street is complete and the keys are back at your office. Thanks, Pat – Emoro Building");
+  assert.equal(
+    text("cant-reach"),
+    "Hi Test PM, quick update on 12 Test Street. I've tried the tenant a few times with no luck. Could you help me get in touch with them? Keen to get it done ASAP. Cheers, Pat – Emoro Building",
+  );
+  assert.equal(
+    text("emergency"),
+    "Hi Test PM, got your request about the emergency at 12 Test Street. I can attend 9am. In the meantime, if it's a water issue, please ask the tenant to turn off the main. I'll update you once I'm on site. Thanks, Pat – Emoro Building",
+  );
+  const blank = fillSmsTemplate(smsTemplates[0]?.english ?? "", { ...full, name: "", brand: "", agency: "", address: "" });
+  assert.equal(blank.includes("["), false);
+  assert.match(blank, /Hi tenant, Pat here/);
+  assert.equal(fillSmsTemplate(smsTemplates.find((item) => item.id === "arrival")?.variants?.[1]?.english ?? "", { ...full, mins: "" }).includes("["), false);
 });
 
-test("a blank name is tenant, and a missing day or time is left out", () => {
-  const first = smsTemplates[0].english;
-  assert.equal(
-    fillSmsTemplate(first, { name: " ", address: "12 Test Street", day: "", time: "", brand: "Emporo Plumbing" }),
-    "Hi tenant, Emporo Plumbing here. We can come to 12 Test Street. Does that suit? Thanks! - Emporo Plumbing",
-  );
-  assert.equal(
-    fillSmsTemplate(first, { name: "", address: "12 Test Street", day: "Tuesday", time: "", brand: "Emoro Building" }),
-    "Hi tenant, Emoro Building here. We can come to 12 Test Street on Tuesday. Does that suit? Thanks! - Emoro Building",
-  );
-  assert.equal(
-    fillSmsTemplate(smsTemplates[4].english, { name: "", address: "", day: "", time: "", brand: "" }),
-    "Hi tenant. Just a reminder we'll be at your place tomorrow. See you then, thanks!",
-  );
-  assert.equal(
-    fillSmsTemplate(smsTemplates[5].english, { name: "Sam", address: "4 Test Road", day: "", time: "2pm", brand: "Emoro Building" }),
-    "Hi Sam, Emoro Building here. We need to move the visit at 4 Test Road to 2pm. Sorry about the change. Thanks! - Emoro Building",
-  );
+test("a job stage suggests a few templates, and the Chinese note can pick one", () => {
+  assert.deepEqual(suggestTemplates("Contacting tenant").map((item) => item.id), ["first-visit", "follow-up", "cant-reach"]);
+  assert.deepEqual(suggestTemplates("Scheduled").map((item) => item.id), ["confirm", "arrival", "keys"]);
+  assert.equal(suggestTemplates("On the way")[0]?.variant, "enroute");
+  assert.equal(suggestTemplates("Completed")[0]?.variant, "return");
+  assert.deepEqual(matchSmsTemplate("跟进没回复"), { id: "follow-up", variant: "" });
+  assert.deepEqual(matchSmsTemplate("我在路上"), { id: "arrival", variant: "enroute" });
+  assert.equal(matchSmsTemplate(""), null);
+  assert.equal(dateFromChip("tomorrow", now), "Mon 23/11");
+  assert.equal(dateFromChip("wed", now), "Wed 25/11");
+  assert.deepEqual(scheduleFromJob("2026-11-25T09:00:00+11:00", now), { dateKey: "wed", dateLabel: "Wed 25/11", time: "9am" });
+  assert.equal(scheduleConflict("下午3点过来", { dateKey: "wed", time: "9am" }).includes("3pm"), true);
+  assert.equal(scheduleConflict("上午9点", { dateKey: "today", time: "9am" }), "");
+  assert.equal(highlightSchedule("See you on Wed 25/11 around 9am.").some((part) => part.mark && part.text === "Wed 25/11"), true);
   const form = readFileSync(new URL("../src/components/internal/sms-reply-form.tsx", import.meta.url), "utf8");
-  assert.match(form, /sms-template/);
-  assert.match(form, /fillSmsTemplate/);
-  assert.equal(form.includes("MAKE_"), false);
+  assert.match(form, /optgroup/);
+  assert.match(form, /smsTemplateGroups/);
+  assert.match(form, /Suggested for this job/);
   assert.equal(form.includes("/jobs/api/depart"), false);
 });

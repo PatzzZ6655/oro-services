@@ -20,6 +20,8 @@ export type SmsOpenJob = {
   jobId: string;
   title: string;
   address: string;
+  status: string;
+  scheduled: string;
 };
 
 const notionVersion = "2022-06-28";
@@ -96,7 +98,7 @@ export function tenantQuery(business: Business, jobId: string): { url: string; b
 }
 
 export function openJob(job: TodayJob): SmsOpenJob {
-  return { business: job.business, jobId: job.jobId, title: job.title, address: job.address };
+  return { business: job.business, jobId: job.jobId, title: job.title, address: job.address, status: job.status, scheduled: job.scheduled };
 }
 
 export async function listSmsJobs(fetchImpl?: FetchLike): Promise<{ status: number; body: { ok: true; jobs: SmsOpenJob[] } | JobsError }> {

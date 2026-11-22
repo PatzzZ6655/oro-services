@@ -34,6 +34,7 @@ export type SmsReplyInput = {
   image?: SmsReplyImage | null;
   draft?: string;
   revision?: string;
+  base?: string;
 };
 
 export type SmsReplyPrompt = {
@@ -94,8 +95,9 @@ export function parseSmsReply(body: unknown): { ok: true; value: SmsReplyInput }
   const customerMessage = cleanField(row.customerMessage, maxField);
   const draft = cleanField(row.draft, maxSms);
   const revision = cleanField(row.revision, maxField);
+  const base = cleanField(row.base, maxSms);
   if (revision && !draft) return { ok: false, message: "There is no draft to revise." };
-  if (!revision && !customerMessage && !image) return { ok: false, message: "Paste the customer's text or add a screenshot." };
+  if (!revision && !customerMessage && !image && !base) return { ok: false, message: "Paste the customer's text or add a screenshot." };
   return {
     ok: true,
     value: {
@@ -106,6 +108,7 @@ export function parseSmsReply(body: unknown): { ok: true; value: SmsReplyInput }
       image,
       draft,
       revision,
+      base,
     },
   };
 }
@@ -126,6 +129,8 @@ export function smsReplyPrompt(input: SmsReplyInput): SmsReplyPrompt {
     `Customer name: ${name}`,
   ];
   if (input.image) lines.unshift("A screenshot of the text conversation is attached.");
+  const base = input.base?.trim() ?? "";
+  if (base) lines.push("", "English base to follow. Keep this wording, and change a fact only when Pat's intent says so:", base);
   const draft = input.draft?.trim() ?? "";
   const revision = input.revision?.trim() ?? "";
   if (draft && revision) {
