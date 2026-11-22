@@ -180,7 +180,7 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
   }
 }
 
-async function postJson(url: string, payload: Record<string, string>, call: FetchLike, timeout: number): Promise<{ status: number; json: Record<string, unknown> | null }> {
+async function postJson(url: string, payload: Record<string, unknown>, call: FetchLike, timeout: number): Promise<{ status: number; json: Record<string, unknown> | null }> {
   const response = await call(url, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/json" },
@@ -538,9 +538,11 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
       body: {
         ok: true,
         jobUrl,
+        jobId: text(result.json.jobId, 40, secret).replace(/-/g, "") || notionPageId(jobUrl) || "",
         jobTitle: text(result.json.jobTitle, 200, secret),
         brand: text(result.json.brand, 80, secret),
         address: text(result.json.address, 300, secret),
+        desc: text(result.json.desc, 4000, secret) || text(result.json.description, 4000, secret),
         tenant1: text(result.json.tenant1, 80, secret),
         phone1: text(result.json.phone1, 40, secret),
         email1: text(result.json.email1, 120, secret),
@@ -552,6 +554,11 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
         pmPhone: text(result.json.pmPhone, 40, secret),
         workOrderNumber: text(result.json.workOrderNumber, 80, secret),
         description: text(result.json.description, 2000, secret),
+        tenants: parseTenantList(result.json.tenants).map((row) => ({
+          name: text(row.name, 80, secret),
+          phone: text(row.phone, 40, secret),
+          email: text(row.email, 120, secret),
+        })),
         propertyCreated: flag(result.json.propertyCreated),
         customerCreated: flag(result.json.customerCreated),
         contact1Created: flag(result.json.contact1Created),
@@ -561,6 +568,111 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
         voucherMessage: text(result.json.voucherMessage, 300, secret),
         voucherBusiness: text(result.json.voucherBusiness, 40, secret),
         voucherRedeemedDate: text(result.json.voucherRedeemedDate, 10, secret),
+      },
+    };
+  } catch {
+    return upstream();
+  }
+}
+
+export type IntroEmailOutcome = {
+  ok: true;
+  mode: "sendIntroEmail";
+  status: string;
+  message: string;
+  sendAt: string;
+  to: string;
+  error: string;
+};
+
+export async function sendIntroEmail(
+  input: {
+    jobId: string;
+    business: Business;
+    desc: string;
+    address: string;
+    pmAgency: string;
+    tenants: { name: string; email: string }[];
+    action: "send" | "skip";
+  },
+  fetchImpl?: FetchLike,
+): Promise<JobsResult<IntroEmailOutcome>> {
+  if (input.action !== "send" && input.action !== "skip") {
+    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose send or skip." } };
+  }
+  if (!isBusiness(input.business)) {
+    return { status: 400, body: { ok: false, error: "bad_request", message: "Choose Emoro or Emporo." } };
+  }
+  const config = makeConfig();
+  if (!config) return unconfigured();
+  const call = fetchImpl ?? globalThis.fetch;
+  const tenants = input.tenants
+    .map((row) => ({ name: row.name.replace(/[\u0000-\u001F]+/g, " ").trim().slice(0, 80), email: row.email.replace(/[\u0000-\u001F]+/g, " ").trim().slice(0, 120) }))
+    .filter((row) => row.name || row.email);
+  try {
+    const result = await postJson(
+      config.newJob,
+      {
+        secret: config.secret,
+        mode: "sendIntroEmail",
+        jobId: input.jobId.replace(/-/g, ""),
+        business: input.business,
+        desc: input.desc,
+        address: input.address,
+        pmAgency: input.pmAgency.trim(),
+        tenants,
+        action: input.action,
+      },
+      call,
+      JSON_TIMEOUT_MS,
+    );
+    if (result.status === 401 || result.json?.error === "unauthorized") {
+      const error = failure(401, result.json) ?? {
+        ok: false as const,
+        error: "webhook_unauthorized",
+        message: "The server key was rejected.",
+      };
+      return { status: statusFor(error, result.status), body: error };
+    }
+    const secret = config.secret;
+    const errorCode = text(result.json?.error, 40, secret);
+    if (result.status === 400 || errorCode === "missingDescOrJobId") {
+      return {
+        status: 400,
+        body: {
+          ok: false,
+          error: "missingDescOrJobId",
+          message: text(result.json?.message, 300, secret) || "The job text or job id is missing.",
+        },
+      };
+    }
+    if (result.status === 404 || errorCode === "jobNotFound") {
+      return {
+        status: 404,
+        body: { ok: false, error: "jobNotFound", message: text(result.json?.message, 300, secret) || "That job was not found." },
+      };
+    }
+    if (result.status === 502 || errorCode === "sendFailed" || errorCode === "noneSent" || result.json?.status === "failed") {
+      return {
+        status: 502,
+        body: {
+          ok: false,
+          error: errorCode || "sendFailed",
+          message: text(result.json?.message, 300, secret) || "The intro email was not sent.",
+        },
+      };
+    }
+    if (!result.json || result.json.ok === false) return upstream();
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        mode: "sendIntroEmail",
+        status: text(result.json.status, 40, secret),
+        message: text(result.json.message, 400, secret),
+        sendAt: text(result.json.sendAt, 80, secret),
+        to: text(result.json.to, 120, secret),
+        error: "",
       },
     };
   } catch {

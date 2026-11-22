@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { JobsClientError, postJobsForm } from "@/components/jobs/api";
+import { JobsClientError, postJobs, postJobsForm } from "@/components/jobs/api";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { BackLink, JobsButton, JobsLink, Screen, fieldClass } from "@/components/jobs/ui";
 import {
@@ -19,6 +19,7 @@ import {
   tenantsFromTyped,
   type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
+import { introBody, introStatusText, introSubject, introTenantLine, introTestNote, type IntroTenant } from "@/lib/jobs-app/intro-email";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
@@ -113,6 +114,9 @@ export function NewJobScreen() {
   const pending = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<NewJobResult | null>(null);
+  const [introPhase, setIntroPhase] = useState<"preview" | "status" | "done">("preview");
+  const [introStatus, setIntroStatus] = useState<{ status: string; message: string; error: string } | null>(null);
+  const [introBusy, setIntroBusy] = useState<"send" | "skip" | null>(null);
   const router = useRouter();
 
   async function continueToCheck() {
@@ -226,6 +230,87 @@ export function NewJobScreen() {
       pending.current = false;
       setBusy(null);
     }
+  }
+
+  async function finishIntro(action: "send" | "skip") {
+    if (!result || !isBusiness(business) || pending.current) return;
+    pending.current = true;
+    setIntroBusy(action);
+    setError("");
+    const people: IntroTenant[] = (result.tenants.length > 0 ? result.tenants : tenants).map((row) => ({
+      name: row.name,
+      email: row.email,
+    }));
+    try {
+      const outcome = await postJobs<{ status: string; message: string; error: string }>("/jobs/api/new/intro", {
+        action,
+        jobId: result.jobId,
+        business,
+        desc: result.desc,
+        address: result.address,
+        pmAgency: result.pmAgency,
+        tenants: people,
+      });
+      setIntroStatus({ status: outcome.status, message: outcome.message, error: "" });
+      setIntroPhase("status");
+    } catch (reason) {
+      if (reason instanceof JobsClientError && reason.status === 401) {
+        router.push("/jobs/login");
+        return;
+      }
+      const message = reason instanceof JobsClientError ? reason.message : "The intro email was not sent.";
+      const code = reason instanceof JobsClientError ? reason.code : "upstream";
+      setIntroStatus({ status: code === "upstream" ? "failed" : code, message, error: code });
+      setIntroPhase("status");
+    } finally {
+      pending.current = false;
+      setIntroBusy(null);
+    }
+  }
+
+  if (result && isBusiness(business) && introPhase !== "done") {
+    const people: IntroTenant[] = (result.tenants.length > 0 ? result.tenants : tenants).map((row) => ({
+      name: row.name,
+      email: row.email,
+    }));
+    const preview = {
+      business,
+      brand: businessLabel(business),
+      address: result.address,
+      pmAgency: result.pmAgency,
+      desc: result.desc,
+      tenants: people,
+    };
+    const named = people.find((row) => row.name.trim())?.name ?? "";
+    if (introPhase === "status" && introStatus) {
+      return (
+        <Screen title="Intro email" back={<BackLink href="/jobs" />}>
+          <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p>
+          <p className="text-base text-neutral-700">{introTestNote}</p>
+          <JobsButton type="button" variant="outline" onClick={() => setIntroPhase("done")}>
+            Done
+          </JobsButton>
+        </Screen>
+      );
+    }
+    return (
+      <Screen title="Intro email" back={<BackLink href="/jobs" />}>
+        <p className="text-base text-neutral-700">{introTestNote}</p>
+        <p className="text-lg font-semibold">{introSubject(preview.address, preview.brand)}</p>
+        <ul className="space-y-2 text-base">
+          {people.map((row, index) => (
+            <li key={`${row.email}-${index}`}>{introTenantLine(row)}</li>
+          ))}
+        </ul>
+        <pre className="whitespace-pre-wrap rounded-2xl border border-black p-4 text-base">{introBody(preview, named)}</pre>
+        <JobsButton type="button" onClick={() => finishIntro("send")} disabled={introBusy !== null}>
+          {introBusy === "send" ? "Sending" : "Send"}
+        </JobsButton>
+        <JobsButton type="button" variant="outline" onClick={() => finishIntro("skip")} disabled={introBusy !== null}>
+          {introBusy === "skip" ? "Skipping" : "Skip"}
+        </JobsButton>
+      </Screen>
+    );
   }
 
   if (result) {
