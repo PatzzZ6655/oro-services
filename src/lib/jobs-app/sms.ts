@@ -98,7 +98,7 @@ export function sharedSms(topSms: string, contacts: SmsContact[], tickedPhones: 
 }
 
 export function thankYouVoucherSentence(code: string, validUntil: string): string {
-  return `As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until ${validUntil}, T&Cs apply). Mention it when you book a job for your own case and we'll take $60 off.`;
+  return `As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until ${validUntil}, T&Cs apply). Mention it when you book your own job with us and we'll take $60 off.`;
 }
 
 /** Job complete: keep Make's message, and use the current thank-you voucher sentence. */

@@ -142,7 +142,7 @@ test("a completed job uses the thank-you voucher sentence for both brands", () =
   const old = (code: string, brand: string) =>
     `${prefix}As a thank-you, here is a $60 voucher: ${code}, valid until 22 Feb 2027. Mention it when you book with us again and we'll take $60 off. - ${brand}`;
   const next = (code: string, brand: string) =>
-    `${prefix}As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until 22 Feb 2027, T&Cs apply). Mention it when you book a job for your own case and we'll take $60 off. - ${brand}`;
+    `${prefix}As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until 22 Feb 2027, T&Cs apply). Mention it when you book your own job with us and we'll take $60 off. - ${brand}`;
   const emoro = next("EMB-8A133B", "Emoro Building");
   const emporo = next("EMP-8A133B", "Emporo Plumbing");
   assert.equal(completeJobSms(old("EMB-8A133B", "Emoro Building")), emoro);
