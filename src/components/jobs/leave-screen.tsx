@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { useClientReady } from "@/components/jobs/client-ready";
+import { KeepPage } from "@/components/jobs/keep-page";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import { OPTIONAL_ITEMS, REQUIRED_ITEMS, checklistText } from "@/lib/jobs-app/checklist";
+import {
+  clearStoredLeaveDraft,
+  leaveDraftDirty,
+  parseLeaveDraft,
+  readLeaveSnapshot,
+  writeStoredLeaveDraft,
+  type LeaveDraft,
+} from "@/lib/jobs-app/leave-draft";
 import { keptCount, LEAVE_MAX_EDGE, LEAVE_QUALITIES } from "@/lib/jobs-app/photos";
 import type { LeaveResult } from "@/lib/jobs-app/types";
 import { clearVisit, loadVisit, type ActiveVisit } from "@/lib/jobs-app/visit";
@@ -26,6 +35,9 @@ export function LeaveScreen() {
   const [notes, setNotes] = useState("");
   const [issues, setIssues] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoCount, setPhotoCount] = useState(0);
+  const [photosCleared, setPhotosCleared] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [drop, setDrop] = useState<{ kept: File[]; dropped: number } | null>(null);
@@ -33,11 +45,72 @@ export function LeaveScreen() {
   const [result, setResult] = useState<LeaveResult | null>(null);
   const [finished, setFinished] = useState<ActiveVisit | null>(null);
   const current = finished ?? visit;
+  const draftCache = useRef<string | null>(null);
+  const stored = useSyncExternalStore(
+    () => () => {},
+    () => {
+      if (draftCache.current === null) draftCache.current = readLeaveSnapshot();
+      return draftCache.current;
+    },
+    () => "",
+  );
+  if (ready && !hydrated && stored !== "") {
+    setHydrated(true);
+    if (stored !== "\0" && visit) {
+      const draft = parseLeaveDraft(stored);
+      if (draft && draft.jobId === visit.jobId) {
+        setChecked(draft.checked);
+        setStep(draft.step);
+        setOutcome(draft.outcome || null);
+        setNotes(draft.notes);
+        setIssues(draft.issues);
+        setPhotoCount(draft.photoCount);
+        setPhotosCleared(draft.photoCount > 0);
+      }
+    }
+  }
 
-  if (!ready) return <Screen title="Leave"><Spinner label="Opening" /></Screen>;
+  const currentDraft = useCallback((): LeaveDraft => {
+    return {
+      jobId: visit?.jobId ?? "",
+      step,
+      checked,
+      outcome: outcome ?? "",
+      notes,
+      issues,
+      photoCount,
+    };
+  }, [visit?.jobId, step, checked, outcome, notes, issues, photoCount]);
+
+  useEffect(() => {
+    if (!ready || !hydrated || result || !visit) return;
+    writeStoredLeaveDraft(currentDraft());
+  }, [ready, hydrated, result, visit, currentDraft]);
+
+  useEffect(() => {
+    if (!ready || !hydrated || result || !visit) return;
+    if (!leaveDraftDirty(currentDraft())) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [ready, hydrated, result, visit, currentDraft]);
+
+  if (!ready || !hydrated) {
+    return (
+      <KeepPage>
+        <Screen title="Leave">
+          <Spinner label="Opening" />
+        </Screen>
+      </KeepPage>
+    );
+  }
 
   if (result && current) {
     return (
+      <KeepPage>
       <Screen title="Leave" back={<BackLink href="/jobs" />}>
         <p className="whitespace-pre-wrap text-lg">{result.summary || "Visit recorded."}</p>
         {result.driveLink ? (
@@ -73,11 +146,13 @@ export function LeaveScreen() {
           Done
         </JobsButton>
       </Screen>
+      </KeepPage>
     );
   }
 
   if (!visit || blocked) {
     return (
+      <KeepPage>
       <Screen title="Leave" back={<BackLink href="/jobs" />}>
         <Alert>
           {blocked ? "No open visit for this job. Tap " : "Tap "}
@@ -100,6 +175,7 @@ export function LeaveScreen() {
           </Link>
         )}
       </Screen>
+      </KeepPage>
     );
   }
 
@@ -126,6 +202,7 @@ export function LeaveScreen() {
       const next = await postJobsForm<LeaveResult>("/jobs/api/leave", form);
       if (visit) setFinished(visit);
       clearVisit();
+      clearStoredLeaveDraft();
       setResult(next);
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
@@ -168,6 +245,7 @@ export function LeaveScreen() {
   }
 
   return (
+    <KeepPage>
     <Screen
       title="Leave"
       back={
@@ -252,12 +330,21 @@ export function LeaveScreen() {
               multiple
               className="sr-only"
               onChange={(event) => {
-                setPhotos([...(event.target.files ?? [])]);
+                const picked = [...(event.target.files ?? [])];
+                setPhotos(picked);
+                setPhotoCount(picked.length);
+                if (picked.length > 0) setPhotosCleared(false);
                 event.currentTarget.value = "";
               }}
             />
           </label>
-          {photos.length > 0 ? <p>{photos.length} selected</p> : <p>Photos are optional.</p>}
+          {photos.length > 0 ? (
+            <p>{photos.length} selected</p>
+          ) : photosCleared ? (
+            <p>The photos were cleared when the page reloaded. Add them again if you still want them with this visit.</p>
+          ) : (
+            <p>Photos are optional.</p>
+          )}
           <JobsButton type="button" onClick={() => submit(false)}>
             Submit
           </JobsButton>
@@ -309,5 +396,6 @@ export function LeaveScreen() {
         </div>
       ) : null}
     </Screen>
+    </KeepPage>
   );
 }
