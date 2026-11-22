@@ -22,7 +22,7 @@ import {
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { completeJobSms, groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
-import { invoiceContext, invoiceCreate, invoiceCreateBody, invoiceDraft, invoiceFinish } from "@/lib/jobs-app/webhooks";
+import { invoiceContext, invoiceCreate, invoiceCreateBody, invoiceDraft } from "@/lib/jobs-app/webhooks";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -195,9 +195,6 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
         isTest: true,
       });
     }
-    if (body.mode === "invoiceFinish") {
-      return jsonResponse({ ok: false, error: "refused", checks: ["Amount is empty"] }, 409);
-    }
     return jsonResponse({ ok: true, draft: { primaryObjective: "Fix the tap", tasks: [{ label: "Tap", text: "Replace the washer" }], suggestedClauses: ["GST inclusive"], missing: ["Test result"], questions: ["How many visits?"], amountLayoutSuggestion: "combined" } });
   }) as typeof fetch;
   try {
@@ -265,13 +262,20 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     assert.equal(created.body.docUrl, "https://docs.google.com/document/d/doc-9");
     assert.equal(created.body.isTest, true);
 
-    const refused = await invoiceFinish({ business: "emoro", type: "general", jobId: "abc", invoicePageId: "page-1", confirm: "yes" });
-    assert.equal(refused.status, 409);
-    if (refused.body.ok) throw new Error("expected a refusal");
-    assert.match(refused.body.message, /Amount is empty/);
-
-    const unconfirmed = await invoiceFinish({ business: "emoro", type: "general", jobId: "abc", invoicePageId: "page-1", confirm: "no" });
-    assert.equal(unconfirmed.status, 400);
+    const callsBeforeFinish = sent.length;
+    const { POST } = await import("@/app/jobs/api/invoice/route");
+    const cookie = `${JOBS_COOKIE}=${encodeURIComponent(await signJobsSession("pat.z@orosvc.com"))}`;
+    const finish = await POST(
+      new Request("http://localhost:3000/jobs/api/invoice", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000", cookie, "content-type": "application/json" },
+        body: JSON.stringify({ mode: "invoiceFinish", business: "emoro", type: "general", jobId: "abc", invoicePageId: "page-1", confirm: "yes" }),
+      }),
+    );
+    const finishBody = await finish.json();
+    assert.equal(finish.status, 403);
+    assert.equal(finishBody.message, "finish disabled");
+    assert.equal(sent.length, callsBeforeFinish);
 
     const drafted = await invoiceDraft({ business: "emoro", type: "general", jobId: "abc", dictation: "The kitchen tap was leaking." });
     if (!drafted.body.ok) throw new Error(drafted.body.message);
@@ -286,8 +290,10 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     assert.equal(page.includes("patch({ address"), false);
     assert.match(page, /Invoice number/);
     assert.match(page, /Generate Word \(Draft\)/);
-    assert.match(page, /Finish: PDF to Recently/);
+    assert.equal(page.includes("Finish: PDF to Recently"), false);
+    assert.equal(page.includes("invoiceFinish"), false);
     assert.match(page, /status === "pending"/);
+    assert.match(route, /finish disabled/);
     assert.match(leave, /Create Tax Invoice/);
     assert.match(leave, /Skip/);
     assert.equal(page.includes("MAKE_SHORTCUTS_SECRET"), false);

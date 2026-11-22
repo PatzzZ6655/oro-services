@@ -1051,34 +1051,3 @@ export async function invoiceCreate(input: InvoiceCreateInput, fetchImpl?: Fetch
     },
   };
 }
-
-export type InvoiceFinished = { ok: true; mode: "invoiceFinish"; status: "triggered"; message: string };
-
-export async function invoiceFinish(
-  input: { business: Business; type: InvoiceType; jobId: string; invoicePageId: string; confirm: string },
-  fetchImpl?: FetchLike,
-): Promise<JobsResult<InvoiceFinished>> {
-  const jobId = cleanJobId(input.jobId.replace(/-/g, ""));
-  const invoicePageId = clipLine(input.invoicePageId, 80);
-  if (!jobId || !invoicePageId || input.confirm !== "yes" || !isInvoiceType(input.type) || !isBusiness(input.business)) {
-    return { status: 400, body: { ok: false, error: "bad_request", message: "Confirm before the PDF is filed." } };
-  }
-  const posted = await postNewJob({ mode: "invoiceFinish", business: input.business, type: input.type, jobId, invoicePageId, confirm: "yes" }, fetchImpl);
-  if (!posted.config) return posted.result;
-  const result = posted.result;
-  if ("body" in result && result.body && "ok" in result.body && result.body.ok === false && !("json" in result)) return result as JobsResult<InvoiceFinished>;
-  const json = "json" in result ? result.json : null;
-  const status = "status" in result ? result.status : 502;
-  if (status === 409) {
-    const checks = clipList(json?.checks, 12, 200).map((item) => text(item, 200, posted.config.secret));
-    return {
-      status: 409,
-      body: { ok: false, error: "refused", message: checks.join(" ") || text(json?.message, 300, posted.config.secret) || "The invoice was not finished." },
-    };
-  }
-  if (!json || !accepted(json)) {
-    const error = failure(status, json);
-    return { status: statusFor(error ?? upstream().body, status), body: error ?? upstream().body };
-  }
-  return { status: 200, body: { ok: true, mode: "invoiceFinish", status: "triggered", message: "The PDF was sent to Recently." } };
-}

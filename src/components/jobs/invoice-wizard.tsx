@@ -93,7 +93,6 @@ type Saved = {
   conditions: { text: string; on: boolean }[];
   docUrl: string;
   notionUrl: string;
-  invoicePageId: string;
   createdMessage: string;
   templateCheck: string;
   isTest: boolean;
@@ -129,7 +128,6 @@ function blank(jobId: string, clientName: string, address: string): Saved {
     conditions: [],
     docUrl: "",
     notionUrl: "",
-    invoicePageId: "",
     createdMessage: "",
     templateCheck: "",
     isTest: false,
@@ -181,7 +179,6 @@ export function InvoiceWizard({
   const [form, setForm] = useState<Saved>(() => readSaved(jobId, clientName, address));
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [confirmFinish, setConfirmFinish] = useState(false);
   const pending = useRef(false);
   const patch = (next: Partial<Saved>) => setForm((current) => ({ ...current, ...next }));
 
@@ -325,7 +322,6 @@ export function InvoiceWizard({
           step: "ready",
           docUrl: created.docUrl,
           notionUrl: created.notionUrl,
-          invoicePageId: created.invoicePageId,
           createdMessage: created.message,
           templateCheck: created.templateCheck,
           isTest: created.isTest,
@@ -333,35 +329,6 @@ export function InvoiceWizard({
         return;
       }
       setError("The document is still generating. Tap Generate Word (Draft) again.");
-    } catch (reason) {
-      fail(reason);
-    } finally {
-      pending.current = false;
-      setBusy("");
-    }
-  }
-
-  async function finish() {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy("Filing the PDF");
-    setError("");
-    setConfirmFinish(false);
-    try {
-      await postJobs("/jobs/api/invoice", {
-        mode: "invoiceFinish",
-        business,
-        type: form.invoiceType,
-        jobId,
-        invoicePageId: form.invoicePageId,
-        confirm: "yes",
-      });
-      try {
-        sessionStorage.removeItem(invoiceDraftKey);
-      } catch {
-        // Ignore a blocked store.
-      }
-      onDone();
     } catch (reason) {
       fail(reason);
     } finally {
@@ -589,28 +556,9 @@ export function InvoiceWizard({
               Open in Notion
             </JobsLink>
           ) : null}
-          <JobsButton type="button" variant="outline" onClick={() => setConfirmFinish(true)}>
-            Finish: PDF to Recently
-          </JobsButton>
           <JobsButton type="button" variant="text" onClick={onDone}>
             Done
           </JobsButton>
-        </div>
-      ) : null}
-      {confirmFinish ? (
-        <div role="alertdialog" aria-labelledby="finish-title" className="fixed inset-0 z-20 flex items-end bg-black/40 p-4">
-          <div className="w-full rounded-2xl bg-white p-4">
-            <h2 id="finish-title" className="text-lg font-semibold">Finish: PDF to Recently</h2>
-            <p className="mt-2 text-base">This files the PDF. It does not send an email or a text.</p>
-            <div className="mt-4 flex flex-col gap-3">
-              <JobsButton type="button" onClick={finish}>
-                Finish
-              </JobsButton>
-              <JobsButton type="button" variant="outline" onClick={() => setConfirmFinish(false)}>
-                Go back
-              </JobsButton>
-            </div>
-          </div>
         </div>
       ) : null}
     </Screen>

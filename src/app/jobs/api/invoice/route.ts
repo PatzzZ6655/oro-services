@@ -1,6 +1,6 @@
 import { isAmountLayout, isInvoiceType, isNotesMode, isQaChoice, type InvoiceTask } from "@/lib/jobs-app/invoice";
 import { jobsJson, requireJobsUser } from "@/lib/jobs-app/guard";
-import { invoiceContext, invoiceCreate, invoiceDraft, invoiceFinish } from "@/lib/jobs-app/webhooks";
+import { invoiceContext, invoiceCreate, invoiceDraft } from "@/lib/jobs-app/webhooks";
 import { isBusiness } from "@/lib/jobs-app/types";
 
 export const maxDuration = 60;
@@ -35,6 +35,9 @@ export async function POST(request: Request) {
   }
   const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const mode = input.mode;
+  if (mode === "invoiceFinish") {
+    return jobsJson({ ok: false, error: "finish_disabled", message: "finish disabled" }, 403);
+  }
   const business = input.business;
   const type = input.type;
   const jobId = typeof input.jobId === "string" ? input.jobId : "";
@@ -68,16 +71,6 @@ export async function POST(request: Request) {
       scopeArea: typeof input.scopeArea === "string" ? input.scopeArea : "",
       depositObjective: typeof input.depositObjective === "string" ? input.depositObjective : "",
       conditions: strings(input.conditions),
-    });
-    return jobsJson(result.body, result.status);
-  }
-  if (mode === "invoiceFinish") {
-    const result = await invoiceFinish({
-      business,
-      type,
-      jobId,
-      invoicePageId: typeof input.invoicePageId === "string" ? input.invoicePageId : "",
-      confirm: input.confirm === "yes" ? "yes" : "",
     });
     return jobsJson(result.body, result.status);
   }
