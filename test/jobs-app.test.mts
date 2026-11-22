@@ -282,6 +282,9 @@ test("a tax invoice uses the new-job webhook and never sends the secret to the p
     const leave = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../src/app/jobs/api/invoice/route.ts", import.meta.url), "utf8");
     assert.match(page, /Create Tax Invoice|Draft with AI/);
+    assert.equal(page.includes("patch({ clientName"), false);
+    assert.equal(page.includes("patch({ address"), false);
+    assert.match(page, /Invoice number/);
     assert.match(page, /Generate Word \(Draft\)/);
     assert.match(page, /Finish: PDF to Recently/);
     assert.match(page, /status === "pending"/);

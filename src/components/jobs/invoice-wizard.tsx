@@ -422,14 +422,14 @@ export function InvoiceWizard({
             <input value={form.invoiceNumber} onChange={(event) => patch({ invoiceNumber: event.target.value })} className={fieldClass} />
           </label>
           {form.numberNote ? <p className="text-base">{form.numberNote}</p> : null}
-          <label className="flex flex-col gap-2 text-base">
-            Client
-            <input value={form.clientName} onChange={(event) => patch({ clientName: event.target.value })} className={fieldClass} />
-          </label>
-          <label className="flex flex-col gap-2 text-base">
-            Address
-            <input value={form.address} onChange={(event) => patch({ address: event.target.value })} className={fieldClass} />
-          </label>
+          <p>
+            <span className="text-sm text-neutral-600">Client</span>
+            <span className="mt-1 block text-lg">{form.clientName}</span>
+          </p>
+          <p>
+            <span className="text-sm text-neutral-600">Address</span>
+            <span className="mt-1 block text-lg">{form.address}</span>
+          </p>
           <JobsButton type="button" onClick={() => patch({ step: "dictate" })}>
             Continue
           </JobsButton>
