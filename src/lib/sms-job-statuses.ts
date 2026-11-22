@@ -135,6 +135,6 @@ export function isSmsTestJob(title: string): boolean {
  * Production hides TEST jobs. Preview, local development, and the test runner
  * keep them, the same split as a TEST invoice that is marked isTest and still shown while testing.
  */
-export function smsIncludeTestJobs(env: { VERCEL_ENV?: string } = process.env): boolean {
+export function smsIncludeTestJobs(env: { VERCEL_ENV?: string } = { VERCEL_ENV: process.env.VERCEL_ENV }): boolean {
   return env.VERCEL_ENV !== "production";
 }
