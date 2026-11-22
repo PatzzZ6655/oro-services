@@ -18,7 +18,7 @@ export function SiteFooter() {
         </Link>
 
         <div className="flex max-w-xl flex-col items-center gap-3 text-xs md:items-end">
-          <p>© 2026 ORO Services. Emoro Building® is a registered trademark of Emoro Building Pty Ltd. Emporo Plumbing® is a registered trademark of Emporo Plumbing Pty Ltd.</p>
+          <p>© 2026 ORO Services</p>
           <p className="flex items-center gap-3">
             <Link href="/terms" className="hover:text-white hover:underline">
               Terms
