@@ -4,7 +4,7 @@ import test from "node:test";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
 import { smsAddressKey } from "@/lib/sms-address";
 import { readGeminiShot } from "@/lib/sms-reply";
-import { isSmsTestJob, smsIncludeTestJobs } from "@/lib/sms-job-statuses";
+import { isSmsTestJob, smsIncludeTestJobs, smsJobStage } from "@/lib/sms-job-statuses";
 import {
   jobsFromNotion,
   jobsQuery,
@@ -49,6 +49,11 @@ const OLD = "11111111-1111-1111-1111-111111111111";
 const ACTIVE = "22222222-2222-2222-2222-222222222222";
 const EMPTY = "33333333-3333-3333-3333-333333333333";
 const SAME = "Unit 4/12 Test Street, Doncaster East VIC 3109";
+
+function statusNames(body: string): string[] {
+  const parsed = JSON.parse(body) as { filter: { or: Array<{ select: { equals: string } }> } };
+  return parsed.filter.or.map((item) => item.select.equals);
+}
 
 function notionJob(id: string, title: string, address: string, status: string) {
   return {
@@ -126,6 +131,18 @@ test("an address match keeps the active job and drops the finished one at the sa
   assert.equal(emoro.body.includes("on_or_before"), false);
   assert.equal(emporo.body.includes("In Progress (Return Key)"), false);
   assert.equal(emporo.body.includes("Quoting (Collect Key)"), false);
+  const emoroNames = statusNames(emoro.body);
+  const emporoNames = statusNames(emporo.body);
+  for (const name of ["In Progress (Collect Key)", "In Progress", "In Progress (Waiting)", "In Progress (Purchase Material)", "In Progress (Customer Service)", "In Progress (Return Key)"]) {
+    assert.equal(emoroNames.includes(name), true, name);
+  }
+  assert.deepEqual(
+    emporoNames.filter((name) => name.toLowerCase().startsWith("in progress")),
+    ["In Progress", "In Progress (Purchase Material)"],
+  );
+  assert.equal(emoroNames.includes("Complete") || emporoNames.includes("Cancelled"), false);
+  assert.ok(smsJobStage("Job Key Appointing") < smsJobStage("In Progress"));
+  assert.ok(smsJobStage("In Progress") < smsJobStage("In Progress (Return Key)"));
 });
 
 test("a bare mobile matches the active job, not an older job at the same address", () => {
