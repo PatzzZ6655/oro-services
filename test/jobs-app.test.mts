@@ -21,7 +21,7 @@ import {
 } from "@/lib/jobs-app/new-job-text";
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
-import { groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
+import { completeJobSms, groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -135,6 +135,26 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("a completed job uses the thank-you voucher sentence for both brands", () => {
+  const prefix = "Hi Sam, the works at 12 Smith Street are now complete. Thank you for your cooperation and understanding, and all the best! ";
+  const old = (code: string, brand: string) =>
+    `${prefix}As a thank-you, here is a $60 voucher: ${code}, valid until 22 Feb 2027. Mention it when you book with us again and we'll take $60 off. - ${brand}`;
+  const next = (code: string, brand: string) =>
+    `${prefix}As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until 22 Feb 2027, T&Cs apply). Mention it when you book a job for your own case and we'll take $60 off. - ${brand}`;
+  const emoro = next("EMB-8A133B", "Emoro Building");
+  const emporo = next("EMP-8A133B", "Emporo Plumbing");
+  assert.equal(completeJobSms(old("EMB-8A133B", "Emoro Building")), emoro);
+  assert.equal(completeJobSms(old("EMP-8A133B", "Emporo Plumbing")), emporo);
+  const withReview = `${old("EMB-8A133B", "Emoro Building").replace(" - Emoro Building", "")} If you were happy with our work, we'd really appreciate a Google review: https://g.page/r/example - Emoro Building`;
+  assert.equal(completeJobSms(withReview).includes("https://g.page/r/example - Emoro Building"), true);
+  assert.equal(completeJobSms(withReview).includes("here's a $60 voucher just for you: EMB-8A133B"), true);
+  const plain = "Hi Sam, the works at 12 Smith Street are now complete. Thank you. - Emoro Building";
+  assert.equal(completeJobSms(plain), plain);
+  const returned = "Hi Sam, Emoro Building here. Today's work at 12 Smith Street is done. We will be in touch soon to arrange the next visit. Thank you for your patience. - Emoro Building";
+  assert.equal(tenantSms(returned, [{ name: "Sam", phone: "+61411111111", sms: returned }], ["+61411111111"]), returned);
+  assert.equal(tenantSms(old("EMB-8A133B", "Emoro Building"), [{ name: "Sam", phone: "+61411111111", sms: "" }], ["+61411111111"]), emoro);
 });
 
 test("a new work order sends an optional EMB or EMP voucher code", async () => {

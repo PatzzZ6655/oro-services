@@ -97,9 +97,20 @@ export function sharedSms(topSms: string, contacts: SmsContact[], tickedPhones: 
   return messageBody(source, selected.map((contact) => contact.name), selected.length);
 }
 
-/** Leave complete: Make's tenant SMS already includes the voucher and review link. */
+export function thankYouVoucherSentence(code: string, validUntil: string): string {
+  return `As a thank-you, here's a $60 voucher just for you: ${code} (min. spend $150, valid until ${validUntil}, T&Cs apply). Mention it when you book a job for your own case and we'll take $60 off.`;
+}
+
+/** Job complete: keep Make's message, and use the current thank-you voucher sentence. */
+export function completeJobSms(text: string): string {
+  return text.replace(
+    /As a thank-you, here is a \$60 voucher: ([A-Z]{3}-[A-Z0-9]+), valid until ([^.]+)\. Mention it when you book with us again and we'll take \$60 off\./g,
+    (_match, code: string, validUntil: string) => thankYouVoucherSentence(code, validUntil.trim()),
+  );
+}
+
 export function tenantSms(topSms: string, contacts: SmsContact[], tickedPhones: string[]): string {
-  return smsSource(topSms, contacts, selectedContacts(contacts, tickedPhones));
+  return completeJobSms(smsSource(topSms, contacts, selectedContacts(contacts, tickedPhones)));
 }
 
 export function smsHref(phones: string[], body: string): { href: string; fallback: string | null } | null {
