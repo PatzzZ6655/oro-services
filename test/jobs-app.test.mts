@@ -96,9 +96,9 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
   const { leaveJob } = await import("@/lib/jobs-app/webhooks");
   const original = globalThis.fetch;
   const tenantText = "Hi Sam, thanks for having us. Your $60 voucher is EMB-123456, valid to 31 Jan 2027. Review: https://g.page/r/example";
-  let sent: FormData | null = null;
+  const sent: { body: FormData | null } = { body: null };
   globalThis.fetch = (async (_url: string, init?: RequestInit) => {
-    sent = init?.body instanceof FormData ? init.body : null;
+    sent.body = init?.body instanceof FormData ? init.body : null;
     return jsonResponse({
       ok: true,
       business: "emoro",
@@ -129,16 +129,16 @@ test("leave complete keeps Make's tenant SMS, including the voucher", async () =
     form.set("issues", "");
     const result = await leaveJob(form);
     assert.equal(result.status, 200);
-    assert.equal(sent?.get("includeVoucher"), "0");
+    assert.equal(sent.body?.get("includeVoucher"), "0");
     form.set("includeVoucher", "1");
     const withVoucher = await leaveJob(form);
     assert.equal(withVoucher.status, 200);
-    assert.equal(sent?.get("includeVoucher"), "1");
+    assert.equal(sent.body?.get("includeVoucher"), "1");
     form.set("outcome", "return");
     form.set("includeVoucher", "1");
     const comingBack = await leaveJob(form);
     assert.equal(comingBack.status, 200);
-    assert.equal(sent?.get("includeVoucher"), "0");
+    assert.equal(sent.body?.get("includeVoucher"), "0");
     if (!result.body.ok) throw new Error(result.body.message);
     assert.equal(result.body.voucherCode, "EMB-123456");
     assert.equal(result.body.voucherExpiry, "2027-01-31");
