@@ -11,6 +11,7 @@ import {
 } from "@/lib/jobs-app/new-job-text";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { LEAVE_MAX_PHOTOS, NEW_JOB_MAX_IMAGES, UPLOAD_BUDGET_BYTES } from "@/lib/jobs-app/photos";
+import { isAmountLayout, isInvoiceType, isNotesMode, isQaChoice, type AmountLayout, type InvoiceTask, type InvoiceType, type NotesMode, type QaChoice } from "@/lib/jobs-app/invoice";
 import { applyVoucherStatus, cleanVoucherCode, notionPageId, voucherStatus } from "@/lib/jobs-app/voucher";
 import {
   isBusiness,
@@ -752,4 +753,301 @@ export async function applyVoucher(
   } catch {
     return upstream();
   }
+}
+
+function clipLine(value: unknown, max: number): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ").trim().slice(0, max);
+}
+
+function clipList(value: unknown, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => clipLine(item, maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function clipTasks(value: unknown): InvoiceTask[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const label = clipLine(row.label, 80);
+      const text = clipLine(row.text, 2000);
+      if (!label && !text) return null;
+      return { label, text };
+    })
+    .filter((row): row is InvoiceTask => row !== null)
+    .slice(0, 12);
+}
+
+function accepted(json: Record<string, unknown> | null): boolean {
+  return json?.ok === true || json?.ok === "true";
+}
+
+async function postNewJob(payload: Record<string, unknown>, fetchImpl?: FetchLike) {
+  const config = makeConfig();
+  if (!config) return { config: null, result: unconfigured() };
+  try {
+    const result = await postJson(config.newJob, { secret: config.secret, ...payload }, fetchImpl ?? globalThis.fetch, JSON_TIMEOUT_MS);
+    if (result.status === 401 || result.json?.error === "unauthorized") {
+      const error = failure(401, result.json) ?? { ok: false as const, error: "webhook_unauthorized", message: "The server key was rejected." };
+      return { config, result: { status: statusFor(error, result.status), body: error } };
+    }
+    return { config, result };
+  } catch {
+    return { config, result: upstream() };
+  }
+}
+
+export type InvoiceContext = {
+  ok: true;
+  mode: "invoiceContext";
+  brand: string;
+  jobId: string;
+  jobUrl: string;
+  jobTitle: string;
+  customer: { id: string; name: string };
+  property: { id: string; name: string };
+  suggestedNumber: string;
+  latestNumberSeen: string;
+  numberNote: string;
+  today: string;
+  invoicesOnJob: string;
+  existingInvoice: { id: string; url: string; number: string; status: string; docIds: string[] };
+  reuseExistingPage: boolean;
+};
+
+export async function invoiceContext(
+  input: { business: Business; type: InvoiceType; jobId: string },
+  fetchImpl?: FetchLike,
+): Promise<JobsResult<InvoiceContext>> {
+  const jobId = cleanJobId(input.jobId.replace(/-/g, ""));
+  if (!jobId || !isInvoiceType(input.type) || !isBusiness(input.business)) {
+    return { status: 400, body: { ok: false, error: "bad_request", message: "That request was not valid." } };
+  }
+  const posted = await postNewJob({ mode: "invoiceContext", business: input.business, type: input.type, jobId }, fetchImpl);
+  if (!posted.config) return posted.result;
+  const result = posted.result;
+  if ("body" in result && result.body && "ok" in result.body && result.body.ok === false && result.status !== 200) return result as JobsResult<InvoiceContext>;
+  const json = "json" in result ? result.json : null;
+  const status = "status" in result ? result.status : 502;
+  if (!json || !accepted(json)) {
+    const error = failure(status, json);
+    return { status: statusFor(error ?? upstream().body, status), body: error ?? upstream().body };
+  }
+  const secret = posted.config.secret;
+  const existing = json.existingInvoice && typeof json.existingInvoice === "object" ? (json.existingInvoice as Record<string, unknown>) : {};
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      mode: "invoiceContext",
+      brand: text(json.brand, 80, secret),
+      jobId: text(json.jobId, 80, secret) || jobId,
+      jobUrl: httpsUrl(json.jobUrl),
+      jobTitle: text(json.jobTitle, 200, secret),
+      customer: {
+        id: text((json.customer as Record<string, unknown> | undefined)?.id, 80, secret),
+        name: text((json.customer as Record<string, unknown> | undefined)?.name, 120, secret),
+      },
+      property: {
+        id: text((json.property as Record<string, unknown> | undefined)?.id, 80, secret),
+        name: text((json.property as Record<string, unknown> | undefined)?.name, 200, secret),
+      },
+      suggestedNumber: text(json.suggestedNumber, 40, secret),
+      latestNumberSeen: text(json.latestNumberSeen, 40, secret),
+      numberNote: text(json.numberNote, 300, secret),
+      today: text(json.today, 40, secret),
+      invoicesOnJob: text(json.invoicesOnJob, 20, secret),
+      existingInvoice: {
+        id: text(existing.id, 80, secret),
+        url: httpsUrl(existing.url),
+        number: text(existing.number, 40, secret),
+        status: text(existing.status, 40, secret),
+        docIds: clipList(existing.docIds, 8, 80).map((item) => text(item, 80, secret)),
+      },
+      reuseExistingPage: flag(json.reuseExistingPage) === true,
+    },
+  };
+}
+
+export type InvoiceDraftResult = {
+  ok: true;
+  mode: "invoiceDraft";
+  draft: {
+    primaryObjective: string;
+    tasks: InvoiceTask[];
+    recommendation: string;
+    notesMode: NotesMode | "";
+    notesText: string;
+    suggestedClauses: string[];
+    qaBox: QaChoice | "";
+    amountLayoutSuggestion: AmountLayout | "";
+    multiVisit: boolean;
+    jobType: string;
+    scopeArea: string;
+    depositObjective: string;
+    conditions: string[];
+    missing: string[];
+    questions: string[];
+  };
+};
+
+export async function invoiceDraft(
+  input: { business: Business; type: InvoiceType; jobId: string; dictation: string },
+  fetchImpl?: FetchLike,
+): Promise<JobsResult<InvoiceDraftResult>> {
+  const jobId = cleanJobId(input.jobId.replace(/-/g, ""));
+  const dictation = clipLine(input.dictation, 8000);
+  if (!jobId || !dictation || !isInvoiceType(input.type) || !isBusiness(input.business)) {
+    return { status: 400, body: { ok: false, error: "bad_request", message: "Say what the invoice should cover." } };
+  }
+  const posted = await postNewJob({ mode: "invoiceDraft", business: input.business, type: input.type, jobId, dictation }, fetchImpl);
+  if (!posted.config) return posted.result;
+  const result = posted.result;
+  if ("body" in result && result.body && "ok" in result.body && result.body.ok === false && !("json" in result)) return result as JobsResult<InvoiceDraftResult>;
+  const json = "json" in result ? result.json : null;
+  const status = "status" in result ? result.status : 502;
+  if (!json || !accepted(json)) {
+    const error = failure(status, json);
+    return { status: statusFor(error ?? upstream().body, status), body: error ?? upstream().body };
+  }
+  const secret = posted.config.secret;
+  const draft = json.draft && typeof json.draft === "object" ? (json.draft as Record<string, unknown>) : {};
+  const notesMode = isNotesMode(draft.notesMode) ? draft.notesMode : "";
+  const qaBox = isQaChoice(draft.qaBox) ? draft.qaBox : "";
+  const layout = isAmountLayout(draft.amountLayoutSuggestion) ? draft.amountLayoutSuggestion : "";
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      mode: "invoiceDraft",
+      draft: {
+        primaryObjective: text(draft.primaryObjective, 2000, secret),
+        tasks: clipTasks(draft.tasks).map((row) => ({ label: text(row.label, 80, secret), text: text(row.text, 2000, secret) })),
+        recommendation: text(draft.recommendation, 2000, secret),
+        notesMode,
+        notesText: text(draft.notesText, 4000, secret),
+        suggestedClauses: clipList(draft.suggestedClauses, 12, 300).map((item) => text(item, 300, secret)),
+        qaBox,
+        amountLayoutSuggestion: layout,
+        multiVisit: flag(draft.multiVisit) === true,
+        jobType: text(draft.jobType, 80, secret),
+        scopeArea: text(draft.scopeArea, 300, secret),
+        depositObjective: text(draft.depositObjective, 500, secret),
+        conditions: clipList(draft.conditions, 12, 300).map((item) => text(item, 300, secret)),
+        missing: clipList(draft.missing, 12, 300).map((item) => text(item, 300, secret)),
+        questions: clipList(draft.questions, 12, 300).map((item) => text(item, 300, secret)),
+      },
+    },
+  };
+}
+
+export type InvoiceCreateInput = {
+  business: Business;
+  type: InvoiceType;
+  jobId: string;
+  invoiceNumber: string;
+  primaryObjective: string;
+  tasks: InvoiceTask[];
+  recommendation: string;
+  notesMode: NotesMode;
+  notesText: string;
+  qaBox: QaChoice;
+  amountLayout: AmountLayout;
+  labourLabel?: string;
+  keepCallout?: boolean;
+  variationDesc?: string;
+  scopeArea?: string;
+  depositObjective?: string;
+  conditions?: string[];
+};
+
+export type InvoiceCreated = {
+  ok: true;
+  mode: "invoiceCreate";
+  status: "created" | "exists" | "pending";
+  invoicePageId: string;
+  notionUrl: string;
+  invoiceNumber: string;
+  docId: string;
+  docUrl: string;
+  templateCheck: string;
+  isTest: boolean;
+  message: string;
+};
+
+export function invoiceCreateBody(input: InvoiceCreateInput): Record<string, unknown> | null {
+  const jobId = cleanJobId(input.jobId.replace(/-/g, ""));
+  const invoiceNumber = clipLine(input.invoiceNumber, 40);
+  if (!jobId || !invoiceNumber || !isInvoiceType(input.type) || !isBusiness(input.business)) return null;
+  if (!isNotesMode(input.notesMode) || !isQaChoice(input.qaBox) || !isAmountLayout(input.amountLayout)) return null;
+  const body: Record<string, unknown> = {
+    mode: "invoiceCreate",
+    business: input.business,
+    type: input.type,
+    jobId,
+    invoiceNumber,
+    primaryObjective: clipLine(input.primaryObjective, 2000),
+    tasks: clipTasks(input.tasks),
+    recommendation: clipLine(input.recommendation, 2000),
+    notesMode: input.notesMode,
+    notesText: clipLine(input.notesText, 4000),
+    qaBox: input.qaBox,
+    amountLayout: input.amountLayout,
+  };
+  const labour = clipLine(input.labourLabel, 80);
+  const variation = clipLine(input.variationDesc, 500);
+  const scope = clipLine(input.scopeArea, 300);
+  const objective = clipLine(input.depositObjective, 500);
+  const conditions = clipList(input.conditions, 12, 300);
+  if (labour) body.labourLabel = labour;
+  if (typeof input.keepCallout === "boolean") body.keepCallout = input.keepCallout;
+  if (variation) body.variationDesc = variation;
+  if (scope) body.scopeArea = scope;
+  if (objective) body.depositObjective = objective;
+  if (conditions.length > 0) body.conditions = conditions;
+  return body;
+}
+
+export async function invoiceCreate(input: InvoiceCreateInput, fetchImpl?: FetchLike): Promise<JobsResult<InvoiceCreated>> {
+  const payload = invoiceCreateBody(input);
+  if (!payload) return { status: 400, body: { ok: false, error: "bad_request", message: "The invoice number is missing." } };
+  const posted = await postNewJob(payload, fetchImpl);
+  if (!posted.config) return posted.result;
+  const result = posted.result;
+  if ("body" in result && result.body && "ok" in result.body && result.body.ok === false && !("json" in result)) return result as JobsResult<InvoiceCreated>;
+  const json = "json" in result ? result.json : null;
+  const status = "status" in result ? result.status : 502;
+  if (status === 202) {
+    return { status: 202, body: { ok: true, mode: "invoiceCreate", status: "pending", invoicePageId: "", notionUrl: "", invoiceNumber: "", docId: "", docUrl: "", templateCheck: "", isTest: false, message: "Still generating the document." } };
+  }
+  if (status === 400) {
+    return { status: 400, body: { ok: false, error: text(json?.error, 40, posted.config.secret) || "bad_request", message: text(json?.message, 300, posted.config.secret) || "The invoice was not created." } };
+  }
+  if (!json || !accepted(json)) {
+    const error = failure(status, json);
+    return { status: statusFor(error ?? upstream().body, status), body: error ?? upstream().body };
+  }
+  const secret = posted.config.secret;
+  const created = text(json.status, 20, secret);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      mode: "invoiceCreate",
+      status: created === "exists" ? "exists" : "created",
+      invoicePageId: text(json.invoicePageId, 80, secret),
+      notionUrl: httpsUrl(json.notionUrl),
+      invoiceNumber: text(json.invoiceNumber, 40, secret),
+      docId: text(json.docId, 120, secret),
+      docUrl: httpsUrl(json.docUrl),
+      templateCheck: text(json.templateCheck, 200, secret),
+      isTest: flag(json.isTest) === true,
+      message: created === "exists" ? "This invoice number is already there." : "Word draft is ready.",
+    },
+  };
 }

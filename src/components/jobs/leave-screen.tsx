@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { useClientReady } from "@/components/jobs/client-ready";
+import { InvoiceWizard } from "@/components/jobs/invoice-wizard";
 import { KeepPage } from "@/components/jobs/keep-page";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import { OPTIONAL_ITEMS, REQUIRED_ITEMS, checklistText } from "@/lib/jobs-app/checklist";
+import { invoiceDraftKey } from "@/lib/jobs-app/invoice";
 import {
   clearStoredLeaveDraft,
   leaveDraftDirty,
@@ -43,6 +45,7 @@ export function LeaveScreen() {
   const [drop, setDrop] = useState<{ kept: File[]; dropped: number } | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [result, setResult] = useState<LeaveResult | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [finished, setFinished] = useState<ActiveVisit | null>(null);
   const current = finished ?? visit;
   const draftCache = useRef<string | null>(null);
@@ -98,12 +101,37 @@ export function LeaveScreen() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [ready, hydrated, result, visit, currentDraft]);
 
+  function leaveDone() {
+    try {
+      sessionStorage.removeItem(invoiceDraftKey);
+    } catch {
+      // Ignore a blocked store.
+    }
+    router.push("/jobs");
+    router.refresh();
+  }
+
   if (!ready || !hydrated) {
     return (
       <KeepPage>
         <Screen title="Leave">
           <Spinner label="Opening" />
         </Screen>
+      </KeepPage>
+    );
+  }
+
+  if (result && current && result.outcome === "complete" && invoiceOpen) {
+    return (
+      <KeepPage>
+        <InvoiceWizard
+          business={result.business}
+          jobId={current.jobId}
+          clientName={result.tenant}
+          address={result.address || current.address}
+          onBack={() => setInvoiceOpen(false)}
+          onDone={leaveDone}
+        />
       </KeepPage>
     );
   }
@@ -135,16 +163,27 @@ export function LeaveScreen() {
           allowManual={result.contacts.length === 0}
           verbatim={result.outcome === "complete"}
         />
-        <JobsButton
-          type="button"
-          variant="outline"
-          onClick={() => {
-            router.push("/jobs");
-            router.refresh();
-          }}
-        >
-          Done
-        </JobsButton>
+        {result.outcome === "complete" ? (
+          <>
+            <JobsButton type="button" onClick={() => setInvoiceOpen(true)}>
+              Create Tax Invoice
+            </JobsButton>
+            <JobsButton type="button" variant="outline" onClick={leaveDone}>
+              Skip
+            </JobsButton>
+          </>
+        ) : (
+          <JobsButton
+            type="button"
+            variant="outline"
+            onClick={() => {
+              router.push("/jobs");
+              router.refresh();
+            }}
+          >
+            Done
+          </JobsButton>
+        )}
       </Screen>
       </KeepPage>
     );

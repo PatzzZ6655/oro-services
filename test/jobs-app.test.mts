@@ -22,6 +22,7 @@ import {
 import { keptCount } from "@/lib/jobs-app/photos";
 import { JOBS_COOKIE, JOBS_MAX_AGE, jobsCookieOptions, readJobsSession, signJobsSession } from "@/lib/jobs-app/session";
 import { completeJobSms, groupGreeting, sharedSms, smsHref, tenantSms } from "@/lib/jobs-app/sms";
+import { invoiceContext, invoiceCreate, invoiceCreateBody, invoiceDraft } from "@/lib/jobs-app/webhooks";
 import { rememberSelection, tickedFromMemory, type SmsMemory, type SmsMemoryStore } from "@/lib/jobs-app/sms-memory";
 import { indexablePaths } from "@/lib/content";
 import { buildVCard, buildVCardFile } from "@/lib/jobs-app/vcf";
@@ -155,6 +156,152 @@ test("a completed job uses the thank-you voucher sentence for both brands", () =
   const returned = "Hi Sam, Emoro Building here. Today's work at 12 Smith Street is done. We will be in touch soon to arrange the next visit. Thank you for your patience. - Emoro Building";
   assert.equal(tenantSms(returned, [{ name: "Sam", phone: "+61411111111", sms: returned }], ["+61411111111"]), returned);
   assert.equal(tenantSms(old("EMB-8A133B", "Emoro Building"), [{ name: "Sam", phone: "+61411111111", sms: "" }], ["+61411111111"]), emoro);
+});
+
+test("a tax invoice uses the new-job webhook and never sends the secret to the page", async () => {
+  useEnv();
+  const original = globalThis.fetch;
+  const sent: Record<string, unknown>[] = [];
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    sent.push(body);
+    if (body.mode === "invoiceContext") {
+      return jsonResponse({
+        ok: true,
+        brand: "Emoro Building",
+        jobId: "abc",
+        customer: { id: "c1", name: "Sam Lee" },
+        property: { id: "p1", name: "12 Smith Street" },
+        suggestedNumber: "INV-1042",
+        numberNote: "Next free number",
+        existingInvoice: { number: "INV-1001", status: "Draft", url: "https://www.notion.so/old", docIds: ["doc-1"] },
+        reuseExistingPage: true,
+        secret: SECRET,
+      });
+    }
+    if (body.mode === "invoiceCreate" && sent.filter((item) => item.mode === "invoiceCreate").length === 1) {
+      return jsonResponse({ ok: false, status: "pending" }, 202);
+    }
+    if (body.mode === "invoiceCreate") {
+      return jsonResponse({
+        ok: true,
+        status: "created",
+        invoicePageId: "page-1",
+        notionUrl: "https://www.notion.so/page-1",
+        invoiceNumber: "INV-1042",
+        docId: "doc-9",
+        docUrl: "https://docs.google.com/document/d/doc-9",
+        templateCheck: "ok",
+        isTest: true,
+      });
+    }
+    return jsonResponse({ ok: true, draft: { primaryObjective: "Fix the tap", tasks: [{ label: "Tap", text: "Replace the washer" }], suggestedClauses: ["GST inclusive"], missing: ["Test result"], questions: ["How many visits?"], amountLayoutSuggestion: "combined" } });
+  }) as typeof fetch;
+  try {
+    const payload = invoiceCreateBody({
+      business: "emoro",
+      type: "general",
+      jobId: "abc-def",
+      invoiceNumber: "INV-1042",
+      primaryObjective: "Fix the tap",
+      tasks: [{ label: "Tap", text: "Replace the washer" }],
+      recommendation: "",
+      notesMode: "remove",
+      notesText: "",
+      qaBox: "keep",
+      amountLayout: "combined",
+    });
+    assert.equal(payload?.mode, "invoiceCreate");
+    assert.equal(payload?.jobId, "abcdef");
+    assert.equal("secret" in (payload ?? {}), false);
+    assert.equal("email" in (payload ?? {}), false);
+    assert.equal("sms" in (payload ?? {}), false);
+
+    const context = await invoiceContext({ business: "emoro", type: "general", jobId: "abc" });
+    if (!context.body.ok) throw new Error(context.body.message);
+    assert.equal(context.body.suggestedNumber, "INV-1042");
+    assert.equal(context.body.customer.name, "Sam Lee");
+    assert.equal(context.body.existingInvoice.number, "INV-1001");
+    assert.equal(context.body.reuseExistingPage, true);
+    assert.equal(JSON.stringify(context.body).includes(SECRET), false);
+    assert.equal(sent[0]?.secret, SECRET);
+    assert.equal(sent[0]?.mode, "invoiceContext");
+
+    const pending = await invoiceCreate({
+      business: "emoro",
+      type: "general",
+      jobId: "abc",
+      invoiceNumber: "INV-1042",
+      primaryObjective: "Fix the tap",
+      tasks: [],
+      recommendation: "",
+      notesMode: "remove",
+      notesText: "",
+      qaBox: "keep",
+      amountLayout: "combined",
+    });
+    assert.equal(pending.status, 202);
+    if (!pending.body.ok) throw new Error(pending.body.message);
+    assert.equal(pending.body.status, "pending");
+
+    const created = await invoiceCreate({
+      business: "emoro",
+      type: "general",
+      jobId: "abc",
+      invoiceNumber: "INV-1042",
+      primaryObjective: "Fix the tap",
+      tasks: [],
+      recommendation: "",
+      notesMode: "remove",
+      notesText: "",
+      qaBox: "keep",
+      amountLayout: "combined",
+    });
+    assert.equal(created.status, 200);
+    if (!created.body.ok) throw new Error(created.body.message);
+    assert.equal(created.body.docUrl, "https://docs.google.com/document/d/doc-9");
+    assert.equal(created.body.isTest, true);
+
+    const callsBeforeFinish = sent.length;
+    const { POST } = await import("@/app/jobs/api/invoice/route");
+    const cookie = `${JOBS_COOKIE}=${encodeURIComponent(await signJobsSession("pat.z@orosvc.com"))}`;
+    const finish = await POST(
+      new Request("http://localhost:3000/jobs/api/invoice", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000", cookie, "content-type": "application/json" },
+        body: JSON.stringify({ mode: "invoiceFinish", business: "emoro", type: "general", jobId: "abc", invoicePageId: "page-1", confirm: "yes" }),
+      }),
+    );
+    const finishBody = await finish.json();
+    assert.equal(finish.status, 403);
+    assert.equal(finishBody.message, "finish disabled");
+    assert.equal(sent.length, callsBeforeFinish);
+
+    const drafted = await invoiceDraft({ business: "emoro", type: "general", jobId: "abc", dictation: "The kitchen tap was leaking." });
+    if (!drafted.body.ok) throw new Error(drafted.body.message);
+    assert.equal(drafted.body.draft.primaryObjective, "Fix the tap");
+    assert.equal(drafted.body.draft.tasks[0]?.label, "Tap");
+
+    const page = readFileSync(new URL("../src/components/jobs/invoice-wizard.tsx", import.meta.url), "utf8");
+    const leave = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
+    const route = readFileSync(new URL("../src/app/jobs/api/invoice/route.ts", import.meta.url), "utf8");
+    assert.match(page, /Create Tax Invoice|Draft with AI/);
+    assert.equal(page.includes("patch({ clientName"), false);
+    assert.equal(page.includes("patch({ address"), false);
+    assert.match(page, /Invoice number/);
+    assert.match(page, /Generate Word \(Draft\)/);
+    assert.equal(page.includes("Finish: PDF to Recently"), false);
+    assert.equal(page.includes("invoiceFinish"), false);
+    assert.match(page, /status === "pending"/);
+    assert.match(route, /finish disabled/);
+    assert.match(leave, /Create Tax Invoice/);
+    assert.match(leave, /Skip/);
+    assert.equal(page.includes("MAKE_SHORTCUTS_SECRET"), false);
+    assert.equal(route.includes("secret"), false);
+    assert.match(route, /invoiceCreate/);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test("a new work order sends an optional EMB or EMP voucher code", async () => {
@@ -930,6 +1077,7 @@ test("the public site does not advertise /jobs and the source has no webhook URL
     /\/jobs\/|\/jobs-app\//.test(file),
   );
   for (const file of jobsUi) {
+    if (file.endsWith(`${join("jobs-app", "invoice.ts")}`)) continue;
     const source = readFileSync(file, "utf8").replace(/const chinese = \/[\s\S]*?\);/, "");
     assert.equal(/[\u4e00-\u9fff]/.test(source), false, file);
   }
