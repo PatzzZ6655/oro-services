@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { smsJobSearchAfter } from "@/lib/sms-job-statuses";
 import { resizeToJpeg } from "@/components/jobs/resize-image";
 import { normalizePhone } from "@/lib/jobs-app/phones";
 import { smsHref } from "@/lib/jobs-app/sms";
-import { smsBodyHref, smsReplyBrands, type SmsReplyBrand } from "@/lib/sms-reply-client";
+import { clearSmsReplyStorage, smsBodyHref, smsReplyBrands, type SmsReplyBrand } from "@/lib/sms-reply-client";
 import type { SmsJobContact, SmsOpenJob } from "@/lib/sms-reply-jobs";
 import {
   dateFromChip,
@@ -62,6 +63,34 @@ async function readShot(file: File): Promise<Shot> {
     if (!allowed || file.size > 1_200_000) throw new Error("read");
     return { mimeType: mime as Shot["mimeType"], data: await fileBase64(file), preview: URL.createObjectURL(file) };
   }
+}
+
+const emptyFields = {
+  name: "",
+  pmName: "",
+  address: "",
+  day: "",
+  time: "",
+  mins: "",
+  reason: "",
+  issue: "",
+  agency: "",
+  brand: "" as SmsReplyBrand | "",
+  templateId: "",
+  variant: "",
+};
+
+function NewMessageButton({ onClick, wide = false }: { onClick: () => void; wide?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-brand-navy bg-white px-3 text-sm font-semibold text-brand-navy ${wide ? "w-full" : ""}`}
+    >
+      <RefreshCw className="size-4 shrink-0" aria-hidden />
+      New message
+    </button>
+  );
 }
 
 export function SmsReplyForm() {
@@ -506,6 +535,58 @@ export function SmsReplyForm() {
     }
   }
 
+  function startOver() {
+    setShot((current) => {
+      if (current) URL.revokeObjectURL(current.preview);
+      return null;
+    });
+    setCustomerMessage("");
+    setIntent("");
+    setBrand("");
+    setCustomerName("");
+    setMobile("");
+    setDraft("");
+    setRevision("");
+    setReady(false);
+    setError("");
+    setPasteNote("");
+    setPhoneNote("");
+    setPending("");
+    setCopied(false);
+    setJobsNote("");
+    jobKeyRef.current = "";
+    setJobKey("");
+    setContacts([]);
+    setContactPhone("");
+    setTemplateId("");
+    setVariant("");
+    setDateKey("");
+    setDateLabel("");
+    setVisitTime("");
+    setMins("");
+    setAgency("");
+    setPmName("");
+    setReason("");
+    setIssue("");
+    setPickedNote("");
+    setJobStatus("");
+    setJobOpen(false);
+    setJobQuery("");
+    setMatchNote("");
+    setPhoneWarning(false);
+    setSaveConfirm(false);
+    setSaveNote("");
+    shotPhoneRef.current = "";
+    setShotPhone("");
+    setDraftEdited(false);
+    fields.current = { ...emptyFields };
+    clearSmsReplyStorage([
+      typeof localStorage === "undefined" ? null : localStorage,
+      typeof sessionStorage === "undefined" ? null : sessionStorage,
+    ]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function copy() {
     setError("");
     try {
@@ -530,13 +611,16 @@ export function SmsReplyForm() {
           <label id="sms-job-label" className="text-sm font-medium text-slate-800">
             Job (optional)
           </label>
-          <button
-            type="button"
-            onClick={() => void loadJobs()}
-            className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-brand-navy"
-          >
-            {jobs === null ? "Show jobs" : "Refresh"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void loadJobs()}
+              className="min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-brand-navy"
+            >
+              {jobs === null ? "Show jobs" : "Refresh"}
+            </button>
+            <NewMessageButton onClick={startOver} />
+          </div>
         </div>
         <button
           type="button"
@@ -1027,6 +1111,7 @@ export function SmsReplyForm() {
           <p className="text-sm text-slate-600">Nothing is sent from here. Send opens Messages with the number and the text, and you confirm it there.</p>
         </section>
       ) : null}
+      <NewMessageButton wide onClick={startOver} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
 import { smsHref } from "@/lib/jobs-app/sms";
+import { clearSmsReplyStorage } from "@/lib/sms-reply-client";
 import {
   SMS_GEMINI_MODEL,
   SMS_REPLY_LIMIT,
@@ -256,6 +257,33 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     resetSmsReplyLimits();
     process.env.GEMINI_SMS_API_KEY = KEY;
   }
+});
+
+test("New message clears a saved SMS draft and does not call the server", () => {
+  const form = readFileSync(new URL("../src/components/internal/sms-reply-form.tsx", import.meta.url), "utf8");
+  assert.equal((form.match(/<NewMessageButton/g) ?? []).length, 2);
+  const start = form.indexOf("function startOver()");
+  const body = form.slice(start, form.indexOf("async function copy()", start));
+  assert.equal(body.includes("fetch("), false);
+  assert.equal(body.includes("save:"), false);
+  assert.match(body, /scrollTo/);
+  assert.match(body, /clearSmsReplyStorage/);
+  const removed: string[] = [];
+  const store = {
+    length: 3,
+    keys: ["oro.sms-reply.draft", "oro.jobs.visit", "note"],
+    key(index: number) {
+      return this.keys[index] ?? null;
+    },
+    removeItem(key: string) {
+      removed.push(key);
+      this.keys = this.keys.filter((item) => item !== key);
+      this.length = this.keys.length;
+    },
+  };
+  clearSmsReplyStorage([store, null]);
+  assert.deepEqual(removed, ["oro.sms-reply.draft"]);
+  assert.deepEqual(store.keys, ["oro.jobs.visit", "note"]);
 });
 
 test("a Gemini miss does not echo the key", async () => {
