@@ -5,24 +5,33 @@ import { barLinks, indexablePaths, menuLinks } from "@/lib/content";
 
 const clauses = [
   "About these terms",
-  "These terms apply to work carried out by ORO Services through Emoro Building and Emporo Plumbing. They apply when the customer accepts a quote, confirms a booking, or allows us to start work.",
+  "These terms apply to work carried out under the Emoro Building brand by Emoro Building Pty Ltd, and under the Emporo Plumbing brand by Emporo Plumbing Pty Ltd. ORO Services is the trading name we use for both brands. They apply when the customer accepts a quote, confirms a booking, or allows us to start work.",
+  'In these terms, "we", "us" and "our" mean the company named on the quote or tax invoice for the job (Emoro Building Pty Ltd or Emporo Plumbing Pty Ltd).',
   "Quotes and acceptance",
   "Quotes are valid for 14 days from the date issued, unless a shorter period is stated on the quote.",
-  "except urgent make-safe work.",
+  "any extra work or cost needs approval under Variations before we continue, except urgent make-safe work and incidental repairs.",
   "Prices and GST",
-  "Prices include GST unless stated otherwise.",
+  "Prices include GST unless stated otherwise. Tax invoices will include the information required by the Australian Taxation Office, including the customer's name or ABN on jobs of $1,000 or more.",
   "Call-outs, access and after-hours",
-  "The customer or their property manager should give at least 24 hours' notice to cancel or reschedule.",
+  "If the customer cancels or reschedules a booking with less than 24 hours' notice, we may charge a call-out fee to cover our reasonable time and travel already committed, up to a maximum of $176 (including GST).",
+  "The customer or their property manager is responsible for arranging safe access, including keys, codes and tenant notice.",
   "Appointment times",
-  "Appointment times are our best estimate and are not guaranteed. We may need to delay, shorten or reschedule a visit because of emergency work (such as a gas leak or burst pipe), earlier jobs running over, traffic, accidents, vehicle breakdown, weather, illness or other events outside our reasonable control. If this happens, we'll let the customer or their property manager know as soon as we reasonably can and arrange a new time at no extra charge. To the extent permitted by law (including the Australian Consumer Law), we are not liable for any loss, cost or time off work caused by a delayed or rescheduled appointment.",
+  "we are not liable for any loss, cost or time off work caused by a delayed or rescheduled appointment where the delay or rescheduling is caused by one of the reasons listed above.",
   "Payment",
   "Payment is due within 30 days of the invoice date, or within 45 days if agreed in writing for an approved account.",
+  "The customer confirms that they are the owner, or have the authority of the owner or the owners corporation, to approve the work, and is responsible for payment, unless a named owner has accepted the quote in writing.",
   "Late payment",
   "Overdue amounts may incur interest at the rate prescribed under the Penalty Interest Rates Act 1983 (Vic), plus reasonable costs of recovery.",
+  "Cancellation after acceptance",
+  "for materials already ordered for the job, 25% of the cost of those materials plus any delivery or transport costs already incurred.",
   "Materials",
   "Materials we supply remain our property until paid in full.",
   "Workmanship and consumer rights",
-  "If you notice a problem with our workmanship, tell us promptly. We will inspect it and, where it is our responsibility, fix it at no cost to you. Parts and fixtures follow the manufacturer's warranty.",
+  "If you notice a problem with our workmanship, tell us promptly. We will inspect it and, where it is our responsibility, fix it at no cost to you.",
+  "Contact: info@orosvc.com · www.orosvc.com. It covers problems with our workmanship that appear within 6 months of the date we complete the work.",
+  "Our goods and services come with guarantees that cannot be excluded under the Australian Consumer Law. For major failures with the service, you are entitled:",
+  "to cancel your service contract with us; and",
+  "to a refund for the unused portion, or to compensation for its reduced value.",
   "Nothing in these terms excludes, restricts or modifies any right or consumer guarantee that cannot legally be excluded under the Australian Consumer Law or other applicable law.",
   "Governing law",
   "These terms are governed by the laws of Victoria, Australia. We and the customer submit to the non-exclusive jurisdiction of the courts of Victoria.",
@@ -31,38 +40,40 @@ const clauses = [
   "Matching finishes",
   "We will take reasonable care, but an exact match to existing colours, tiles, render, paint, timber or other finishes is not guaranteed, including because of ageing, light, wear or batch differences.",
   "Customer-supplied materials",
-  "If the customer supplies materials or fixtures, we will install them with reasonable care, but we do not warrant their quality, suitability, colour or performance. If items are missing, incorrect or unsuitable, we will explain any extra labour and get the customer's approval before charging it.",
-  "We may decline to install items that are not WaterMark-certified or otherwise not compliant with the relevant standards, or that we reasonably consider unsafe.",
+  "any extra labour needs approval under Variations before we charge it.",
   "Product supply and substitutions",
-  "Where we supply products, the final brand or model may depend on supplier availability and compatibility with existing services and site conditions. If a listed item is unavailable or not compatible, we will tell the customer and agree any substitute or change in cost before we proceed.",
+  "any substitute or change in cost needs approval under Variations before we proceed.",
   "Pre-existing conditions",
   "We are not responsible for pre-existing defects, settlement or other movement, moisture, or work done by others before we started, except to the extent our work causes new damage.",
   "Investigative and diagnostic repairs",
-  "Some faults, such as leaks, intermittent defects and concealed issues, require a process of elimination, as the cause may not be visible or may be in more than one location. Where we repair or treat an area identified during an attendance, no warranty can be provided that this will completely resolve the issue until it has been monitored under normal conditions (for roof leaks, after suitable rainfall). If the issue continues, further investigation and/or repair may be required. We will explain any extra cost and get the customer's approval before that work goes ahead, as set out in Variations. A continuing issue after an investigative repair is not, of itself, a defect in our workmanship.",
+  "Any extra cost needs approval under Variations before that work goes ahead.",
   "Variations",
-  "Changes to the quoted scope, including customer-requested changes, are variations. We will explain any extra cost and get the customer's approval before doing that work, except urgent make-safe work. Approved variations are charged at the agreed price.",
-  "Incidental repairs: During the works we may identify a defect in an existing component that is directly connected to, or affected by, the quoted works and that was not apparent at the time of quoting (for example, a failed non-return valve or a leaking pressure/temperature relief valve on the hot water system being serviced). Such components are often already worn, scaled or near the end of their service life, and the defect may only become apparent once they are handled; it is a pre-existing condition unless caused by our work. Where the additional cost of rectifying it (parts and labour) is $176 (including GST) or less, we may carry out the repair without seeking the customer's prior approval, and it will be itemised separately on the customer's invoice. This does not apply to materials or fixtures supplied by the customer, and a change of brand or model still needs the customer's agreement under Product supply and substitutions. Defects in components unrelated to the quoted works, or repairs that would exceed this amount, will not proceed without the customer's approval, except for urgent make-safe work under the Variations clause.",
+  'or verbally and confirmed in writing ("approval under Variations").',
+  "Urgent make-safe work means the minimum work needed to stop an immediate risk to people or immediate damage to property",
+  "they want to be asked before any incidental repair is done.",
+  "they can tell us within 14 days of the invoice date",
   "Asbestos and hazardous materials",
-  "If we suspect asbestos or other hazardous material, we will stop work in the affected area. Testing and removal by appropriately licensed specialists is an extra cost. We will explain that cost and get the customer's approval before that work goes ahead.",
+  "needs approval under Variations before that work goes ahead.",
   "Work at heights",
-  "Work at heights is carried out only with appropriate safe access, such as scaffolding, an elevating work platform or edge protection, as required by Victorian occupational health and safety law. If the required access equipment is not included in the quote, we will explain the extra cost and get the customer's approval before proceeding. We may decline or pause work that cannot be done safely.",
+  "the extra cost needs approval under Variations before we proceed.",
   "Confined spaces",
-  "Work in a confined space is carried out only with the permits and controls required by Victorian occupational health and safety law. Examples include a pit, a tank, or a subfloor or roof void that is a confined space under the Occupational Health and Safety Regulations 2017 (Vic). If we identify a confined space that was not in the quote, we will stop that work until those controls are arranged. We will explain any extra cost and get the customer's approval before we proceed.",
+  "Any extra cost needs approval under Variations before we proceed.",
   "Thank-you vouchers",
   "After a completed job we may send a thank-you voucher worth $60 off a future job of $150 or more, including GST, before the voucher is applied. A voucher can be used for work with either Emoro Building or Emporo Plumbing. Emoro codes start with EMB- and Emporo codes start with EMP-.",
-  "A voucher is valid for 3 months from the issue date shown on it. The job must be booked within that time. The customer must quote the voucher code when booking, and before the invoice is issued. A voucher cannot be applied after an invoice has been issued.",
-  "Once a voucher is applied to a job, it is redeemed. It is never reused or reissued, including if the job is later cancelled or does not go ahead.",
-  "A voucher is void if any other discount or price reduction is given on that job. If we agree to reduce the quoted price, any voucher already applied to that job is treated as used and will not be reinstated.",
-  "One voucher per job. It cannot be exchanged for cash or split.",
-  "The voucher is a thank-you and is not conditional on leaving a review.",
-  "Emoro Building and Emporo Plumbing reserve the right to determine how these terms apply, acting reasonably. Nothing in these terms limits the customer's rights under the Australian Consumer Law.",
+  "Once a voucher is applied to a job, it is redeemed. It is not reused or reissued if the customer cancels the job or the job does not go ahead for a reason within the customer's control. If we cancel the job, the voucher is not treated as redeemed and stays valid until its original expiry date.",
+  "A voucher cannot be combined with any other discount or price reduction on the same job.",
+  "Complaints",
+  "We will contact them within 14 days to discuss it and try to resolve it. This does not affect the customer's right to contact Consumer Affairs Victoria",
+  "Privacy",
+  "Our Privacy Policy at www.orosvc.com/privacy explains more.",
 ];
 
 test("the terms page keeps the approved wording and stays public", () => {
   const page = readFileSync(new URL("../src/app/terms/page.tsx", import.meta.url), "utf8");
   assert.match(page, /title: "Terms and Conditions"/);
   assert.match(page, /path: "\/terms"/);
-  assert.match(page, /Last updated: 22 November 2026/);
+  assert.match(page, /Last updated: 24 November 2026/);
+  assert.equal(page.includes("Last updated: 22 November 2026"), false);
   assert.equal(page.includes("Last updated: 21 November 2026"), false);
   assert.equal(page.includes("Last updated: 20 November 2026"), false);
   assert.ok(page.indexOf('heading: "Call-outs, access and after-hours"') < page.indexOf('heading: "Appointment times"'));
@@ -71,24 +82,35 @@ test("the terms page keeps the approved wording and stays public", () => {
   assert.match(page, /ORO Services · Emoro Building and Emporo Plumbing/);
   const subtitleAt = page.indexOf("ORO Services · Emoro Building and Emporo Plumbing");
   const clausesAt = page.indexOf('className="mt-10 space-y-10"');
-  const updatedAt = page.indexOf("Last updated: 22 November 2026");
+  const updatedAt = page.indexOf("Last updated: 24 November 2026");
   assert.ok(subtitleAt < clausesAt && clausesAt < updatedAt);
   assert.ok(page.indexOf('heading: "Thank-you vouchers"') < updatedAt);
   assert.ok(page.indexOf('heading: "Confined spaces"') < page.indexOf('heading: "Thank-you vouchers"'));
   assert.ok(page.indexOf('heading: "Thank-you vouchers"') < page.indexOf('heading: "Governing law"'));
   assert.ok(page.indexOf('heading: "Governing law"') < page.indexOf('heading: "Severability"'));
   assert.ok(page.indexOf('heading: "Severability"') < updatedAt);
-  assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 22 November 2026/);
-  const vouchers = page.slice(page.indexOf('heading: "Thank-you vouchers"'), page.indexOf('heading: "Governing law"'));
-  assert.ok(vouchers.indexOf("Once a voucher is applied to a job, it is redeemed.") < vouchers.indexOf("A voucher is void if"));
-  assert.ok(vouchers.indexOf("A voucher is void if") < vouchers.indexOf("The voucher is a thank-you"));
+  assert.match(page, /text-xs text-slate-500[^>]*>Last updated: 24 November 2026/);
+  assert.ok(page.indexOf('heading: "Thank-you vouchers"') < page.indexOf('heading: "Complaints"'));
+  assert.ok(page.indexOf('heading: "Complaints"') < page.indexOf('heading: "Privacy"'));
+  assert.ok(page.indexOf('heading: "Privacy"') < page.indexOf('heading: "Governing law"'));
+  const vouchers = page.slice(page.indexOf('heading: "Thank-you vouchers"'), page.indexOf('heading: "Complaints"'));
+  assert.ok(vouchers.indexOf("Once a voucher is applied to a job, it is redeemed.") < vouchers.indexOf("A voucher cannot be combined"));
+  assert.ok(vouchers.indexOf("A voucher cannot be combined") < vouchers.indexOf("The voucher is a thank-you"));
   assert.equal(vouchers.includes("can't be combined"), false);
+  assert.equal(vouchers.includes("30 days"), false);
+  assert.equal(vouchers.includes("void"), false);
   assert.equal(vouchers.includes("ABN"), false);
+  assert.equal((page.match(/\bABN\b/g) ?? []).length, 1);
+  assert.equal(/\b\d{2} \d{3} \d{3} \d{3}\b/.test(page), false);
+  assert.equal(page.includes("0489"), false);
+  const acl = "Nothing in these terms excludes, restricts or modifies any right or consumer guarantee that cannot legally be excluded under the Australian Consumer Law or other applicable law.";
+  assert.equal(page.split(acl).length, 2);
+  assert.equal(page.includes("Nothing in these terms limits the customer's rights under the Australian Consumer Law."), false);
   assert.equal(page.includes("Terms and Conditions (ORO Services: Emoro Building and Emporo Plumbing)"), false);
   for (const clause of clauses) assert.equal(page.includes(clause), true, clause);
   assert.ok(page.indexOf('heading: "Matching finishes"') < page.indexOf('heading: "Thank-you vouchers"'));
   assert.equal(/\bMake\b/.test(page), false);
-  assert.equal(/DBCA|registered builder|\binsurance\b/i.test(page), false);
+  assert.equal(/DBCA|registered builder|\binsurance\b|\bdeposit\b/i.test(page), false);
   assert.ok(
     page.indexOf('heading: "Pre-existing conditions"') <
       page.indexOf('heading: "Investigative and diagnostic repairs"') &&
@@ -113,7 +135,20 @@ test("the terms page keeps the approved wording and stays public", () => {
 
 test("the privacy page names the voucher code and keeps the enquiry in the inbox", () => {
   const page = readFileSync(new URL("../src/app/privacy/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /Last updated: 22 November 2026/);
+  assert.match(page, /Last updated: 24 November 2026/);
+  assert.match(
+    page,
+    /This page explains what ORO Services does with personal information, including details you send us through this website and the records we keep when we arrange and carry out jobs\. It is written for an Australian small business/,
+  );
+  assert.match(page, /Emoro Building \(Emoro Building Pty Ltd\) and Emporo Plumbing \(Emporo Plumbing Pty Ltd\)/);
+  assert.match(page, /Job records, tenants and messages/);
+  assert.match(page, /We do not use tenant details for marketing and we do not sell them\./);
+  assert.match(page, /tax records are generally kept for 5 years/);
+  assert.equal(page.includes("artificial intelligence"), false);
+  const websiteAt = page.indexOf(">This website<");
+  const jobsAt = page.indexOf(">Job records, tenants and messages<");
+  const updated = page.indexOf("Last updated: 24 November 2026");
+  assert.ok(websiteAt < jobsAt && jobsAt < updated);
   assert.match(
     page,
     /A voucher code, if you choose to give one\. On an Emoro Building or Emporo Plumbing enquiry the form accepts a code starting with EMB- or EMP-\. A blank or unusable code is not kept with the enquiry\./,
