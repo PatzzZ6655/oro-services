@@ -39,15 +39,31 @@ export type SmsOpenJob = {
   scheduled: string;
 };
 
-const notionVersion = "2022-06-28";
-const tenantDatabases: Record<Business, { database: string; relation: string }> = {
-  emoro: { database: "d1da6a01-0507-43fc-9e3f-72a16f34a342", relation: "Jobs" },
-  emporo: { database: "38c91037-f9ca-80ac-bef4-c824f3e1c3ef", relation: "Jobs (Plumbing)" },
+const notionVersion = "2025-09-03";
+const tenantDatabases: Record<Business, { dataSource: string; relation: string }> = {
+  emoro: { dataSource: "8df4fd74-0cdb-426e-8c42-d45038551b7d", relation: "Jobs" },
+  emporo: { dataSource: "60491037-f9ca-82cd-b1ef-072c1552caee", relation: "Jobs (Plumbing)" },
 };
-const jobDatabases: Record<Business, { database: string; address: string }> = {
-  emoro: { database: "ff086255-3e2c-4e2b-a462-fe183e32b1ba", address: "Property Address (rollup)" },
-  emporo: { database: "38c91037-f9ca-80fd-a313-d6833c2e589d", address: "Address Rollup" },
+const jobDatabases: Record<Business, { dataSource: string; address: string }> = {
+  emoro: { dataSource: "e2a99c4d-87e9-4f3d-a99f-35d777781c32", address: "Property Address (rollup)" },
+  emporo: { dataSource: "e9b91037-f9ca-8388-abb9-87e3f743cb6d", address: "Address Rollup" },
 };
+
+function dataSourceQuery(id: string): string {
+  return `https://api.notion.com/v1/data_sources/${id}/query`;
+}
+
+/** A log line for a failed Notion call. Never includes the token or request headers. */
+export function formatNotionError(scope: string, status: number, payload: unknown): string {
+  let code = "";
+  let message = "";
+  if (payload && typeof payload === "object") {
+    const row = payload as { code?: unknown; message?: unknown };
+    if (typeof row.code === "string") code = row.code.replace(/\s+/g, " ").slice(0, 60);
+    if (typeof row.message === "string") message = row.message.replace(/\s+/g, " ").slice(0, 240);
+  }
+  return `sms-reply notion ${scope} status=${status} code=${code} message=${message}`;
+}
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -195,7 +211,7 @@ export function phoneQuery(business: Business, phone: string): { url: string; bo
   const source = tenantDatabases[business];
   const national = phone.replace(/^\+61/, "");
   return {
-    url: `https://api.notion.com/v1/databases/${source.database}/query`,
+    url: dataSourceQuery(source.dataSource),
     body: JSON.stringify({
       page_size: 20,
       filter: {
@@ -249,7 +265,7 @@ export function tenantCreateBody(business: Business, jobId: string, phone: strin
   const cleaned = name.replace(/[\u0000-\u001F]/g, " ").trim().slice(0, 80);
   const title = !cleaned || normalizePhone(cleaned) ? "Tenant" : cleaned;
   return {
-    parent: { database_id: source.database },
+    parent: { type: "data_source_id", data_source_id: source.dataSource },
     properties: {
       Name: { title: [{ type: "text", text: { content: title } }] },
       Phone: { phone_number: phone },
@@ -270,7 +286,7 @@ function notionHeaders(token: string): Record<string, string> {
 export function tenantQuery(business: Business, jobId: string): { url: string; body: string } {
   const source = tenantDatabases[business];
   return {
-    url: `https://api.notion.com/v1/databases/${source.database}/query`,
+    url: dataSourceQuery(source.dataSource),
     body: JSON.stringify({
       page_size: 10,
       filter: {
@@ -287,7 +303,7 @@ export function tenantQuery(business: Business, jobId: string): { url: string; b
 export function jobsQuery(business: Business): { url: string; body: string } {
   const source = jobDatabases[business];
   return {
-    url: `https://api.notion.com/v1/databases/${source.database}/query`,
+    url: dataSourceQuery(source.dataSource),
     body: JSON.stringify({
       page_size: 100,
       filter: {
@@ -366,7 +382,10 @@ async function queryBrandJobs(business: Business, token: string, call: FetchLike
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error(formatNotionError(business, response.status, await response.json().catch(() => null)));
+      return null;
+    }
     const payload = (await response.json().catch(() => null)) as unknown;
     jobs.push(...jobsFromNotion(payload, business));
     const row = payload && typeof payload === "object" ? (payload as { has_more?: unknown; next_cursor?: unknown }) : {};
@@ -386,7 +405,9 @@ export async function listSmsJobs(fetchImpl?: FetchLike): Promise<{ status: numb
     if (!emoro || !emporo) return { status: 502, body: { ok: false, error: "upstream", message: "The job list could not be loaded." } };
     const jobs = keepActiveSmsJobs([...emoro, ...emporo]).sort(compareSmsJobs);
     return { status: 200, body: { ok: true, jobs } };
-  } catch {
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "Error";
+    console.error(`sms-reply notion list ${name}`);
     return { status: 502, body: { ok: false, error: "upstream", message: "The job list could not be loaded." } };
   }
 }

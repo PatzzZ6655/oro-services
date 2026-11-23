@@ -6,8 +6,10 @@ import { smsAddressKey } from "@/lib/sms-address";
 import { readGeminiShot } from "@/lib/sms-reply";
 import { isSmsTestJob, smsIncludeTestJobs, smsJobStage } from "@/lib/sms-job-statuses";
 import {
+  formatNotionError,
   jobsFromNotion,
   jobsQuery,
+  listSmsJobs,
   keepActiveSmsJobs,
   matchActiveSmsJobs,
   matchJobsByPhone,
@@ -97,8 +99,8 @@ test("tenant contacts drop the owner and normalise the mobile", () => {
   ]);
   const emoro = tenantQuery("emoro", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   const emporo = tenantQuery("emporo", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-  assert.match(emoro.url, /d1da6a01-0507-43fc-9e3f-72a16f34a342/);
-  assert.match(emporo.url, /38c91037-f9ca-80ac-bef4-c824f3e1c3ef/);
+  assert.match(emoro.url, /\/v1\/data_sources\/8df4fd74-0cdb-426e-8c42-d45038551b7d\/query/);
+  assert.match(emporo.url, /\/v1\/data_sources\/60491037-f9ca-82cd-b1ef-072c1552caee\/query/);
   assert.match(emoro.body, /does_not_equal/);
   assert.match(emoro.body, /"Owner"/);
   assert.match(emporo.body, /Jobs \(Plumbing\)/);
@@ -122,6 +124,8 @@ test("an address match keeps the active job and drops the finished one at the sa
   assert.equal(smsIncludeTestJobs({ VERCEL_ENV: "preview" }), true);
   const emoro = jobsQuery("emoro");
   const emporo = jobsQuery("emporo");
+  assert.match(emoro.url, /\/v1\/data_sources\/e2a99c4d-87e9-4f3d-a99f-35d777781c32\/query/);
+  assert.match(emporo.url, /\/v1\/data_sources\/e9b91037-f9ca-8388-abb9-87e3f743cb6d\/query/);
   assert.match(emoro.body, /New Work Order/);
   assert.match(emoro.body, /Contacting Tenant 3 Cc PM/);
   assert.match(emoro.body, /In Progress \(Return Key\)/);
@@ -204,6 +208,8 @@ test("saving a number fills an empty tenant phone or creates a contact, and neve
   assert.deepEqual(planTenantSave("0400 000 009", taken), { action: "create" });
   assert.deepEqual(planTenantSave("+61400000001", taken), { action: "already" });
   const created = tenantCreateBody("emoro", ACTIVE, "+61400000009", "");
+  assert.match(JSON.stringify(created), /data_source_id/);
+  assert.equal(JSON.stringify(created).includes("database_id"), false);
   const encoded = JSON.stringify(created);
   assert.equal(encoded.includes("Property"), false);
   assert.match(encoded, /"Jobs"/);
@@ -214,6 +220,31 @@ test("saving a number fills an empty tenant phone or creates a contact, and neve
   assert.match(named, /Jobs \(Plumbing\)/);
   assert.match(named, /Sam/);
   assert.equal(named.includes("Property"), false);
+});
+
+test("a failed Notion job query is logged without the token", async () => {
+  process.env.NOTION_TOKEN = "ntn_test_secret_value";
+  const original = globalThis.fetch;
+  const lines: string[] = [];
+  const error = console.error;
+  console.error = (line?: unknown) => {
+    lines.push(String(line));
+  };
+  globalThis.fetch = async () => Response.json({ object: "error", code: "validation_error", message: "Use a data source id." }, { status: 400 });
+  try {
+    const listed = await listSmsJobs();
+    assert.equal(listed.status, 502);
+    assert.equal(listed.body.ok, false);
+    const line = formatNotionError("emoro", 400, { code: "validation_error", message: "Use a data source id." });
+    assert.match(line, /status=400/);
+    assert.match(line, /validation_error/);
+    assert.equal(line.includes("ntn_test_secret_value"), false);
+    assert.equal(lines.some((item) => item.includes("validation_error") && !item.includes("ntn_test_secret_value")), true);
+  } finally {
+    console.error = error;
+    globalThis.fetch = original;
+    delete process.env.NOTION_TOKEN;
+  }
 });
 
 test("the job route reads active jobs and writes a tenant number only when asked", async () => {
@@ -234,9 +265,9 @@ test("the job route reads active jobs and writes a tenant number only when asked
     if (url.includes("generativelanguage")) {
       return Response.json({ candidates: [{ content: { parts: [{ text: gemini }] } }] });
     }
-    if (url.includes("ff086255-3e2c-4e2b-a462-fe183e32b1ba")) return Response.json({ results: emoroJobs() });
-    if (url.includes("38c91037-f9ca-80fd-a313-d6833c2e589d")) return Response.json({ results: [] });
-    if (url.includes("d1da6a01-0507-43fc-9e3f-72a16f34a342") || url.includes("38c91037-f9ca-80ac-bef4-c824f3e1c3ef")) {
+    if (url.includes("e2a99c4d-87e9-4f3d-a99f-35d777781c32")) return Response.json({ results: emoroJobs() });
+    if (url.includes("e9b91037-f9ca-8388-abb9-87e3f743cb6d")) return Response.json({ results: [] });
+    if (url.includes("8df4fd74-0cdb-426e-8c42-d45038551b7d") || url.includes("60491037-f9ca-82cd-b1ef-072c1552caee")) {
       if (body.includes("phone_number")) {
         return Response.json({
           results: [
