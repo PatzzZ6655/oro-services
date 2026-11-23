@@ -21,13 +21,13 @@ export default function PrivacyPage() {
           { label: "Privacy" },
         ]}
       >
-        This page explains what ORO Services does with the details you send us. It is written for an Australian small business and follows the idea of the Australian Privacy Principles: collect only what the form asks for, use it for the enquiry, and let you ask about it.
+        This page explains what ORO Services does with personal information, including details you send us through this website and the records we keep when we arrange and carry out jobs. It is written for an Australian small business and follows the idea of the Australian Privacy Principles: collect only what the form asks for, use it for the enquiry, and let you ask about it.
       </InteriorHero>
       <article className="mx-auto max-w-3xl space-y-8 px-6 py-16 text-slate-700">
         <section className="space-y-3">
           <h2 className="text-2xl font-bold text-slate-900">Who we are</h2>
           <p>
-            ORO Services runs this website, www.orosvc.com. The two brands are Emoro Building and Emporo Plumbing. For privacy questions, email{" "}
+            ORO Services runs this website, www.orosvc.com. The two brands are Emoro Building (Emoro Building Pty Ltd) and Emporo Plumbing (Emporo Plumbing Pty Ltd). For privacy questions, email{" "}
             <a className="font-semibold text-brand-navy underline" href={`mailto:${corporateEmail}`}>
               {corporateEmail}
             </a>
@@ -115,7 +115,32 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        <p className="mt-16 text-xs text-slate-500">Last updated: 22 November 2026</p>
+        <section className="space-y-3">
+          <h2 className="text-2xl font-bold text-slate-900">Job records, tenants and messages</h2>
+          <p>When we arrange or carry out a job, we also collect the details we need for that job. They may come from the customer, the property manager, the owner or the tenant. They can include:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>names, phone numbers and email addresses of the customer, property manager, owner and tenant</li>
+            <li>the job address and access details, such as key, code or tenant-notice arrangements</li>
+            <li>photos of the work area</li>
+            <li>quotes, invoices and payment status</li>
+            <li>text messages, emails and notes about the job</li>
+          </ul>
+          <p>If a website enquiry becomes a job, we copy the details we need into our job records.</p>
+          <p>
+            We use these details only to arrange, carry out, invoice and follow up the job, including any workmanship or complaint issue. We do not use tenant details for marketing and we do not sell them.
+          </p>
+          <p>
+            Our job records and messages are kept in systems run by service providers, such as Google Workspace and Notion, which may store or process data outside Australia. Only people who work on our jobs can see them.
+          </p>
+          <p>
+            We keep job records for as long as we need them for the job, any workmanship or complaint issue, and our tax and legal record-keeping obligations (tax records are generally kept for 5 years).
+          </p>
+          <p>
+            Tenants and other people named in a job can ask for a copy or correction of their details by emailing {corporateEmail}, as set out under Access and correction.
+          </p>
+        </section>
+
+        <p className="mt-16 text-xs text-slate-500">Last updated: 24 November 2026</p>
       </article>
     </SiteFrame>
   );
