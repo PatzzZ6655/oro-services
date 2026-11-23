@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { inflateSync } from "node:zlib";
 
 function pngSize(file: string): { width: number; height: number; green: boolean } {
   const png = readFileSync(new URL(file, import.meta.url));
@@ -10,6 +11,58 @@ function pngSize(file: string): { width: number; height: number; green: boolean 
   const width = png.readUInt32BE(16);
   const height = png.readUInt32BE(20);
   return { width, height, green: true };
+}
+
+function cornerGreen(png: Buffer): { top: number[]; bottom: number[] } {
+  let off = 8;
+  const parts: Buffer[] = [];
+  let width = 0;
+  let height = 0;
+  while (off < png.length) {
+    const len = png.readUInt32BE(off);
+    const type = png.subarray(off + 4, off + 8).toString();
+    const data = png.subarray(off + 8, off + 8 + len);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+    } else if (type === "IDAT") parts.push(data);
+    off += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(parts));
+  const stride = width * 3;
+  const rows: Buffer[] = [];
+  let cursor = 0;
+  const paeth = (a: number, b: number, c: number) => {
+    const pa = Math.abs(b - c);
+    const pb = Math.abs(a - c);
+    const pc = Math.abs(a + b - 2 * c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[cursor];
+    cursor += 1;
+    const row = Buffer.alloc(stride);
+    const prev = rows[y - 1] ?? Buffer.alloc(stride);
+    for (let i = 0; i < stride; i += 1) {
+      const value = raw[cursor];
+      cursor += 1;
+      const left = i >= 3 ? row[i - 3] : 0;
+      const up = prev[i];
+      const upLeft = i >= 3 ? prev[i - 3] : 0;
+      let next = value;
+      if (filter === 1) next = (value + left) & 255;
+      else if (filter === 2) next = (value + up) & 255;
+      else if (filter === 3) next = (value + Math.floor((left + up) / 2)) & 255;
+      else if (filter === 4) next = (value + paeth(left, up, upLeft)) & 255;
+      row[i] = next;
+    }
+    rows.push(row);
+  }
+  const bottom = rows[height - 1];
+  return {
+    top: [rows[0][0], rows[0][1], rows[0][2]],
+    bottom: [bottom[0], bottom[1], bottom[2]],
+  };
 }
 
 test("the SMS home screen icon is its own green app and the staff icon is unchanged", () => {
@@ -47,6 +100,11 @@ test("the SMS home screen icon is its own green app and the staff icon is unchan
   const apple = readFileSync(new URL("../public/internal/sms/apple-touch-icon.png", import.meta.url));
   const staffIcon = readFileSync(new URL("../public/internal/icons/apple-touch-icon.png", import.meta.url));
   assert.equal(apple.equals(staffIcon), false);
+  const large = readFileSync(new URL("../public/internal/sms/icon-512.png", import.meta.url));
+  const green = cornerGreen(large);
+  assert.ok(green.top[1] >= 190 && green.top[1] <= 215, `top green ${green.top}`);
+  assert.ok(green.bottom[1] >= 190 && green.bottom[1] <= 220, `bottom green ${green.bottom}`);
+  assert.ok(green.bottom[0] >= 40, `bottom is too dark ${green.bottom}`);
 
   const page = readFileSync(new URL("../src/app/internal/(portal)/sms-reply/page.tsx", import.meta.url), "utf8");
   const layout = readFileSync(new URL("../src/app/internal/layout.tsx", import.meta.url), "utf8");
