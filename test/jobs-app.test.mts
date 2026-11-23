@@ -984,6 +984,12 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /Create job/);
   assert.match(page, /\/jobs\/api\/new\/read/);
   assert.match(page, /screenshotReadFallback/);
+  assert.equal(page.includes("introTestNote"), false);
+  assert.equal(page.includes("While testing, To is rewritten"), false);
+  const intro = readFileSync(new URL("../src/lib/jobs-app/intro-email.ts", import.meta.url), "utf8");
+  assert.equal(intro.includes("introTestRecipient"), false);
+  assert.equal(intro.includes("introTestNote"), false);
+  assert.equal(intro.includes("pat.z+tenant-intro@orosvc.com"), false);
   assert.equal(screenshotReadFallback, "Couldn't read the screenshots — type the details in");
   const lock = readFileSync(new URL("../src/components/jobs/keep-page.tsx", import.meta.url), "utf8");
   const depart = readFileSync(new URL("../src/components/jobs/depart-screen.tsx", import.meta.url), "utf8");

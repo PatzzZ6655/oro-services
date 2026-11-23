@@ -1,9 +1,5 @@
 import { businessLabel, type Business } from "@/lib/jobs-app/types";
 
-export const introTestRecipient = "pat.z+tenant-intro@orosvc.com";
-
-export const introTestNote = `While testing, To is rewritten to ${introTestRecipient}.`;
-
 export type IntroTenant = { name: string; email: string };
 
 export type IntroPreview = {
