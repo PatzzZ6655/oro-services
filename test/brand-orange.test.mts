@@ -30,6 +30,9 @@ test("Emoro accents use the brand hue instead of Tailwind orange", () => {
     assert.equal(/orange-\d+/.test(text), false, file);
     assert.equal(text.includes("#ea580c"), false, file);
   }
+  const contact = source("src/components/contact-section.tsx");
+  assert.match(contact, /uppercase tracking-widest text-slate-500/);
+  assert.equal(contact.includes("text-brand-orange"), false);
   const tones = source("src/lib/content.ts");
   assert.match(tones, /button: "bg-brand-orange hover:bg-brand-orange-hover"/);
   assert.match(tones, /button: "bg-brand-navy hover:bg-brand-blue"/);

@@ -5,7 +5,7 @@ import { brands, corporateEmail } from "@/lib/content";
 export function ContactSection() {
   return (
     <section id="contact" className="mx-auto max-w-4xl scroll-mt-32 px-6 py-20 text-center md:py-24">
-      <span className="text-xs font-bold uppercase tracking-widest text-brand-orange">
+      <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
         Contact
       </span>
       <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
