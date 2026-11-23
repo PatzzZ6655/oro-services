@@ -159,9 +159,9 @@ export const smsStageSuggestions: Record<string, Array<{ id: string; variant: st
   "In Progress (Return Key)": [{ id: "keys", variant: "return" }],
 };
 
-/** A Notion test job is titled TEST, TEST_ or TEST –. "Testing the tap" is not one. */
-export function isSmsTestJob(title: string): boolean {
-  return /^test(?:$|[\s_\-–—])/i.test(title.trim());
+/** A test job title or address starts with TEST, in any case, after trimming. */
+export function isSmsTestJob(value: string): boolean {
+  return value.trim().toLowerCase().startsWith("test");
 }
 
 /**

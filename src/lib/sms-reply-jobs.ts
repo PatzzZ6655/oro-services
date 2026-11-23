@@ -341,9 +341,9 @@ export function jobsFromNotion(payload: unknown, business: Business): SmsOpenJob
   return jobs;
 }
 
-/** Keep the configured active statuses. Drop TEST titles in production. */
+/** Keep the configured active statuses. Drop a title or address that starts with TEST. */
 export function keepActiveSmsJobs(jobs: SmsOpenJob[], includeTest = smsIncludeTestJobs()): SmsOpenJob[] {
-  return jobs.filter((job) => isAllowedSmsStatus(job.status) && (includeTest || !isSmsTestJob(job.title)));
+  return jobs.filter((job) => isAllowedSmsStatus(job.status) && (includeTest || !(isSmsTestJob(job.title) || isSmsTestJob(job.address))));
 }
 
 export function compareSmsJobs(left: SmsOpenJob, right: SmsOpenJob): number {
@@ -403,7 +403,7 @@ export async function listSmsJobs(fetchImpl?: FetchLike): Promise<{ status: numb
   try {
     const [emoro, emporo] = await Promise.all([queryBrandJobs("emoro", token, call), queryBrandJobs("emporo", token, call)]);
     if (!emoro || !emporo) return { status: 502, body: { ok: false, error: "upstream", message: "The job list could not be loaded." } };
-    const jobs = keepActiveSmsJobs([...emoro, ...emporo]).sort(compareSmsJobs);
+    const jobs = keepActiveSmsJobs([...emoro, ...emporo], false).sort(compareSmsJobs);
     return { status: 200, body: { ok: true, jobs } };
   } catch (error) {
     const name = error instanceof Error ? error.name : "Error";

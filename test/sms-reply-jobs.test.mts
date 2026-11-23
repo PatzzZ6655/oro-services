@@ -73,14 +73,14 @@ function notionJob(id: string, title: string, address: string, status: string) {
 function emoroJobs() {
   return [
     notionJob(OLD, "Kitchen leak", SAME, "Complete"),
-    notionJob(ACTIVE, "TEST_ kitchen leak", "12 Test St, Doncaster East", "New Work Order"),
+    notionJob(ACTIVE, "Kitchen leak repair", "12 Test St, Doncaster East", "New Work Order"),
     notionJob("44444444-4444-4444-4444-444444444444", "TEST_ other", "9 Other Road, Fitzroy", "Quoting"),
   ];
 }
 
 const activePair: SmsOpenJob[] = [
   { business: "emoro", jobId: OLD, title: "Kitchen leak", address: SAME, status: "Complete", scheduled: "2024-01-01" },
-  { business: "emoro", jobId: ACTIVE, title: "TEST_ kitchen leak", address: "12 Test St, Doncaster East", status: "New Work Order", scheduled: "2026-11-25T09:00:00+11:00" },
+  { business: "emoro", jobId: ACTIVE, title: "Kitchen leak repair", address: "12 Test St, Doncaster East", status: "New Work Order", scheduled: "2026-11-25T09:00:00+11:00" },
   { business: "emoro", jobId: "44444444-4444-4444-4444-444444444444", title: "Cancelled tap", address: SAME, status: "Cancelled", scheduled: "" },
 ];
 
@@ -118,8 +118,10 @@ test("an address match keeps the active job and drops the finished one at the sa
   assert.equal(parsed.some((job) => job.status === "Complete"), true);
   assert.deepEqual(keepActiveSmsJobs(parsed).map((job) => job.status).sort(), ["New Work Order", "Quoting"]);
   assert.equal(isSmsTestJob("TEST_ kitchen leak"), true);
-  assert.equal(isSmsTestJob("Testing the tap"), false);
-  assert.deepEqual(keepActiveSmsJobs(parsed, false).map((job) => job.jobId), []);
+  assert.equal(isSmsTestJob("  TeSt kitchen"), true);
+  assert.equal(isSmsTestJob("Testing the tap"), true);
+  assert.equal(isSmsTestJob("12 Test St"), false);
+  assert.deepEqual(keepActiveSmsJobs(parsed, false).map((job) => job.jobId), [ACTIVE]);
   assert.equal(smsIncludeTestJobs({ VERCEL_ENV: "production" }), false);
   assert.equal(smsIncludeTestJobs({ VERCEL_ENV: "preview" }), true);
   const emoro = jobsQuery("emoro");
@@ -147,6 +149,18 @@ test("an address match keeps the active job and drops the finished one at the sa
   assert.equal(emoroNames.includes("Complete") || emporoNames.includes("Cancelled"), false);
   assert.ok(smsJobStage("Job Key Appointing") < smsJobStage("In Progress"));
   assert.ok(smsJobStage("In Progress") < smsJobStage("In Progress (Return Key)"));
+});
+
+test("the job list drops a title or address that starts with TEST", () => {
+  const jobs: SmsOpenJob[] = [
+    { business: "emoro", jobId: "title", title: "  TEST kitchen", address: "1 Smith St", status: "New Work Order", scheduled: "" },
+    { business: "emporo", jobId: "address", title: "Hot water", address: "test 9 Road", status: "Quoting", scheduled: "" },
+    { business: "emoro", jobId: "kept", title: "Real repair", address: "12 Test St", status: "In Progress", scheduled: "" },
+  ];
+  assert.deepEqual(
+    keepActiveSmsJobs(jobs, false).map((job) => job.jobId),
+    ["kept"],
+  );
 });
 
 test("a bare mobile matches the active job, not an older job at the same address", () => {
@@ -318,7 +332,7 @@ test("the job route reads active jobs and writes a tenant number only when asked
     assert.equal(listed.status, 200);
     assert.deepEqual(
       listedBody.jobs.map((job) => job.jobId),
-      [ACTIVE, "44444444-4444-4444-4444-444444444444"],
+      [ACTIVE],
     );
     assert.equal(listedBody.jobs.some((job) => job.status === "Complete" || job.status === "Cancelled"), false);
     assert.equal(calls.some((call) => call.url.includes("/depart") || call.url.includes("/leave") || call.url.includes("/v1/pages")), false);
