@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { allowedEmails } from "@/lib/auth/session";
 import { reportCard, type ReportKind } from "@/lib/reports/catalog";
 import { driveAppProperty, driveFolderQuery, submissionFolderName } from "@/lib/reports/paths";
@@ -251,6 +252,13 @@ export async function listRecentReports(): Promise<StoredReport[]> {
     url: row.url,
   }));
 }
+
+/** Shared company Drive list. The refresh token is not per staff user. */
+export const recentReportsCacheSeconds = 45;
+
+export const listCachedRecentReports = unstable_cache(listRecentReports, ["oro-recent-reports"], {
+  revalidate: recentReportsCacheSeconds,
+});
 
 export async function saveLicenceRecord(record: Omit<LicenceRecord, "id" | "created">): Promise<void> {
   const token = await accessToken();

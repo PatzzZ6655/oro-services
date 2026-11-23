@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { requireUser } from "@/lib/auth/current";
 import { PortalFallback, PortalFrame, showFieldJobs } from "@/components/internal/portal-frame";
 import { reportCards } from "@/lib/reports/catalog";
 import { safetyCards } from "@/lib/reports/safety";
 import { formatAuDate } from "@/lib/reports/dates";
-import { driveConfigured, listRecentReports, type StoredReport } from "@/lib/reports/drive";
+import { driveConfigured, listCachedRecentReports, type StoredReport } from "@/lib/reports/drive";
 
 export default function Page() {
   return (
@@ -17,7 +18,6 @@ export default function Page() {
 
 async function Hub() {
   const user = await requireUser();
-  const recent = await recentReports();
 
   return (
     <PortalFrame email={user.email} name={user.name}>
@@ -33,7 +33,7 @@ async function Hub() {
         </div>
       </div>
       {showFieldJobs(user.email) ? <FieldJobTiles /> : null}
-      <ReportsPanel recent={recent} />
+      <ReportsPanel />
     </PortalFrame>
   );
 }
@@ -68,17 +68,13 @@ function FieldJobTiles() {
 async function recentReports(): Promise<{ status: "unconfigured" } | { status: "error" } | { status: "ready"; rows: StoredReport[] }> {
   if (!driveConfigured()) return { status: "unconfigured" };
   try {
-    return { status: "ready", rows: await listRecentReports() };
+    return { status: "ready", rows: await listCachedRecentReports() };
   } catch {
     return { status: "error" };
   }
 }
 
-function ReportsPanel({
-  recent,
-}: {
-  recent: { status: "unconfigured" } | { status: "error" } | { status: "ready"; rows: StoredReport[] } | null;
-}) {
+function ReportsPanel() {
   return (
     <div className="mt-4 space-y-4">
       {(
@@ -108,32 +104,48 @@ function ReportsPanel({
       ))}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-base font-semibold text-brand-navy">Recent reports</h2>
-        {recent?.status === "unconfigured" ? (
-          <p className="mt-2 text-sm text-slate-600">Recent reports appear here once Google Drive is connected.</p>
-        ) : null}
-        {recent?.status === "error" ? <p className="mt-2 text-sm text-slate-600">The report list could not be loaded.</p> : null}
-        {recent?.status === "ready" && recent.rows.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">No reports filed yet.</p>
-        ) : null}
-        {recent?.status === "ready" && recent.rows.length > 0 ? (
-          <ul className="mt-2 divide-y divide-slate-200">
-            {recent.rows.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900">{row.title}</p>
-                  <p className="truncate text-sm text-slate-600">
-                    {row.date ? formatAuDate(row.date) : "Date not recorded"}
-                    {row.address ? ` · ${row.address}` : ""}
-                  </p>
-                </div>
-                <a href={row.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-sm font-semibold text-brand-navy underline">
-                  PDF
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <Suspense fallback={<RecentReportsPlaceholder />}>
+          <RecentReports />
+        </Suspense>
       </section>
     </div>
+  );
+}
+
+function RecentReportsPlaceholder() {
+  return <p className="mt-2 text-sm text-slate-600">Loading recent reports…</p>;
+}
+
+async function RecentReports() {
+  await connection();
+  const recent = await recentReports();
+  return (
+    <>
+      {recent.status === "unconfigured" ? (
+        <p className="mt-2 text-sm text-slate-600">Recent reports appear here once Google Drive is connected.</p>
+      ) : null}
+      {recent.status === "error" ? <p className="mt-2 text-sm text-slate-600">The report list could not be loaded.</p> : null}
+      {recent.status === "ready" && recent.rows.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-600">No reports filed yet.</p>
+      ) : null}
+      {recent.status === "ready" && recent.rows.length > 0 ? (
+        <ul className="mt-2 divide-y divide-slate-200">
+          {recent.rows.map((row) => (
+            <li key={row.id} className="flex items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">{row.title}</p>
+                <p className="truncate text-sm text-slate-600">
+                  {row.date ? formatAuDate(row.date) : "Date not recorded"}
+                  {row.address ? ` · ${row.address}` : ""}
+                </p>
+              </div>
+              <a href={row.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-sm font-semibold text-brand-navy underline">
+                PDF
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
   );
 }
