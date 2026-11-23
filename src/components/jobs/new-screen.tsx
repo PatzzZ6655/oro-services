@@ -34,7 +34,7 @@ import {
   tenantsFromTyped,
   type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
-import { introBody, introStatusText, introSubject, introTenantLine, introTestNote, type IntroTenant } from "@/lib/jobs-app/intro-email";
+import { introBody, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
@@ -414,7 +414,6 @@ export function NewJobScreen() {
         <KeepPage>
           <Screen title="Intro email" back={<BackLink href="/jobs" />}>
             <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p>
-            <p className="text-base text-neutral-700">{introTestNote}</p>
             <JobsButton type="button" variant="outline" onClick={() => setIntroPhase("done")}>
               Done
             </JobsButton>
@@ -425,7 +424,6 @@ export function NewJobScreen() {
     return (
       <KeepPage>
       <Screen title="Intro email" back={<BackLink href="/jobs" />}>
-        <p className="text-base text-neutral-700">{introTestNote}</p>
         <p className="text-lg font-semibold">{introSubject(preview.address, preview.brand)}</p>
         <ul className="space-y-2 text-base">
           {people.map((row, index) => (
