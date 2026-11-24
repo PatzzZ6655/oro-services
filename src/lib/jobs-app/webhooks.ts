@@ -1,3 +1,4 @@
+import { jobPropertyAddress } from "@/lib/jobs-app/property-address";
 import {
   newJobNeedDetail,
   newJobTextCoversScreenshots,
@@ -428,6 +429,7 @@ export type ScreenshotRead = {
   pmEmail: string;
   pmPhone: string;
   tenants: JobTenant[];
+  officeHint: string;
 };
 
 function readValue(json: Record<string, unknown>, key: string, max: number, secret: string): string {
@@ -466,6 +468,9 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
     }
     const secret = config.secret;
     const guess = businessGuess(readValue(result.json, "businessGuess", 20, secret));
+    const agency = readValue(result.json, "pmAgency", 80, secret);
+    const rawAddress = readValue(result.json, "address", 300, secret);
+    const address = jobPropertyAddress(rawAddress, { agency });
     return {
       status: 200,
       body: {
@@ -476,7 +481,7 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
         tenantName: readValue(result.json, "tenantName", 80, secret),
         phone: readValue(result.json, "phone", 40, secret),
         email: readValue(result.json, "email", 120, secret),
-        address: readValue(result.json, "address", 300, secret),
+        address,
         description: readValue(result.json, "description", 2000, secret),
         workOrderNumber: readValue(result.json, "workOrderNumber", 80, secret),
         voucher: readValue(result.json, "voucher", 40, secret),
@@ -484,7 +489,7 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
         phone2: readValue(result.json, "phone2", 40, secret),
         email2: readValue(result.json, "email2", 120, secret),
         pmName: readValue(result.json, "pmName", 80, secret),
-        pmAgency: readValue(result.json, "pmAgency", 80, secret),
+        pmAgency: agency,
         pmEmail: readValue(result.json, "pmEmail", 120, secret),
         pmPhone: readValue(result.json, "pmPhone", 40, secret),
         tenants: parseTenantList(result.json.tenants).map((row) => ({
@@ -492,6 +497,7 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
           phone: text(row.phone, 40, secret),
           email: text(row.email, 120, secret),
         })),
+        officeHint: address ? "" : rawAddress,
       },
     };
   } catch {
