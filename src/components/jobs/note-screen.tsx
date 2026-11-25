@@ -16,9 +16,19 @@ function emptyParsed(): ParsedNote {
   return { materials: [], tools: [], notes: [], todos: [] };
 }
 
+type Heard = {
+  lang: string;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  abort: () => void;
+};
+
 export function NoteScreen() {
   const router = useRouter();
   const box = useRef<HTMLTextAreaElement>(null);
+  const heardRef = useRef<Heard | null>(null);
+  const draftReady = useRef(false);
   const [jobs, setJobs] = useState<NoteJob[] | null>(null);
   const [today, setToday] = useState("");
   const [group, setGroup] = useState<NoteGroup>("progress");
@@ -60,6 +70,54 @@ export function NoteScreen() {
   }, [router]);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyOverscroll: body.style.overscrollBehavior,
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+    };
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    let startY = 0;
+    const onStart = (event: TouchEvent) => {
+      startY = event.touches[0]?.clientY ?? 0;
+    };
+    const onMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? 0;
+      if (y <= startY + 8) return;
+      let node = event.target instanceof Element ? event.target : null;
+      while (node) {
+        if (node instanceof HTMLElement && node.scrollTop > 0) return;
+        node = node.parentElement;
+      }
+      if (event.cancelable) event.preventDefault();
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      html.style.overscrollBehavior = previous.htmlOverscroll;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady.current) {
+      draftReady.current = true;
+      return;
+    }
+    if (!text.trim()) {
+      localStorage.removeItem(draftKey);
+      return;
+    }
     localStorage.setItem(draftKey, JSON.stringify({ text, group, jobId }));
   }, [text, group, jobId]);
 
@@ -68,12 +126,7 @@ export function NoteScreen() {
   const chosen = choices.find((job) => job.jobId === jobId) ?? null;
 
   function dictate() {
-    const speech = (window as unknown as { webkitSpeechRecognition?: new () => {
-      lang: string;
-      onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-      onend: (() => void) | null;
-      start: () => void;
-    } }).webkitSpeechRecognition;
+    const speech = (window as unknown as { webkitSpeechRecognition?: new () => Heard }).webkitSpeechRecognition;
     if (!speech) {
       box.current?.focus();
       return;
@@ -93,10 +146,34 @@ export function NoteScreen() {
     };
     heard.onend = () => {
       setListening(false);
+      if (heardRef.current !== heard) return;
       if (spoken.trim()) void submit(spoken);
     };
+    heardRef.current = heard;
     setListening(true);
     heard.start();
+  }
+
+  function reenter() {
+    const heard = heardRef.current;
+    heardRef.current = null;
+    if (heard) {
+      heard.onresult = null;
+      heard.onend = null;
+      try {
+        heard.abort();
+      } catch {
+        // Recognition already finished.
+      }
+    }
+    setListening(false);
+    setText("");
+    setParsed(null);
+    setSuggestion(null);
+    setError("");
+    setSaved("");
+    localStorage.removeItem(draftKey);
+    box.current?.focus();
   }
 
   async function keep(next: ParsedNote, review: boolean, id: string) {
@@ -157,7 +234,8 @@ export function NoteScreen() {
   if (!jobs) return <Spinner label="Opening" />;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
+    <div data-note-scroll="page" className="fixed inset-0 overflow-y-auto overscroll-none bg-white text-black">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
       <h1 className="text-center text-xl font-semibold">随手记</h1>
       <div className="grid grid-cols-2 gap-2">
         {noteGroups.map((item) => (
@@ -177,7 +255,7 @@ export function NoteScreen() {
       {group === "chore" ? (
         <p className="text-base">Not job-related.</p>
       ) : (
-        <div className="h-[50vh] overflow-y-auto rounded-2xl border border-black">
+        <div data-note-jobs="list" className="h-[50vh] overflow-y-auto overscroll-y-contain rounded-2xl border border-black">
           {choices.length === 0 ? <p className="px-4 py-3 text-base">No jobs in this group.</p> : null}
           {sections.map((section) => (
             <div key={section.label || "jobs"}>
@@ -207,9 +285,14 @@ export function NoteScreen() {
         placeholder="Dictate with the keyboard mic, or type."
         className={`${fieldClass} min-h-40 py-3`}
       />
-      <JobsButton type="button" variant="outline" onClick={dictate}>
-        {listening ? "Listening" : "Mic"}
-      </JobsButton>
+      <div className="grid grid-cols-2 gap-2">
+        <JobsButton type="button" variant="outline" onClick={dictate}>
+          {listening ? "Listening" : "Mic"}
+        </JobsButton>
+        <JobsButton type="button" variant="outline" onClick={reenter}>
+          重新输入
+        </JobsButton>
+      </div>
       <JobsButton type="button" onClick={() => void submit()} disabled={Boolean(busy) || !text.trim()}>
         {busy || "Save note"}
       </JobsButton>
@@ -304,5 +387,6 @@ export function NoteScreen() {
         </section>
       ) : null}
     </main>
+    </div>
   );
 }
