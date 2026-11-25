@@ -17,8 +17,19 @@ const privateHeaders = {
   "referrer-policy": "no-referrer",
 };
 
+/** Spoken SMS text. Control characters are removed; longer text is refused. */
+export const smsBodyLimit = 300;
+
+export function smsMessageBody(input: string): string | null {
+  if (input.length > smsBodyLimit * 4) return null;
+  const cleaned = input.replace(/[\p{Cc}]/gu, "").trim();
+  if (cleaned.length > smsBodyLimit) return null;
+  return cleaned;
+}
+
 export function smsLinkResponse(url: string): Response {
-  const raw = new URL(url).searchParams.get("to");
+  const params = new URL(url).searchParams;
+  const raw = params.get("to");
   const number = raw ? australianSmsNumber(raw) : null;
   if (!number) {
     return new Response("That number is not valid.", {
@@ -26,25 +37,34 @@ export function smsLinkResponse(url: string): Response {
       headers: { ...privateHeaders, "content-type": "text/plain; charset=utf-8" },
     });
   }
-  return new Response(smsBridgePage(number), {
+  const rawBody = params.get("body");
+  const body = rawBody ? smsMessageBody(rawBody) : "";
+  if (rawBody && body === null) {
+    return new Response("That message is too long.", {
+      status: 400,
+      headers: { ...privateHeaders, "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+  return new Response(smsBridgePage(number, body ?? ""), {
     status: 200,
     headers: { ...privateHeaders, "content-type": "text/html; charset=utf-8" },
   });
 }
 
-export function smsBridgePage(number: string): string {
-  const href = `sms:${number}`;
+export function smsBridgePage(number: string, body = ""): string {
+  const href = body ? `sms:${number}?&body=${encodeURIComponent(body)}` : `sms:${number}`;
+  const attr = href.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
   return `<!doctype html>
 <html lang="en-AU">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="refresh" content="0;url=${href}">
+<meta http-equiv="refresh" content="0;url=${attr}">
 <title>Open Messages</title>
 </head>
 <body>
-<p><a href="${href}">Open Messages</a></p>
+<p><a href="${attr}">Open Messages</a></p>
 <script>location.replace(${JSON.stringify(href)})</script>
 </body>
 </html>`;
