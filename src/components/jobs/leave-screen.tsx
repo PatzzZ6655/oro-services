@@ -7,6 +7,7 @@ import { JobsClientError, postJobsForm } from "@/components/jobs/api";
 import { useClientReady } from "@/components/jobs/client-ready";
 import { InvoiceWizard } from "@/components/jobs/invoice-wizard";
 import { KeepPage } from "@/components/jobs/keep-page";
+import { PhotoBurst } from "@/components/jobs/photo-burst";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
@@ -21,7 +22,7 @@ import {
   type LeaveDraft,
 } from "@/lib/jobs-app/leave-draft";
 import { clearLeaveNext, parseLeaveNext, readLeaveNext, writeLeaveNext } from "@/lib/jobs-app/next-visit";
-import { keptCount, LEAVE_MAX_EDGE, LEAVE_QUALITIES } from "@/lib/jobs-app/photos";
+import { keptCount, LEAVE_MAX_EDGE, LEAVE_MAX_PHOTOS, LEAVE_QUALITIES } from "@/lib/jobs-app/photos";
 import type { LeaveResult } from "@/lib/jobs-app/types";
 import { clearVisit, loadVisit, type ActiveVisit } from "@/lib/jobs-app/visit";
 
@@ -403,29 +404,21 @@ export function LeaveScreen() {
             Other issues found (optional, saved to Notion only, not in the SMS or the property-manager email)
             <textarea value={issues} onChange={(event) => setIssues(event.target.value)} rows={3} className={`${fieldClass} py-3`} />
           </label>
-          <label className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-black text-lg font-semibold">
-            Choose photos
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              onChange={(event) => {
-                const picked = [...(event.target.files ?? [])];
-                setPhotos(picked);
-                setPhotoCount(picked.length);
-                if (picked.length > 0) setPhotosCleared(false);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
-          {photos.length > 0 ? (
-            <p>{photos.length} selected</p>
-          ) : photosCleared ? (
+          <PhotoBurst
+            files={photos}
+            max={LEAVE_MAX_PHOTOS}
+            doneLabel="Done"
+            disabled={Boolean(busy)}
+            onChange={(next) => {
+              setPhotos(next);
+              setPhotoCount(next.length);
+              if (next.length > 0) setPhotosCleared(false);
+            }}
+            onDone={() => undefined}
+          />
+          {photos.length === 0 && photosCleared ? (
             <p>The photos were cleared when the page reloaded. Add them again if you still want them with this visit.</p>
-          ) : (
-            <p>Photos are optional.</p>
-          )}
+          ) : null}
           <JobsButton type="button" onClick={() => submit(false)}>
             Submit
           </JobsButton>
