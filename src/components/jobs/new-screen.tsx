@@ -37,6 +37,7 @@ import {
 import { introBody, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
+import type { AgencyClient } from "@/lib/jobs-app/client-match";
 import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
 
 function created(value: boolean | null): string {
@@ -128,6 +129,9 @@ export function NewJobScreen() {
   const [tenants, setTenants] = useState<JobTenant[]>(blankTenants());
   const [address, setAddress] = useState("");
   const [pmAgency, setPmAgency] = useState("");
+  const [clientChoices, setClientChoices] = useState<AgencyClient[]>([]);
+  const [clientPick, setClientPick] = useState("");
+  const [clientStatus, setClientStatus] = useState<"idle" | "none" | "one" | "several">("idle");
   const [description, setDescription] = useState("");
   const [workOrderNumber, setWorkOrderNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -220,6 +224,42 @@ export function NewJobScreen() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hydrated, result, currentDraft, files.length]);
 
+  async function matchClients(agency: string, hint: string) {
+    if (!isBusiness(business) || !agency.trim()) {
+      setClientChoices([]);
+      setClientPick("");
+      setClientStatus("idle");
+      return;
+    }
+    try {
+      const found = await postJobs<{ pick: AgencyClient | null; suggestions: AgencyClient[] }>("/jobs/api/new/clients", {
+        business,
+        agency,
+        hint,
+      });
+      setClientChoices(found.suggestions);
+      setClientPick(found.pick?.id ?? "");
+      setClientStatus(found.pick ? "one" : found.suggestions.length > 0 ? "several" : "none");
+      if (found.pick) {
+        setPmAgency((current) => {
+          const typed = current.trim().toLowerCase();
+          if (!typed || typed === agency.trim().toLowerCase()) return found.pick?.name ?? current;
+          return current;
+        });
+      }
+    } catch {
+      setClientChoices([]);
+      setClientPick("");
+      setClientStatus("idle");
+    }
+  }
+
+  function chooseClient(client: AgencyClient) {
+    setPmAgency(client.name);
+    setClientPick(client.id);
+    setClientStatus("one");
+  }
+
   async function continueToCheck() {
     if (pending.current) return;
     if (!isBusiness(business)) {
@@ -230,6 +270,7 @@ export function NewJobScreen() {
       setReadyFiles([]);
       setTenants(tenantsFromTyped(tenantName, phone));
       setError("");
+      void matchClients(pmAgency, "");
       setStep("check");
       return;
     }
@@ -264,13 +305,16 @@ export function NewJobScreen() {
         pmAgency: string;
         pmEmail: string;
         pmPhone: string;
+        officeHint?: string;
         tenants?: JobTenant[];
       }>("/jobs/api/new/read", form);
       const recognised = parseReadSnapshot(read);
       setReadSnapshot(recognised);
       setTenants(tenantsFromRead(read, { name: tenantName, phone }));
+      const nextAgency = preferTyped(pmAgency, read.pmAgency);
       setAddress(preferTyped(address, read.address));
-      setPmAgency(preferTyped(pmAgency, read.pmAgency));
+      setPmAgency(nextAgency);
+      void matchClients(nextAgency, read.officeHint ?? "");
       setDescription(preferTyped(description, read.description));
       setWorkOrderNumber(preferTyped(workOrderNumber, read.workOrderNumber));
       setVoucher(preferTyped(voucher, read.voucher.toUpperCase()));
@@ -508,6 +552,11 @@ export function NewJobScreen() {
             setAddress={setAddress}
             pmAgency={pmAgency}
             setPmAgency={setPmAgency}
+            clientChoices={clientChoices}
+            clientPick={clientPick}
+            clientStatus={clientStatus}
+            onChooseClient={chooseClient}
+            onAgencyBlur={() => void matchClients(pmAgency, "")}
             description={description}
             setDescription={setDescription}
             workOrderNumber={workOrderNumber}
@@ -570,6 +619,11 @@ export function NewJobScreen() {
             setAddress={setAddress}
             pmAgency={pmAgency}
             setPmAgency={setPmAgency}
+            clientChoices={clientChoices}
+            clientPick={clientPick}
+            clientStatus={clientStatus}
+            onChooseClient={chooseClient}
+            onAgencyBlur={() => void matchClients(pmAgency, "")}
             description={description}
             setDescription={setDescription}
             workOrderNumber={workOrderNumber}
@@ -599,6 +653,11 @@ function DetailFields({
   setAddress,
   pmAgency,
   setPmAgency,
+  clientChoices = [],
+  clientPick = "",
+  clientStatus = "idle",
+  onChooseClient,
+  onAgencyBlur,
   description,
   setDescription,
   workOrderNumber,
@@ -617,6 +676,11 @@ function DetailFields({
   setAddress: (value: string) => void;
   pmAgency: string;
   setPmAgency: (value: string) => void;
+  clientChoices?: AgencyClient[];
+  clientPick?: string;
+  clientStatus?: "idle" | "none" | "one" | "several";
+  onChooseClient?: (client: AgencyClient) => void;
+  onAgencyBlur?: () => void;
   description: string;
   setDescription: (value: string) => void;
   workOrderNumber: string;
@@ -646,8 +710,23 @@ function DetailFields({
       </label>
       <label className="flex flex-col gap-2 text-base">
         PM agency
-        <input value={pmAgency} onChange={(event) => setPmAgency(event.target.value)} maxLength={80} className={fieldClass} />
+        <input value={pmAgency} onChange={(event) => setPmAgency(event.target.value)} onBlur={onAgencyBlur} maxLength={80} className={fieldClass} />
       </label>
+      {clientStatus === "one" && clientPick ? (
+        <p className="text-sm text-neutral-700">Existing client: {clientChoices.find((client) => client.id === clientPick)?.name ?? pmAgency}</p>
+      ) : null}
+      {clientStatus === "several" ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-neutral-700">Choose an existing client</p>
+          {clientChoices.map((client) => (
+            <button key={client.id} type="button" onClick={() => onChooseClient?.(client)} className="min-h-11 rounded-2xl border border-black px-3 text-left text-base">
+              {client.name}
+              {client.company ? ` · ${client.company}` : ""}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {clientStatus === "none" ? <p className="text-sm text-neutral-700">No existing client. A new client will not be created.</p> : null}
       <label className="flex flex-col gap-2 text-base">
         Job description
         <input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={newJobTextLimits.description} className={fieldClass} />
