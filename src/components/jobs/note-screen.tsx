@@ -80,11 +80,21 @@ export function NoteScreen() {
     }
     const heard = new speech();
     heard.lang = "zh-CN";
+    const prior = text.trim();
+    let spoken = prior;
     heard.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? "";
-      if (transcript) setText((current) => (current ? `${current} ${transcript}` : transcript));
+      const heardText = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      if (!heardText) return;
+      spoken = [prior, heardText].filter(Boolean).join(" ");
+      setText(spoken);
     };
-    heard.onend = () => setListening(false);
+    heard.onend = () => {
+      setListening(false);
+      if (spoken.trim()) void submit(spoken);
+    };
     setListening(true);
     heard.start();
   }
@@ -105,8 +115,8 @@ export function NoteScreen() {
     }
   }
 
-  async function submit() {
-    const spoken = text.trim();
+  async function submit(spokenRaw?: string) {
+    const spoken = (spokenRaw ?? text).trim();
     if (!spoken || busy) return;
     setBusy("Reading");
     setError("");
@@ -167,26 +177,27 @@ export function NoteScreen() {
       {group === "chore" ? (
         <p className="text-base">Not job-related.</p>
       ) : (
-        <select value={jobId} onChange={(event) => setJobId(event.target.value)} className={fieldClass}>
-          <option value="">Choose a job</option>
-          {sections.map((section) =>
-            section.label ? (
-              <optgroup key={section.label} label={section.label}>
-                {section.jobs.map((job) => (
-                  <option key={`${job.business}:${job.jobId}`} value={job.jobId}>
+        <div className="h-[50vh] overflow-y-auto rounded-2xl border border-black">
+          {choices.length === 0 ? <p className="px-4 py-3 text-base">No jobs in this group.</p> : null}
+          {sections.map((section) => (
+            <div key={section.label || "jobs"}>
+              {section.label ? <p className="sticky top-0 bg-white px-4 py-2 text-sm font-semibold">{section.label}</p> : null}
+              {section.jobs.map((job) => {
+                const selected = job.jobId === jobId;
+                return (
+                  <button
+                    key={`${job.business}:${job.jobId}`}
+                    type="button"
+                    onClick={() => setJobId(job.jobId)}
+                    className={`flex min-h-14 w-full items-center px-4 text-left text-base ${selected ? "bg-black text-white" : "bg-white"}`}
+                  >
                     {noteJobLabel(job)}
-                  </option>
-                ))}
-              </optgroup>
-            ) : (
-              section.jobs.map((job) => (
-                <option key={`${job.business}:${job.jobId}`} value={job.jobId}>
-                  {noteJobLabel(job)}
-                </option>
-              ))
-            ),
-          )}
-        </select>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       )}
       <textarea
         ref={box}
@@ -212,6 +223,7 @@ export function NoteScreen() {
               Use {noteJobLabel(suggestion)}
             </button>
           ) : null}
+          {parsed.materials.length > 0 ? <p className="mt-3 text-sm font-semibold">Materials</p> : null}
           {parsed.materials.map((item, index) => (
             <label key={`material-${index}`} className="mt-2 flex items-center gap-2">
               <input
@@ -223,11 +235,13 @@ export function NoteScreen() {
                 }}
                 className={fieldClass}
               />
+              {item.costAud != null ? <span className="shrink-0 text-sm">${item.costAud.toFixed(2)}{item.store ? ` · ${item.store}` : ""}</span> : null}
               <button type="button" className="min-h-11 text-sm underline" onClick={() => setParsed({ ...parsed, materials: parsed.materials.filter((_, itemIndex) => itemIndex !== index) })}>
                 Delete
               </button>
             </label>
           ))}
+          {parsed.tools.length > 0 ? <p className="mt-3 text-sm font-semibold">Tools</p> : null}
           {parsed.tools.map((item, index) => (
             <label key={`tool-${index}`} className="mt-2 flex items-center gap-2">
               <input
@@ -244,6 +258,7 @@ export function NoteScreen() {
               </button>
             </label>
           ))}
+          {parsed.notes.length > 0 ? <p className="mt-3 text-sm font-semibold">Notes</p> : null}
           {parsed.notes.map((item, index) => (
             <label key={`note-${index}`} className="mt-2 flex items-center gap-2">
               <input
@@ -260,6 +275,7 @@ export function NoteScreen() {
               </button>
             </label>
           ))}
+          {parsed.todos.length > 0 ? <p className="mt-3 text-sm font-semibold">To-dos</p> : null}
           {parsed.todos.map((item, index) => (
             <label key={`todo-${index}`} className="mt-2 flex items-center gap-2">
               <input
@@ -271,6 +287,7 @@ export function NoteScreen() {
                 }}
                 className={fieldClass}
               />
+              {item.due ? <span className="shrink-0 text-sm">{item.due}</span> : null}
               <button type="button" className="min-h-11 text-sm underline" onClick={() => setParsed({ ...parsed, todos: parsed.todos.filter((_, itemIndex) => itemIndex !== index) })}>
                 Delete
               </button>

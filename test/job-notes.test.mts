@@ -113,7 +113,8 @@ test("the note page is its own home screen and is not on the jobs home", () => {
   assert.match(manifest, /"name": "随手记"/);
   assert.match(manifest, /"start_url": "\/jobs\/note"/);
   const screen = readFileSync(new URL("../src/components/jobs/note-screen.tsx", import.meta.url), "utf8");
-  assert.match(screen, /Choose a job/);
+  assert.match(screen, /h-\[50vh\]/);
+  assert.match(screen, /void submit\(spoken\)/);
   assert.match(screen, /Not job-related/);
   assert.match(screen, /Leave it/);
 });
