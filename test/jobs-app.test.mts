@@ -915,6 +915,13 @@ test("the intro email uses only the confirmed job text", async () => {
   assert.equal(introTenantLine(preview.tenants[1]!), "Jo Kim — no email - not sent");
   assert.equal(introBody({ ...preview, pmAgency: "  " }, "Sam Lee").includes("property manager at "), false);
   assert.equal(body.includes("property manager at Test Agency"), true);
+  assert.equal(
+    body.includes(
+      "Safety first: If our technician finds anything unsafe, we may need to isolate the gas, water or power, or postpone and reschedule the visit until it's made safe. Urgent safety repairs may extend the attendance time. Your safety and the property's safety come first, so we may use fixtures and fittings on site (such as taps and appliances) for safety checks and testing without prior notice.",
+    ),
+    true,
+  );
+  assert.equal(body.includes("turn off the gas, water or power"), false);
   assert.equal(body.includes("P  0430 016 655"), true);
   assert.equal(body.includes("0489 181 188"), false);
   assert.equal(body.includes("+61489181188"), false);

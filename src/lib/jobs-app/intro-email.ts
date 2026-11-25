@@ -53,7 +53,7 @@ export function introBody(preview: IntroPreview, name: string): string {
     "Access: Where possible, please make sure our tradie can reach the work area. It helps a lot if furniture or stored items are moved out of the way, and if you can let us know about any access codes, parking or building rules.",
     "Pets and children: For everyone's safety, we'd appreciate it if pets could be secured and children kept clear of the work area while we're working.",
     "Missed appointments: If we're unable to get access at the agreed time, we may need to rebook, and your property manager may be advised.",
-    "Safety first: If our tradie finds anything unsafe, we may need to turn off the gas, water or power until it's made safe.",
+    "Safety first: If our technician finds anything unsafe, we may need to isolate the gas, water or power, or postpone and reschedule the visit until it's made safe. Urgent safety repairs may extend the attendance time. Your safety and the property's safety come first, so we may use fixtures and fittings on site (such as taps and appliances) for safety checks and testing without prior notice.",
     "Photos: We may take before and after photos of the work area for your property manager's records.",
     "",
     "Our full terms are available at https://orosvc.com/terms.",
