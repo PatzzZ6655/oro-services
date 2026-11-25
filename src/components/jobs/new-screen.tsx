@@ -35,7 +35,7 @@ import {
   tenantsFromTyped,
   type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
-import { introBody, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
+import { introBody, introCcPayload, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import type { AgencyClient } from "@/lib/jobs-app/client-match";
@@ -148,6 +148,7 @@ export function NewJobScreen() {
   const [introPhase, setIntroPhase] = useState<"preview" | "status" | "done">("preview");
   const [introStatus, setIntroStatus] = useState<{ status: string; message: string; error: string } | null>(null);
   const [introBusy, setIntroBusy] = useState<"send" | "skip" | null>(null);
+  const [ccPm, setCcPm] = useState(false);
   const router = useRouter();
   const draftCache = useRef<string | null>(null);
   const stored = useSyncExternalStore(
@@ -408,6 +409,7 @@ export function NewJobScreen() {
         address: result.address,
         pmAgency: result.pmAgency,
         tenants: people,
+        ...introCcPayload(ccPm, result.pmEmail),
       });
       clearStoredNewJobDraft();
       clearStoredNewJobIntro();
@@ -454,6 +456,8 @@ export function NewJobScreen() {
       tenants: people,
     };
     const named = people.find((row) => row.name.trim())?.name ?? "";
+    const pmInbox = result.pmEmail.trim();
+    const canCcPm = pmInbox.includes("@") && !/\s/.test(pmInbox);
     if (introPhase === "status" && introStatus) {
       return (
         <KeepPage>
@@ -476,6 +480,16 @@ export function NewJobScreen() {
           ))}
         </ul>
         <pre className="whitespace-pre-wrap rounded-2xl border border-black p-4 text-base">{introBody(preview, named)}</pre>
+        <label className={`flex min-h-14 items-center gap-3 text-base ${canCcPm ? "" : "text-neutral-500"}`}>
+          <input
+            type="checkbox"
+            className="h-6 w-6 accent-black"
+            checked={canCcPm && ccPm}
+            disabled={!canCcPm || introBusy !== null}
+            onChange={(event) => setCcPm(event.target.checked)}
+          />
+          {canCcPm ? `CC property manager (${pmInbox})` : "CC property manager"}
+        </label>
         <JobsButton type="button" onClick={() => finishIntro("send")} disabled={introBusy !== null}>
           {introBusy === "send" ? "Sending" : "Send"}
         </JobsButton>

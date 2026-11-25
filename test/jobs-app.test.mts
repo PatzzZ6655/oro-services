@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { mapsHref, shortAddress } from "@/lib/jobs-app/address";
-import { introBody, introSubject, introTenantLine } from "@/lib/jobs-app/intro-email";
+import { introBody, introCcPayload, introSubject, introTenantLine } from "@/lib/jobs-app/intro-email";
 import { checklistText, OPTIONAL_ITEMS, REQUIRED_ITEMS } from "@/lib/jobs-app/checklist";
 import { jobsEmailAllowed } from "@/lib/jobs-app/allowlist";
 import { JOBS_GOOGLE_CALLBACK_PATH, jobsGoogleRedirectUri } from "@/lib/jobs-app/google";
@@ -915,6 +915,12 @@ test("the intro email uses only the confirmed job text", async () => {
   assert.equal(introTenantLine(preview.tenants[1]!), "Jo Kim — no email - not sent");
   assert.equal(introBody({ ...preview, pmAgency: "  " }, "Sam Lee").includes("property manager at "), false);
   assert.equal(body.includes("property manager at Test Agency"), true);
+  assert.equal(body.includes("P  0430 016 655"), true);
+  assert.equal(body.includes("0489 181 188"), false);
+  assert.equal(body.includes("+61489181188"), false);
+  assert.deepEqual(introCcPayload(false, "pm@agency.com"), { ccPm: "0", pmEmail: "" });
+  assert.deepEqual(introCcPayload(true, "pm@agency.com"), { ccPm: "1", pmEmail: "pm@agency.com" });
+  assert.deepEqual(introCcPayload(true, "not an email"), { ccPm: "0", pmEmail: "" });
 
   useEnv();
   const { sendIntroEmail, createJob } = await import("@/lib/jobs-app/webhooks");
@@ -940,10 +946,29 @@ test("the intro email uses only the confirmed job text", async () => {
     assert.equal(payload.action, "send");
     assert.equal(payload.desc, "Leaking kitchen tap");
     assert.equal(payload.pmAgency, "");
+    assert.equal(payload.ccPm, "0");
+    assert.equal(payload.pmEmail, "");
     assert.equal("forceQueue" in payload, false);
     assert.equal(typeof payload.secret, "string");
     if (!result.body.ok) throw new Error(result.body.message);
     assert.equal(result.body.status, "queued");
+    await sendIntroEmail({
+      jobId: "abc",
+      business: "emporo",
+      desc: "Leaking kitchen tap",
+      address: "12 Test Street",
+      pmAgency: "Test Agency",
+      tenants: [{ name: "Sam Lee", email: "sam@example.com" }],
+      action: "send",
+      ccPm: true,
+      pmEmail: "pm@agency.com",
+    });
+    const copied = JSON.parse(sent) as Record<string, unknown>;
+    assert.equal(copied.ccPm, "1");
+    assert.equal(copied.pmEmail, "pm@agency.com");
+    assert.equal(copied.pmAgency, "Test Agency");
+    assert.equal(copied.mode, "sendIntroEmail");
+    assert.equal(copied.desc, "Leaking kitchen tap");
   } finally {
     globalThis.fetch = original;
   }
@@ -983,6 +1008,9 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /scrollIntoView/);
   assert.match(page, /title="Check job"/);
   assert.match(page, /Create job/);
+  assert.match(page, /CC property manager/);
+  assert.match(page, /useState\(false\)/);
+  assert.match(page, /introCcPayload\(ccPm, result\.pmEmail\)/);
   assert.match(page, /\/jobs\/api\/new\/read/);
   assert.match(page, /screenshotReadFallback/);
   assert.equal(page.includes("introTestNote"), false);
