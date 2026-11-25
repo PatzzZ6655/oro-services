@@ -37,6 +37,8 @@ export type SmsOpenJob = {
   address: string;
   status: string;
   scheduled: string;
+  tenant?: string;
+  customer?: string;
 };
 
 const notionVersion = "2025-09-03";
@@ -313,6 +315,12 @@ export function jobsQuery(business: Business): { url: string; body: string } {
   };
 }
 
+/** First segment of "Customer - address - work", when the title has a dash. */
+function jobCustomer(title: string): string {
+  const parts = title.split(/\s+[-–—]\s+/).map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[0]!.slice(0, 80) : "";
+}
+
 /** Read job rows. Status filtering happens in keepActiveSmsJobs. */
 export function jobsFromNotion(payload: unknown, business: Business): SmsOpenJob[] {
   if (!payload || typeof payload !== "object") return [];
@@ -336,6 +344,8 @@ export function jobsFromNotion(payload: unknown, business: Business): SmsOpenJob
       address: rollupAddress(row[addressKey]),
       status,
       scheduled: dateText(row["Scheduled Date"]),
+      tenant: rollupAddress(row["Tenant Name (rollup)"]),
+      customer: jobCustomer(title),
     });
   }
   return jobs;
@@ -394,6 +404,22 @@ async function queryBrandJobs(business: Business, token: string, call: FetchLike
     cursor = next;
   }
   return jobs;
+}
+
+/** Every job row, including closed ones. Callers apply their own filters. */
+export async function listAllNotionJobs(fetchImpl?: FetchLike): Promise<{ status: number; body: { ok: true; jobs: SmsOpenJob[] } | JobsError }> {
+  const token = process.env.NOTION_TOKEN?.trim() ?? "";
+  if (!token) return { status: 503, body: { ok: false, error: "unconfigured", message: "Jobs database not connected." } };
+  const call = fetchImpl ?? globalThis.fetch;
+  try {
+    const [emoro, emporo] = await Promise.all([queryBrandJobs("emoro", token, call), queryBrandJobs("emporo", token, call)]);
+    if (!emoro || !emporo) return { status: 502, body: { ok: false, error: "upstream", message: "The job list could not be loaded." } };
+    return { status: 200, body: { ok: true, jobs: [...emoro, ...emporo] } };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "Error";
+    console.error(`sms-reply notion list ${name}`);
+    return { status: 502, body: { ok: false, error: "upstream", message: "The job list could not be loaded." } };
+  }
 }
 
 export async function listSmsJobs(fetchImpl?: FetchLike): Promise<{ status: number; body: { ok: true; jobs: SmsOpenJob[] } | JobsError }> {
