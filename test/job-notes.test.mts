@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { normaliseNote, noteCost, noteNotionProperties, notePropertyNames, resolveNoteDate } from "@/lib/jobs-app/job-notes";
 import { noteSecretOk } from "@/lib/jobs-app/job-notes-store";
-import { guessNoteJob, inProgressToday, jobsInGroup, noteJobLabel, type NoteJob } from "@/lib/jobs-app/note-groups";
+import { guessNoteJob, isOpenClawTestJob, jobsInGroup, noteJobSections, scheduledOnToday, type NoteJob } from "@/lib/jobs-app/note-groups";
 
 const today = "2026-11-25";
 const now = new Date("2026-11-25T01:00:00.000Z");
@@ -14,6 +14,7 @@ function job(partial: Partial<NoteJob> & Pick<NoteJob, "business" | "jobId" | "s
     address: partial.address ?? "",
     scheduled: partial.scheduled ?? "",
     tenant: partial.tenant ?? "",
+    customer: partial.customer ?? "",
     ...partial,
   };
 }
@@ -26,15 +27,29 @@ const sample: NoteJob[] = [
   job({ business: "emporo", jobId: "e".repeat(32), status: "Quoting", address: "1 Bay St", tenant: "Alex" }),
 ];
 
-test("note groups follow the Slack channel filters and put Emoro first", () => {
-  const progress = jobsInGroup(sample, "progress", today);
-  assert.deepEqual(progress.map((item) => item.jobId[0]), ["a", "b"]);
-  assert.equal(inProgressToday(sample[2]!, today), false);
-  assert.deepEqual(jobsInGroup(sample, "contacting", today).map((item) => item.status), ["Contacting Tenant 1"]);
-  assert.equal(jobsInGroup(sample, "active", today).length, 5);
-  assert.equal(jobsInGroup(sample, "chore", today).length, 0);
-  assert.equal(noteJobLabel(sample[1]!), "🟠 Emoro · 12 Smith St · Sam");
-  assert.equal(noteJobLabel(sample[0]!), "🔵 Emporo · 9 River St · Lee");
+test("note groups follow the OpenClaw Slack lists", () => {
+  const quotingToday = job({ business: "emoro", jobId: "f".repeat(32), status: "Quoting", address: "3 Oak St", scheduled: "2026-11-24T22:00:00Z", tenant: "Mia" });
+  const waiting = job({ business: "emporo", jobId: "g".repeat(32), status: "Contacting Tenant (Waiting)", address: "2 Bay St", tenant: "Jo" });
+  const laterContact = job({ business: "emoro", jobId: "h".repeat(32), status: "Contacting Owner", address: "6 Lane", tenant: "Ann" });
+  const approved = job({ business: "emoro", jobId: "i".repeat(32), status: "Quote (Approved)", address: "7 Pine St", tenant: "Bo" });
+  const testWord = job({ business: "emoro", jobId: "j".repeat(32), status: "In Progress", title: "A TEST visit", address: "9 TEST St", scheduled: "2026-11-25", customer: "Sam" });
+  const addressOnly = job({ business: "emoro", jobId: "k".repeat(32), status: "New Work Order", title: "Real repair", address: "TEST 9 Road", scheduled: "2026-11-25" });
+  const rows = [...sample, quotingToday, waiting, laterContact, approved, testWord, addressOnly];
+
+  assert.equal(scheduledOnToday("2026-11-24T23:00:00Z", today), true);
+  assert.deepEqual(
+    jobsInGroup(rows, "progress", today).map((item) => item.jobId[0]),
+    ["a", "f", "k", "b"],
+  );
+  assert.deepEqual(
+    jobsInGroup(rows, "contacting", today).map((item) => item.status),
+    ["Contacting Tenant 1", "Contacting Tenant (Waiting)", "Contacting Owner"],
+  );
+  const active = noteJobSections(rows, "active", today).map((section) => section.label);
+  assert.deepEqual(active, ["New Work Order", "Quoting", "Quote (Approved)", "In Progress", "Contacting"]);
+  assert.equal(isOpenClawTestJob(testWord), true);
+  assert.equal(isOpenClawTestJob(addressOnly), false);
+  assert.equal(jobsInGroup(rows, "chore", today).length, 0);
 });
 
 test("a spoken day becomes a Melbourne date and the wording stays", () => {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs } from "@/components/jobs/api";
 import { JobsButton, Spinner, fieldClass } from "@/components/jobs/ui";
 import type { ParsedNote } from "@/lib/jobs-app/job-notes";
-import { jobsInGroup, noteGroupLabel, noteGroups, noteJobLabel, type NoteGroup, type NoteJob } from "@/lib/jobs-app/note-groups";
+import { noteGroupLabel, noteGroups, noteJobLabel, noteJobSections, type NoteGroup, type NoteJob } from "@/lib/jobs-app/note-groups";
 
 const draftKey = "oro.jobs.note.draft";
 
@@ -63,7 +63,8 @@ export function NoteScreen() {
     localStorage.setItem(draftKey, JSON.stringify({ text, group, jobId }));
   }, [text, group, jobId]);
 
-  const choices = jobs ? jobsInGroup(jobs, group, today) : [];
+  const sections = jobs ? noteJobSections(jobs, group, today) : [];
+  const choices = sections.flatMap((section) => section.jobs);
   const chosen = choices.find((job) => job.jobId === jobId) ?? null;
 
   function dictate() {
@@ -168,11 +169,23 @@ export function NoteScreen() {
       ) : (
         <select value={jobId} onChange={(event) => setJobId(event.target.value)} className={fieldClass}>
           <option value="">Choose a job</option>
-          {choices.map((job) => (
-            <option key={`${job.business}:${job.jobId}`} value={job.jobId}>
-              {noteJobLabel(job)}
-            </option>
-          ))}
+          {sections.map((section) =>
+            section.label ? (
+              <optgroup key={section.label} label={section.label}>
+                {section.jobs.map((job) => (
+                  <option key={`${job.business}:${job.jobId}`} value={job.jobId}>
+                    {noteJobLabel(job)}
+                  </option>
+                ))}
+              </optgroup>
+            ) : (
+              section.jobs.map((job) => (
+                <option key={`${job.business}:${job.jobId}`} value={job.jobId}>
+                  {noteJobLabel(job)}
+                </option>
+              ))
+            ),
+          )}
         </select>
       )}
       <textarea

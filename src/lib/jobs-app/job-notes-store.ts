@@ -1,7 +1,7 @@
 import { SMS_GEMINI_MODEL, geminiSmsUrl } from "@/lib/sms-reply";
 import { cleanJobId } from "@/lib/jobs-app/webhooks";
 import { isBusiness, type Business } from "@/lib/jobs-app/types";
-import { listSmsJobs, type SmsOpenJob } from "@/lib/sms-reply-jobs";
+import { listAllNotionJobs, type SmsOpenJob } from "@/lib/sms-reply-jobs";
 import {
   fallbackNote,
   noteFromGeminiText,
@@ -10,7 +10,7 @@ import {
   type ParsedNote,
   type StoredNote,
 } from "@/lib/jobs-app/job-notes";
-import { compareNoteJobs, type NoteJob } from "@/lib/jobs-app/note-groups";
+import type { NoteJob } from "@/lib/jobs-app/note-groups";
 
 const notionVersion = "2025-09-03";
 const tenantSources: Record<Business, { dataSource: string; relation: string }> = {
@@ -88,11 +88,20 @@ export function tenantNamesFromNotion(payload: unknown, business: Business): Map
 }
 
 function toNoteJob(job: SmsOpenJob, tenant: string): NoteJob {
-  return { ...job, tenant };
+  return {
+    business: job.business,
+    jobId: job.jobId,
+    title: job.title,
+    address: job.address,
+    status: job.status,
+    scheduled: job.scheduled,
+    tenant,
+    customer: job.customer ?? "",
+  };
 }
 
 export async function listNoteJobs(fetchImpl?: FetchLike): Promise<{ status: number; jobs: NoteJob[]; message: string }> {
-  const listed = await listSmsJobs(fetchImpl);
+  const listed = await listAllNotionJobs(fetchImpl);
   if (!listed.body.ok) return { status: listed.status, jobs: [], message: listed.body.message };
   const token = process.env.NOTION_TOKEN?.trim() ?? "";
   const names = new Map<string, string>();
@@ -125,8 +134,7 @@ export async function listNoteJobs(fetchImpl?: FetchLike): Promise<{ status: num
     );
   }
   const jobs = listed.body.jobs
-    .map((job) => toNoteJob(job, names.get(`${job.business}:${job.jobId}`) ?? ""))
-    .sort(compareNoteJobs);
+    .map((job) => toNoteJob(job, job.tenant || names.get(`${job.business}:${job.jobId}`) || ""));
   return { status: 200, jobs, message: "" };
 }
 
