@@ -26,6 +26,13 @@ export function introTenantLine(tenant: IntroTenant): string {
   return email ? `${name} — ${email}` : `${name} — no email - not sent`;
 }
 
+/** Optional CC. An unticked box or a missing address sends an empty address, so Make can ignore it. */
+export function introCcPayload(checked: boolean, pmEmail: string): { ccPm: "0" | "1"; pmEmail: string } {
+  const email = pmEmail.replace(/[\u0000-\u001F]+/g, " ").trim().slice(0, 120);
+  const cc = checked && email.includes("@") && !/\s/.test(email);
+  return { ccPm: cc ? "1" : "0", pmEmail: cc ? email : "" };
+}
+
 export function introBody(preview: IntroPreview, name: string): string {
   const who = name.trim() || "there";
   const brand = preview.brand || businessLabel(preview.business);
@@ -57,7 +64,7 @@ export function introBody(preview: IntroPreview, name: string): string {
     brand,
     "",
     company,
-    "P  0489 181 188",
+    "P  0430 016 655",
     `E  ${email}`,
     "W  www.orosvc.com",
     abn,

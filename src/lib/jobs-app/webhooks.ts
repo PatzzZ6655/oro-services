@@ -1,3 +1,4 @@
+import { introCcPayload } from "@/lib/jobs-app/intro-email";
 import { jobPropertyAddress } from "@/lib/jobs-app/property-address";
 import {
   newJobNeedDetail,
@@ -602,6 +603,8 @@ export async function sendIntroEmail(
     pmAgency: string;
     tenants: { name: string; email: string }[];
     action: "send" | "skip";
+    ccPm?: boolean;
+    pmEmail?: string;
   },
   fetchImpl?: FetchLike,
 ): Promise<JobsResult<IntroEmailOutcome>> {
@@ -617,6 +620,7 @@ export async function sendIntroEmail(
   const tenants = input.tenants
     .map((row) => ({ name: row.name.replace(/[\u0000-\u001F]+/g, " ").trim().slice(0, 80), email: row.email.replace(/[\u0000-\u001F]+/g, " ").trim().slice(0, 120) }))
     .filter((row) => row.name || row.email);
+  const cc = introCcPayload(input.ccPm === true, input.pmEmail ?? "");
   try {
     const result = await postJson(
       config.newJob,
@@ -630,6 +634,8 @@ export async function sendIntroEmail(
         pmAgency: input.pmAgency.trim(),
         tenants,
         action: input.action,
+        ccPm: cc.ccPm,
+        pmEmail: cc.pmEmail,
       },
       call,
       JSON_TIMEOUT_MS,

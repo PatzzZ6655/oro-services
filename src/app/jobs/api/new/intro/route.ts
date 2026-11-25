@@ -39,6 +39,8 @@ export async function POST(request: Request) {
     pmAgency: typeof input.pmAgency === "string" ? input.pmAgency : "",
     tenants,
     action,
+    ccPm: input.ccPm === true || input.ccPm === "1" || input.ccPm === 1,
+    pmEmail: typeof input.pmEmail === "string" ? input.pmEmail : "",
   });
   return jobsJson(result.body, result.status);
 }
