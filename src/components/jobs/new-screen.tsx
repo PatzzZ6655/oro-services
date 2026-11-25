@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs, postJobsForm } from "@/components/jobs/api";
 import { KeepPage } from "@/components/jobs/keep-page";
+import { PhotoBurst } from "@/components/jobs/photo-burst";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import {
@@ -592,24 +593,20 @@ export function NewJobScreen() {
               </button>
             ))}
           </div>
-          <label className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-black text-lg font-semibold">
-            Choose screenshots
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              onChange={(event) => {
-                const picked = [...(event.target.files ?? [])].slice(0, NEW_JOB_MAX_IMAGES);
-                setFiles(picked);
-                setReadyFiles([]);
-                setScreenshotCount(picked.length);
-                if (picked.length > 0) setScreenshotsCleared(false);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
-          <p className="text-base">{files.length > 0 ? `${files.length} selected, ${NEW_JOB_MAX_IMAGES} at most` : screenshotsCleared ? screenshotsClearedOnCapture : `Up to ${NEW_JOB_MAX_IMAGES} screenshots`}</p>
+          <PhotoBurst
+            files={files}
+            max={NEW_JOB_MAX_IMAGES}
+            doneLabel="Done"
+            disabled={busy !== null}
+            onChange={(next) => {
+              setFiles(next);
+              setReadyFiles([]);
+              setScreenshotCount(next.length);
+              if (next.length > 0) setScreenshotsCleared(false);
+            }}
+            onDone={files.length > 0 ? continueToCheck : undefined}
+          />
+          {files.length === 0 && screenshotsCleared ? <p className="text-base">{screenshotsClearedOnCapture}</p> : null}
           <DetailFields
             tenantName={tenantName}
             setTenantName={setTenantName}
@@ -635,9 +632,11 @@ export function NewJobScreen() {
           />
       </div>
       <ActionNotice message={error} busyLabel={busy === "read" ? "Reading the screenshot, about 10 seconds" : ""} />
-      <JobsButton type="button" onClick={continueToCheck} disabled={busy !== null}>
-        {busy === "read" ? "Reading" : files.length > 0 ? "Read screenshots" : "Continue"}
-      </JobsButton>
+      {files.length === 0 ? (
+        <JobsButton type="button" onClick={continueToCheck} disabled={busy !== null}>
+          Continue
+        </JobsButton>
+      ) : null}
     </Screen>
     </KeepPage>
   );

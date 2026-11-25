@@ -974,7 +974,8 @@ test("the intro email uses only the confirmed job text", async () => {
 
 test("the new job screen checks the details before it creates the job", () => {
   const page = readFileSync(new URL("../src/components/jobs/new-screen.tsx", import.meta.url), "utf8");
-  assert.match(page, /Read screenshots/);
+  assert.match(page, /PhotoBurst/);
+  assert.match(page, /doneLabel="Done"/);
   assert.match(page, /Continue/);
   assert.match(page, /Add tenant/);
   assert.match(page, /Tenants/);
