@@ -11,6 +11,27 @@ export function australianSmsNumber(input: string): string | null {
   return `+${digits}`;
 }
 
+const privateHeaders = {
+  "cache-control": "no-store",
+  "x-robots-tag": "noindex, nofollow",
+  "referrer-policy": "no-referrer",
+};
+
+export function smsLinkResponse(url: string): Response {
+  const raw = new URL(url).searchParams.get("to");
+  const number = raw ? australianSmsNumber(raw) : null;
+  if (!number) {
+    return new Response("That number is not valid.", {
+      status: 400,
+      headers: { ...privateHeaders, "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+  return new Response(smsBridgePage(number), {
+    status: 200,
+    headers: { ...privateHeaders, "content-type": "text/html; charset=utf-8" },
+  });
+}
+
 export function smsBridgePage(number: string): string {
   const href = `sms:${number}`;
   return `<!doctype html>

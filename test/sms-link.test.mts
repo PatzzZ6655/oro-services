@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { GET } from "@/app/sms/route";
 import { indexablePaths, menuLinks } from "@/lib/content";
-import { australianSmsNumber } from "@/lib/sms-link";
+import { australianSmsNumber, smsLinkResponse } from "@/lib/sms-link";
 
 test("an Australian mobile or landline becomes an sms number", () => {
   assert.equal(australianSmsNumber("+61421075652"), "+61421075652");
@@ -33,7 +32,7 @@ test("anything that is not one Australian number is rejected", () => {
 });
 
 test("the public sms page redirects only to the checked number", async () => {
-  const ok = await GET(new Request("https://www.orosvc.com/sms?to=%2B61421075652"));
+  const ok = smsLinkResponse("https://www.orosvc.com/sms?to=%2B61421075652");
   assert.equal(ok.status, 200);
   assert.equal(ok.headers.get("cache-control"), "no-store");
   assert.equal(ok.headers.get("x-robots-tag"), "noindex, nofollow");
@@ -45,11 +44,11 @@ test("the public sms page redirects only to the checked number", async () => {
   assert.equal(html.includes("gtag"), false);
   assert.equal(html.includes("analytics"), false);
 
-  const local = await GET(new Request("https://www.orosvc.com/sms?to=0421075652"));
+  const local = smsLinkResponse("https://www.orosvc.com/sms?to=0421075652");
   assert.equal(local.status, 200);
   assert.match(await local.text(), /sms:\+61421075652/);
 
-  const bad = await GET(new Request("https://www.orosvc.com/sms?to=https%3A%2F%2Fevil.example"));
+  const bad = smsLinkResponse("https://www.orosvc.com/sms?to=https%3A%2F%2Fevil.example");
   assert.equal(bad.status, 400);
   assert.equal(bad.headers.get("cache-control"), "no-store");
   const message = await bad.text();
@@ -57,10 +56,11 @@ test("the public sms page redirects only to the checked number", async () => {
   assert.equal(message.includes("sms:"), false);
 
   assert.equal(indexablePaths().some((entry) => entry.path.startsWith("/sms")), false);
-  assert.equal(menuLinks.some((link) => link.href === "/sms"), false);
+  assert.equal(menuLinks.some((link) => String(link.href).includes("/sms")), false);
   const robots = readFileSync(new URL("../src/app/robots.ts", import.meta.url), "utf8");
   assert.match(robots, /\/sms/);
   const route = readFileSync(new URL("../src/app/sms/route.ts", import.meta.url), "utf8");
+  assert.match(route, /await connection\(\)/);
   assert.equal(route.includes("requireJobsUser"), false);
   assert.equal(route.includes("console."), false);
 });
