@@ -1,0 +1,15 @@
+{
+  "id": "/jobs/note",
+  "name": "随手记",
+  "short_name": "随手记",
+  "start_url": "/jobs/note",
+  "scope": "/jobs/note",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "zh",
+  "icons": [
+    { "src": "/jobs/note/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/jobs/note/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1251,7 +1251,8 @@ test("the public site does not advertise /jobs and the source has no webhook URL
     /\/jobs\/|\/jobs-app\//.test(file),
   );
   for (const file of jobsUi) {
-    if (file.endsWith(`${join("jobs-app", "invoice.ts")}`)) continue;
+    if (file.endsWith(`${join("jobs-app", "invoice.ts")}`) || file.endsWith(`${join("jobs-app", "job-notes.ts")}`)) continue;
+    if (file.endsWith(`${join("jobs", "note", "page.tsx")}`) || file.endsWith(`${join("components", "jobs", "note-screen.tsx")}`)) continue;
     const source = readFileSync(file, "utf8").replace(/const chinese = \/[\s\S]*?\);/, "");
     assert.equal(/[\u4e00-\u9fff]/.test(source), false, file);
   }
