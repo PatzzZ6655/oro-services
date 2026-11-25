@@ -64,3 +64,68 @@ test("the public sms page redirects only to the checked number", async () => {
   assert.equal(route.includes("requireJobsUser"), false);
   assert.equal(route.includes("console."), false);
 });
+
+test("an optional body is added in the iOS sms link", async () => {
+  const text = "Hi Sam, it's Pat from Emoro Building about 12 Test St, Richmond.";
+  const ok = smsLinkResponse(`https://www.orosvc.com/sms?to=0421075652&body=${encodeURIComponent(text)}`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("x-robots-tag"), "noindex, nofollow");
+  const html = await ok.text();
+  const encoded = encodeURIComponent(text);
+  assert.match(html, new RegExp(`content="0;url=sms:\\+61421075652\\?&amp;body=${encoded}"`));
+  assert.match(html, new RegExp(`location\\.replace\\("sms:\\+61421075652\\?&body=${encoded}"\\)`));
+  assert.match(html, /noindex, nofollow/);
+  assert.equal(html.includes(text), false);
+
+  const exact = "a".repeat(300);
+  const full = smsLinkResponse(`https://www.orosvc.com/sms?to=%2B61421075652&body=${encodeURIComponent(exact)}`);
+  assert.equal(full.status, 200);
+  assert.match(await full.text(), /body=a{300}/);
+});
+
+test("a body that is too long is refused without echoing it", async () => {
+  const text = "b".repeat(301);
+  const tooLong = smsLinkResponse(`https://www.orosvc.com/sms?to=0421075652&body=${encodeURIComponent(text)}`);
+  assert.equal(tooLong.status, 400);
+  assert.equal(tooLong.headers.get("x-robots-tag"), "noindex, nofollow");
+  const message = await tooLong.text();
+  assert.equal(message.includes("bbb"), false);
+  assert.equal(message.includes("sms:"), false);
+});
+
+test("control characters are stripped from the body and the number stays checked", async () => {
+  const text = "Hi\u0000 Sam\nit's Pat\r\u007f";
+  const ok = smsLinkResponse(`https://www.orosvc.com/sms?to=0421%20075%20652&body=${encodeURIComponent(text)}`);
+  assert.equal(ok.status, 200);
+  const html = await ok.text();
+  assert.match(html, /sms:\+61421075652\?&body=Hi%20Samit's%20Pat/);
+  assert.equal(html.includes("\u0000"), false);
+  assert.equal(html.includes("%0A"), false);
+  assert.equal(html.includes("%0D"), false);
+  assert.equal(html.includes("%7F"), false);
+
+  const blank = smsLinkResponse(`https://www.orosvc.com/sms?to=0421075652&body=${encodeURIComponent("\n\t\u0000")}`);
+  assert.equal(blank.status, 200);
+  const empty = await blank.text();
+  assert.match(empty, /url=sms:\+61421075652"/);
+  assert.equal(empty.includes("body="), false);
+});
+
+test("a body cannot break out of the page or replace the number", async () => {
+  const evil = `"><script>alert(1)</script>\njavascript:https://evil.example`;
+  const ok = smsLinkResponse(`https://www.orosvc.com/sms?to=0421075652&body=${encodeURIComponent(evil)}`);
+  assert.equal(ok.status, 200);
+  const html = await ok.text();
+  assert.match(html, /location\.replace\("sms:\+61421075652\?&body=/);
+  assert.match(html, /%3Cscript%3Ealert\(1\)%3C%2Fscript%3E/);
+  assert.equal(html.includes("<script>alert"), false);
+  assert.equal(html.includes("javascript:"), false);
+  assert.equal(html.includes("https://evil.example"), false);
+  assert.equal(html.includes('url=sms:"'), false);
+
+  const badNumber = smsLinkResponse(`https://www.orosvc.com/sms?to=javascript:alert(1)&body=${encodeURIComponent("Hi")}`);
+  assert.equal(badNumber.status, 400);
+  const message = await badNumber.text();
+  assert.equal(message.includes("javascript"), false);
+  assert.equal(message.includes("Hi"), false);
+});
