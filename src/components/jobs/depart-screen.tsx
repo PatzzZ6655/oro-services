@@ -6,6 +6,7 @@ import { JobsClientError, postJobs } from "@/components/jobs/api";
 import { useClientReady } from "@/components/jobs/client-ready";
 import { KeepPage } from "@/components/jobs/keep-page";
 import { SmsPicker } from "@/components/jobs/sms-picker";
+import { ErrorBanner, FieldReason, Marked, redBorder } from "@/components/jobs/field-error";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner } from "@/components/jobs/ui";
 import { mapsHref } from "@/lib/jobs-app/address";
 import { parseDepartArrival, readDepartArrival, writeDepartArrival } from "@/lib/jobs-app/next-visit";
@@ -17,6 +18,7 @@ type TodayResponse = { ok: true; date: string; jobs: TodayJob[] };
 export function DepartScreen() {
   const [jobs, setJobs] = useState<TodayJob[] | null>(null);
   const [error, setError] = useState("");
+  const [failedId, setFailedId] = useState("");
   const [pendingId, setPendingId] = useState("");
   const [attempt, setAttempt] = useState(0);
   const router = useRouter();
@@ -59,6 +61,7 @@ export function DepartScreen() {
   async function depart(job: TodayJob) {
     setPendingId(job.jobId);
     setError("");
+    setFailedId("");
     try {
       const result = await postJobs<DepartResult>("/jobs/api/depart", { business: job.business, jobId: job.jobId });
       const next = {
@@ -75,6 +78,7 @@ export function DepartScreen() {
         router.push("/jobs/login");
         return;
       }
+      setFailedId(job.jobId);
       setError(reason instanceof JobsClientError ? reason.message : "The server did not reply. Try again.");
     } finally {
       setPendingId("");
@@ -126,24 +130,29 @@ export function DepartScreen() {
     <KeepPage>
     <Screen title="Depart" back={<BackLink href="/jobs" />}>
       {visit ? <p className="text-base">A visit is still open: {visit.title}. Departing again will switch to this job.</p> : null}
-      {error ? <Alert>{error}</Alert> : null}
+      {error && !failedId ? <ErrorBanner message={error} /> : null}
       {jobs === null && !error ? <Spinner label="Loading today's jobs" /> : null}
       {jobs && jobs.length === 0 ? <p className="text-lg">No jobs scheduled today</p> : null}
       <div className="flex flex-col gap-3">
-        {jobs?.map((job) => (
-          <button
-            key={`${job.business}:${job.jobId}`}
-            type="button"
-            disabled={pendingId !== ""}
-            onClick={() => depart(job)}
-            className="w-full rounded-2xl border border-black px-4 py-4 text-left disabled:opacity-50"
-          >
-            <span className="block text-sm">{businessLabel(job.business)}</span>
-            <span className="mt-1 block text-lg font-semibold">{job.title}</span>
-            <span className="mt-1 block text-base">{job.address}</span>
-            {pendingId === job.jobId ? <span className="mt-2 block text-sm">Recording departure</span> : null}
-          </button>
-        ))}
+        {jobs?.map((job) => {
+          const failed = failedId === job.jobId;
+          return (
+            <Marked key={`${job.business}:${job.jobId}`} active={failed} className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={pendingId !== ""}
+                onClick={() => depart(job)}
+                className={redBorder("w-full rounded-2xl border border-black px-4 py-4 text-left disabled:opacity-50", failed)}
+              >
+                <span className="block text-sm">{businessLabel(job.business)}</span>
+                <span className="mt-1 block text-lg font-semibold">{job.title}</span>
+                <span className="mt-1 block text-base">{job.address}</span>
+                {pendingId === job.jobId ? <span className="mt-2 block text-sm">Recording departure</span> : null}
+              </button>
+              {failed ? <FieldReason message={error} /> : null}
+            </Marked>
+          );
+        })}
       </div>
       {error && jobs === null ? (
         <JobsButton

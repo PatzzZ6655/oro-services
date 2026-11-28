@@ -7,6 +7,7 @@ import { KeepPage } from "@/components/jobs/keep-page";
 import { PhotoBurst } from "@/components/jobs/photo-burst";
 import { SmsPicker } from "@/components/jobs/sms-picker";
 import { compressFiles } from "@/components/jobs/resize-image";
+import { ErrorBanner, FieldReason, Marked, redBorder } from "@/components/jobs/field-error";
 import { BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import {
   clearStoredNewJobDraft,
@@ -176,6 +177,8 @@ export function NewJobScreen() {
   const [busy, setBusy] = useState<"read" | "create" | null>(null);
   const pending = useRef(false);
   const [error, setError] = useState("");
+  const [marks, setMarks] = useState<Record<string, string>>({});
+  const [summary, setSummary] = useState("");
   const [result, setResult] = useState<NewJobResult | null>(null);
   const [introPhase, setIntroPhase] = useState<"preview" | "status" | "sms" | "done">("preview");
   const [introStatus, setIntroStatus] = useState<{ status: string; message: string; error: string } | null>(null);
@@ -288,6 +291,23 @@ export function NewJobScreen() {
     }
   }
 
+  function showMarks(next: Record<string, string>, banner = "") {
+    setError("");
+    setMarks(next);
+    const count = Object.keys(next).length;
+    setSummary(count > 1 ? banner || Object.values(next).join(" ") : "");
+  }
+
+  function clearMark(id: string) {
+    setMarks((current) => {
+      if (!current[id]) return current;
+      const next = { ...current };
+      delete next[id];
+      if (Object.keys(next).length < 2) setSummary("");
+      return next;
+    });
+  }
+
   function chooseClient(client: AgencyClient) {
     setPmAgency(client.name);
     setClientPick(client.id);
@@ -297,13 +317,15 @@ export function NewJobScreen() {
   async function continueToCheck() {
     if (pending.current) return;
     if (!isBusiness(business)) {
-      setError(chooseCompany);
+      showMarks({ company: chooseCompany });
       return;
     }
     if (files.length === 0) {
       setReadyFiles([]);
       setTenants(tenantsFromTyped(tenantName, phone));
       setError("");
+      setMarks({});
+      setSummary("");
       void matchClients(pmAgency, "");
       setStep("check");
       return;
@@ -316,7 +338,7 @@ export function NewJobScreen() {
       compressed = await compressFiles(files.slice(0, NEW_JOB_MAX_IMAGES), NEW_JOB_MAX_EDGE, NEW_JOB_QUALITIES);
       const count = keptCount(compressed.map((file) => file.size));
       if (count === 0 || count < compressed.length) {
-        setError("The photos are too large. Choose fewer.");
+        showMarks({ photos: "The photos are too large. Choose fewer." });
         return;
       }
       const form = new FormData();
@@ -364,6 +386,8 @@ export function NewJobScreen() {
       setReadyFiles(compressed);
       setScreenshotCount(compressed.length);
       setScreenshotsCleared(false);
+      setMarks({});
+      setSummary("");
       setStep("check");
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
@@ -377,7 +401,7 @@ export function NewJobScreen() {
         setStep("check");
         return;
       }
-      setError(reason instanceof JobsClientError ? reason.message : "This screenshot could not be compressed. Use a JPEG.");
+      showMarks({ photos: reason instanceof JobsClientError ? reason.message : "This screenshot could not be compressed. Use a JPEG." });
     } finally {
       pending.current = false;
       setBusy(null);
@@ -387,7 +411,7 @@ export function NewJobScreen() {
   async function submit() {
     if (pending.current) return;
     if (!isBusiness(business)) {
-      setError(chooseCompany);
+      showMarks({ company: chooseCompany });
       return;
     }
     const typed = typedDraft({
@@ -399,11 +423,16 @@ export function NewJobScreen() {
       notes,
     });
     if (readyFiles.length === 0 && !newJobTextCoversScreenshots(typed)) {
-      setError(newJobNeedDetail);
+      const next: Record<string, string> = {};
+      if (!typed.tenantName && !typed.address) next.contact = "Enter a name or address.";
+      if (!typed.description) next.description = "Enter a description.";
+      showMarks(next, newJobNeedDetail);
       return;
     }
     pending.current = true;
     setError("");
+    setMarks({});
+    setSummary("");
     setBusy("create");
     try {
       const form = new FormData();
@@ -420,6 +449,7 @@ export function NewJobScreen() {
       const created = await postJobsForm<NewJobResult>("/jobs/api/new", form);
       clearStoredNewJobDraft();
       if (isBusiness(business)) writeStoredNewJobIntro({ business, tenants, result: created });
+      setError("");
       setResult(created);
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
@@ -463,11 +493,7 @@ export function NewJobScreen() {
         return;
       }
       const message = reason instanceof JobsClientError ? reason.message : "The intro email was not sent.";
-      const code = reason instanceof JobsClientError ? reason.code : "upstream";
-      clearStoredNewJobDraft();
-      clearStoredNewJobIntro();
-      setIntroStatus({ status: code === "upstream" ? "failed" : code, message, error: code });
-      setIntroPhase("status");
+      setError(message);
     } finally {
       pending.current = false;
       setIntroBusy(null);
@@ -545,6 +571,7 @@ export function NewJobScreen() {
           ))}
         </ul>
         <pre className="whitespace-pre-wrap rounded-2xl border border-black p-4 text-base">{introBody(preview, named)}</pre>
+        <ErrorBanner message={error} />
         <label className={`flex min-h-14 items-center gap-3 text-base ${canCcPm ? "" : "text-neutral-500"}`}>
           <input
             type="checkbox"
@@ -613,6 +640,7 @@ export function NewJobScreen() {
         }
       >
         <div className="contents">
+          {summary ? <ErrorBanner message={summary} /> : null}
           <p className="text-base text-neutral-700">{businessLabel(business)}</p>
           <p className="text-base text-neutral-700">
             {readyFiles.length > 0
@@ -621,7 +649,15 @@ export function NewJobScreen() {
                 ? screenshotsClearedOnCheck
                 : "No screenshot. Check the details, then create the job."}
           </p>
-          <TenantList tenants={tenants} setTenants={setTenants} />
+          <TenantList
+            tenants={tenants}
+            setTenants={(next) => {
+              setTenants(next);
+              if (next.some((row) => row.name.trim()) || address.trim()) clearMark("contact");
+            }}
+            issue={marks.contact ?? ""}
+            active={Object.keys(marks)[0] === "contact"}
+          />
           <DetailFields
             showContact={false}
             tenantName={tenantName}
@@ -629,12 +665,16 @@ export function NewJobScreen() {
             phone={phone}
             setPhone={setPhone}
             address={address}
-            setAddress={setAddress}
+            setAddress={(value) => {
+              setAddress(value);
+              if (value.trim() || tenants.some((row) => row.name.trim())) clearMark("contact");
+            }}
             jobTitle={jobTitle}
             setJobTitle={setJobTitle}
             onAddressBlur={() => {
               const place = normalisePropertyAddress(address);
               setAddress(place);
+              if (place.trim() || tenants.some((row) => row.name.trim())) clearMark("contact");
               setJobTitle((current) => current.trim() || confidentJobTitle({
                 pmName,
                 tenantName,
@@ -650,16 +690,22 @@ export function NewJobScreen() {
             onChooseClient={chooseClient}
             onAgencyBlur={() => void matchClients(pmAgency, "")}
             description={description}
-            setDescription={setDescription}
+            setDescription={(value) => {
+              setDescription(value);
+              if (value.trim()) clearMark("description");
+            }}
             workOrderNumber={workOrderNumber}
             setWorkOrderNumber={setWorkOrderNumber}
             notes={notes}
             setNotes={setNotes}
             voucher={voucher}
             setVoucher={setVoucher}
+            issues={marks}
+            firstId={Object.keys(marks)[0] ?? ""}
           />
         </div>
-        <ActionNotice message={error} busyLabel={busy === "create" ? "Creating the job" : ""} />
+        <ErrorBanner message={summary ? "" : error} />
+        <ActionNotice message="" busyLabel={busy === "create" ? "Creating the job" : ""} />
         <JobsButton type="button" onClick={submit} disabled={busy !== null}>
           {busy === "create" ? "Creating" : "Create job"}
         </JobsButton>
@@ -672,31 +718,47 @@ export function NewJobScreen() {
     <KeepPage>
     <Screen title="New job" back={<BackLink href="/jobs" />}>
       <div className="contents">
-          <div className="grid grid-cols-1 gap-3">
-            {(["emoro", "emporo"] as const).map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setBusiness(id)}
-                className={`min-h-14 rounded-2xl border border-black text-lg font-semibold ${business === id ? "bg-black text-white" : "bg-white text-black"}`}
-              >
-                {businessLabel(id)}
-              </button>
-            ))}
-          </div>
-          <PhotoBurst
-            files={files}
-            max={NEW_JOB_MAX_IMAGES}
-            doneLabel="Done"
-            disabled={busy !== null}
-            onChange={(next) => {
-              setFiles(next);
-              setReadyFiles([]);
-              setScreenshotCount(next.length);
-              if (next.length > 0) setScreenshotsCleared(false);
-            }}
-            onDone={files.length > 0 ? continueToCheck : undefined}
-          />
+          {summary ? <ErrorBanner message={summary} /> : null}
+          <Marked active={Object.keys(marks)[0] === "company"} className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 gap-3">
+              {(["emoro", "emporo"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setBusiness(id);
+                    clearMark("company");
+                  }}
+                  className={redBorder(
+                    `min-h-14 rounded-2xl border border-black text-lg font-semibold ${business === id ? "bg-black text-white" : "bg-white text-black"}`,
+                    Boolean(marks.company),
+                  )}
+                >
+                  {businessLabel(id)}
+                </button>
+              ))}
+            </div>
+            <FieldReason message={marks.company ?? ""} />
+          </Marked>
+          <Marked active={Object.keys(marks)[0] === "photos"} className="flex flex-col gap-2">
+            <div className={marks.photos ? "rounded-2xl border border-red-600 p-2" : ""}>
+              <PhotoBurst
+                files={files}
+                max={NEW_JOB_MAX_IMAGES}
+                doneLabel="Done"
+                disabled={busy !== null}
+                onChange={(next) => {
+                  setFiles(next);
+                  setReadyFiles([]);
+                  setScreenshotCount(next.length);
+                  if (next.length > 0) setScreenshotsCleared(false);
+                  clearMark("photos");
+                }}
+                onDone={files.length > 0 ? continueToCheck : undefined}
+              />
+            </div>
+            <FieldReason message={marks.photos ?? ""} />
+          </Marked>
           {files.length === 0 && screenshotsCleared ? <p className="text-base">{screenshotsClearedOnCapture}</p> : null}
           <DetailFields
             tenantName={tenantName}
@@ -734,7 +796,8 @@ export function NewJobScreen() {
             setVoucher={setVoucher}
           />
       </div>
-      <ActionNotice message={error} busyLabel={busy === "read" ? "Reading the screenshot, about 10 seconds" : ""} />
+      <ErrorBanner message={error} />
+      <ActionNotice message="" busyLabel={busy === "read" ? "Reading the screenshot, about 10 seconds" : ""} />
       {files.length === 0 ? (
         <JobsButton type="button" onClick={continueToCheck} disabled={busy !== null}>
           Continue
@@ -771,6 +834,8 @@ function DetailFields({
   setNotes,
   voucher,
   setVoucher,
+  issues = {},
+  firstId = "",
 }: {
   showContact?: boolean;
   tenantName: string;
@@ -797,6 +862,8 @@ function DetailFields({
   setNotes: (value: string) => void;
   voucher: string;
   setVoucher: (value: string) => void;
+  issues?: Record<string, string>;
+  firstId?: string;
 }) {
   return (
     <>
@@ -814,7 +881,7 @@ function DetailFields({
       ) : null}
       <label className="flex flex-col gap-2 text-base">
         Property address
-        <input value={address} onChange={(event) => setAddress(event.target.value)} onBlur={onAddressBlur} maxLength={newJobTextLimits.address} autoComplete="street-address" className={fieldClass} />
+        <input value={address} onChange={(event) => setAddress(event.target.value)} onBlur={onAddressBlur} maxLength={newJobTextLimits.address} autoComplete="street-address" className={redBorder(fieldClass, Boolean(issues.contact))} />
       </label>
       <label className="flex flex-col gap-2 text-base">
         Job title
@@ -841,7 +908,10 @@ function DetailFields({
       {clientStatus === "none" ? <p className="text-sm text-neutral-700">No existing client. A new client will not be created.</p> : null}
       <label className="flex flex-col gap-2 text-base">
         Job description
-        <input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={newJobTextLimits.description} className={fieldClass} />
+        <Marked active={firstId === "description"}>
+          <input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={newJobTextLimits.description} className={redBorder(fieldClass, Boolean(issues.description))} />
+        </Marked>
+        <FieldReason message={issues.description ?? ""} />
       </label>
       <label className="flex flex-col gap-2 text-base">
         PM work order number
@@ -867,7 +937,17 @@ function DetailFields({
   );
 }
 
-function TenantList({ tenants, setTenants }: { tenants: JobTenant[]; setTenants: (next: JobTenant[]) => void }) {
+function TenantList({
+  tenants,
+  setTenants,
+  issue = "",
+  active = false,
+}: {
+  tenants: JobTenant[];
+  setTenants: (next: JobTenant[]) => void;
+  issue?: string;
+  active?: boolean;
+}) {
   function update(index: number, patch: Partial<JobTenant>) {
     setTenants(tenants.map((row, item) => (item === index ? { ...row, ...patch } : row)));
   }
@@ -881,10 +961,10 @@ function TenantList({ tenants, setTenants }: { tenants: JobTenant[]; setTenants:
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <Marked active={active} className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Tenants</h2>
       {tenants.map((row, index) => (
-        <div key={index} className="flex flex-col gap-3 rounded-2xl border border-black p-4">
+        <div key={index} className={`flex flex-col gap-3 rounded-2xl border p-4 ${issue ? "border-red-600" : "border-black"}`}>
           <div className="flex items-center justify-between gap-3">
             <p className="text-base font-semibold">Tenant {index + 1}</p>
             <button type="button" onClick={() => remove(index)} className="min-h-11 px-1 text-base font-semibold underline">
@@ -910,6 +990,7 @@ function TenantList({ tenants, setTenants }: { tenants: JobTenant[]; setTenants:
           Add tenant
         </button>
       ) : null}
-    </div>
+      <FieldReason message={issue} />
+    </Marked>
   );
 }
