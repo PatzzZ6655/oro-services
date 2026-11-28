@@ -47,7 +47,9 @@ export async function POST(request: Request) {
     const issue = book.issues.find((item) => item.id === issueId);
     if (!issue) return jobsJson({ ok: false, message: "That issue is not on this job." }, 400);
     const found = issue.angles.findIndex((angle) => angle.id === angleId);
-    const name = photoFileName(issue.level, issue.area, side, found >= 0 ? found : issue.angles.length);
+    const takenField = form.get("taken");
+    const taken = typeof takenField === "string" && /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(takenField) ? takenField : "";
+    const name = photoFileName(issue.level, issue.area, side, found >= 0 ? found : issue.angles.length, taken);
     const next = await storePhotoBytes({ ...book, title: title || book.title }, { issueId, angleId, side, bytes, name });
     return jobsJson({ ok: true, book: next });
   } catch (error) {

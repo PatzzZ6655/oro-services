@@ -112,6 +112,19 @@ export function GhostCamera({
       />
       {live ? <JobsButton type="button" onClick={() => void snap()}>Take after photo</JobsButton> : null}
       {blocked ? <JobsButton type="button" onClick={() => fileRef.current?.click()}>Open camera</JobsButton> : null}
+      <label className="flex min-h-14 items-center justify-center rounded-2xl border border-black text-lg font-semibold">
+        Choose from library
+        <input
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.currentTarget.value = "";
+            if (file) onCapture(file);
+          }}
+        />
+      </label>
       <JobsButton type="button" variant="outline" onClick={onClose}>Back</JobsButton>
     </section>
   );
