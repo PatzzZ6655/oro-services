@@ -37,6 +37,7 @@ import {
   type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
 import { introBody, introCcPayload, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
+import { confidentJobTitle, normalisePropertyAddress } from "@/lib/jobs-app/job-place";
 import { fillSmsTemplate, smsTemplates } from "@/lib/sms-templates";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
@@ -158,6 +159,8 @@ export function NewJobScreen() {
   const [phone, setPhone] = useState("");
   const [tenants, setTenants] = useState<JobTenant[]>(blankTenants());
   const [address, setAddress] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [pmName, setPmName] = useState("");
   const [pmAgency, setPmAgency] = useState("");
   const [clientChoices, setClientChoices] = useState<AgencyClient[]>([]);
   const [clientPick, setClientPick] = useState("");
@@ -343,10 +346,19 @@ export function NewJobScreen() {
       setReadSnapshot(recognised);
       setTenants(tenantsFromRead(read, { name: tenantName, phone }));
       const nextAgency = preferTyped(pmAgency, read.pmAgency);
-      setAddress(preferTyped(address, read.address));
+      const place = normalisePropertyAddress(preferTyped(address, read.address));
+      const problem = preferTyped(description, read.description);
+      setAddress(place);
+      setPmName(read.pmName);
+      setJobTitle((current) => current.trim() || confidentJobTitle({
+        pmName: read.pmName,
+        tenantName: read.tenantName,
+        address: place,
+        description: problem,
+      }));
       setPmAgency(nextAgency);
       void matchClients(nextAgency, read.officeHint ?? "");
-      setDescription(preferTyped(description, read.description));
+      setDescription(problem);
       setWorkOrderNumber(preferTyped(workOrderNumber, read.workOrderNumber));
       setVoucher(preferTyped(voucher, read.voucher.toUpperCase()));
       setReadyFiles(compressed);
@@ -401,6 +413,7 @@ export function NewJobScreen() {
         if (key === "tenantName" || key === "phone" || !value) continue;
         form.set(key, value);
       }
+      if (jobTitle.trim()) form.set("jobTitle", jobTitle.trim());
       const code = voucher.trim().toUpperCase().replace(/\s+/g, "");
       if (code) form.set("voucher", code);
       for (const file of readyFiles) form.append("images", file);
@@ -617,6 +630,18 @@ export function NewJobScreen() {
             setPhone={setPhone}
             address={address}
             setAddress={setAddress}
+            jobTitle={jobTitle}
+            setJobTitle={setJobTitle}
+            onAddressBlur={() => {
+              const place = normalisePropertyAddress(address);
+              setAddress(place);
+              setJobTitle((current) => current.trim() || confidentJobTitle({
+                pmName,
+                tenantName,
+                address: place,
+                description,
+              }));
+            }}
             pmAgency={pmAgency}
             setPmAgency={setPmAgency}
             clientChoices={clientChoices}
@@ -680,6 +705,18 @@ export function NewJobScreen() {
             setPhone={setPhone}
             address={address}
             setAddress={setAddress}
+            jobTitle={jobTitle}
+            setJobTitle={setJobTitle}
+            onAddressBlur={() => {
+              const place = normalisePropertyAddress(address);
+              setAddress(place);
+              setJobTitle((current) => current.trim() || confidentJobTitle({
+                pmName,
+                tenantName,
+                address: place,
+                description,
+              }));
+            }}
             pmAgency={pmAgency}
             setPmAgency={setPmAgency}
             clientChoices={clientChoices}
@@ -716,6 +753,9 @@ function DetailFields({
   setPhone,
   address,
   setAddress,
+  jobTitle,
+  setJobTitle,
+  onAddressBlur,
   pmAgency,
   setPmAgency,
   clientChoices = [],
@@ -739,6 +779,9 @@ function DetailFields({
   setPhone: (value: string) => void;
   address: string;
   setAddress: (value: string) => void;
+  jobTitle: string;
+  setJobTitle: (value: string) => void;
+  onAddressBlur?: () => void;
   pmAgency: string;
   setPmAgency: (value: string) => void;
   clientChoices?: AgencyClient[];
@@ -771,7 +814,11 @@ function DetailFields({
       ) : null}
       <label className="flex flex-col gap-2 text-base">
         Property address
-        <input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={newJobTextLimits.address} autoComplete="street-address" className={fieldClass} />
+        <input value={address} onChange={(event) => setAddress(event.target.value)} onBlur={onAddressBlur} maxLength={newJobTextLimits.address} autoComplete="street-address" className={fieldClass} />
+      </label>
+      <label className="flex flex-col gap-2 text-base">
+        Job title
+        <input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} maxLength={300} className={fieldClass} />
       </label>
       <label className="flex flex-col gap-2 text-base">
         PM agency
