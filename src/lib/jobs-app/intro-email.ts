@@ -20,6 +20,28 @@ export function introAgencyBit(pmAgency: string): string {
   return agency ? ` at ${agency}` : "";
 }
 
+export function introFirstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? "";
+}
+
+/** One tenant: Hi First,. Two: Hi First and First,. Three or more: Dear Tenants,. */
+export function introGreeting(tenants: Array<{ name: string }>): string {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const tenant of tenants) {
+    const first = introFirstName(tenant.name);
+    if (!first) continue;
+    const key = first.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(first);
+  }
+  if (names.length === 1) return `Hi ${names[0]},`;
+  if (names.length === 2) return `Hi ${names[0]} and ${names[1]},`;
+  if (names.length >= 3) return "Dear Tenants,";
+  return "Hi there,";
+}
+
 export function introTenantLine(tenant: IntroTenant): string {
   const name = tenant.name.trim() || "Tenant";
   const email = tenant.email.trim();
@@ -34,14 +56,14 @@ export function introCcPayload(checked: boolean, pmEmail: string): { ccPm: "0" |
 }
 
 export function introBody(preview: IntroPreview, name: string): string {
-  const who = name.trim() || "there";
+  const greeting = introGreeting(preview.tenants.length > 0 ? preview.tenants : [{ name, email: "" }]);
   const brand = preview.brand || businessLabel(preview.business);
   const agency = introAgencyBit(preview.pmAgency);
   const company = preview.business === "emporo" ? "Emporo Plumbing Pty Ltd" : "Emoro Building Pty Ltd";
   const email = preview.business === "emporo" ? "info.emporo@orosvc.com" : "info.emoro@orosvc.com";
   const abn = preview.business === "emporo" ? "ABN 63 695 532 944" : "ABN 36 695 596 019";
   return [
-    `Hi ${who},`,
+    greeting,
     "",
     `We hope you're having a great week. We're ${brand}, and your property manager${agency} has kindly asked us to look after a repair at ${preview.address}:`,
     "",

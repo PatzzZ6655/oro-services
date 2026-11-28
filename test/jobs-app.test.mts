@@ -909,6 +909,22 @@ test("the intro email uses only the confirmed job text", async () => {
   };
   assert.equal(introSubject(preview.address, preview.brand), "Repair Request At 12 Test Street – Emoro Building");
   const body = introBody(preview, "Sam Lee");
+  assert.equal(body.startsWith("Hi Sam and Jo,"), true);
+  assert.equal(introBody({ ...preview, tenants: [{ name: "Sam Lee", email: "sam@example.com" }] }, "").startsWith("Hi Sam,"), true);
+  assert.equal(
+    introBody(
+      {
+        ...preview,
+        tenants: [
+          { name: "Sam Lee", email: "" },
+          { name: "Jo Kim", email: "" },
+          { name: "Pat Nguyen", email: "" },
+        ],
+      },
+      "",
+    ).startsWith("Dear Tenants,"),
+    true,
+  );
   assert.equal(body.includes("Leaking kitchen tap"), true);
   assert.equal(body.includes(" at Test Agency"), true);
   assert.equal(body.includes("voucher"), false);
@@ -1016,6 +1032,11 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /title="Check job"/);
   assert.match(page, /Create job/);
   assert.match(page, /CC property manager/);
+  assert.match(page, /result\.pmEmail/);
+  assert.match(page, /introPhase === "sms"/);
+  assert.match(page, /<SmsPicker/);
+  assert.equal(page.includes("pm@agency.test"), false);
+  assert.equal(page.includes("Dear Jean"), false);
   assert.match(page, /useState\(false\)/);
   assert.match(page, /introCcPayload\(ccPm, result\.pmEmail\)/);
   assert.match(page, /\/jobs\/api\/new\/read/);
