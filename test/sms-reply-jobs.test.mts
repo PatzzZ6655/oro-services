@@ -91,6 +91,7 @@ test("tenant contacts drop the owner and normalise the mobile", () => {
       notionPage("Test Tenant", "0400 000 001", "Tenant"),
       notionPage("", "04 0000 0001", "Tenant"),
       notionPage("Test Flatmate", "0400 000 002", "Tenant"),
+      notionPage("Next Door", "0400 000 003", "Neighbour"),
     ],
   });
   assert.deepEqual(contacts, [
@@ -101,8 +102,9 @@ test("tenant contacts drop the owner and normalise the mobile", () => {
   const emporo = tenantQuery("emporo", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
   assert.match(emoro.url, /\/v1\/data_sources\/8df4fd74-0cdb-426e-8c42-d45038551b7d\/query/);
   assert.match(emporo.url, /\/v1\/data_sources\/60491037-f9ca-82cd-b1ef-072c1552caee\/query/);
-  assert.match(emoro.body, /does_not_equal/);
-  assert.match(emoro.body, /"Owner"/);
+  assert.match(emoro.body, /is_empty/);
+  assert.match(emoro.body, /"Tenant"/);
+  assert.equal(emoro.body.includes("does_not_equal"), false);
   assert.match(emporo.body, /Jobs \(Plumbing\)/);
   assert.equal(emoro.body.includes("depart"), false);
 });

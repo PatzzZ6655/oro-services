@@ -20,10 +20,10 @@ const privateHeaders = {
 /** Spoken SMS text. Control characters are removed; longer text is refused. */
 export const smsBodyLimit = 300;
 
-export function smsMessageBody(input: string): string | null {
-  if (input.length > smsBodyLimit * 4) return null;
+export function smsMessageBody(input: string, limit = smsBodyLimit): string | null {
+  if (input.length > limit * 4) return null;
   const cleaned = input.replace(/[\p{Cc}]/gu, "").trim();
-  if (cleaned.length > smsBodyLimit) return null;
+  if (cleaned.length > limit) return null;
   return cleaned;
 }
 

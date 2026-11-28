@@ -122,6 +122,24 @@ export const smsTemplates: SmsTemplate[] = [
   },
 ];
 
+/** Job-page texts. Placeholders are filled by group-messages.ts. */
+export const groupSmsTemplates = {
+  n1: "Hi [First], it's Pat from [Brand]. We're doing some [Summary] at [Address], planned for [Date]. [Impact] Is there a time that suits, or anything we should know? Any questions, just call or text me. Thanks!",
+  neighbourFollowUp: "Hi [First], Pat from [Brand] again, following up about the work at [Address]. Could you let me know a day and time that suits? Thanks.",
+  n2: "Hi [First], a quick heads-up from [Brand]: our works at [Address] are booked for [Date], [Time]. Thanks for your patience with any noise. Call or text me if you have any questions.",
+  dateChange: "Hi [First], [Brand] here. The works at [Address] have moved to [Date], [Time]. Sorry for the change and thanks for your patience.",
+  n3: "Hi [First], [Brand] here. The works at [Address] are now complete. Thanks for your patience and cooperation!",
+  o1: "Hi [First], it's Pat from [Brand]. [Agency] has asked us to [Summary] at your property at [Address]. It should take about [Duration]. What day and time suits you for access this week? Thanks!",
+  o2: "Hi [First], Pat from [Brand] again, following up about the [Summary] at [Address]. Could you let me know a day and time that suits? Thanks.",
+} as const;
+
+export const neighbourImpactLines = [
+  "We may need brief access to your side of the property.",
+  "There may be some noise while we work.",
+  "Our van may need to park near your driveway for a short time.",
+  "Just letting you know in advance.",
+] as const;
+
 export type SmsTemplateFields = {
   name: string;
   pmName: string;
