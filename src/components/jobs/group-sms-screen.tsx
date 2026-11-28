@@ -9,6 +9,7 @@ import { fillSmsTemplate, smsTemplateById } from "@/lib/sms-templates";
 import { smsMessageBody } from "@/lib/sms-link";
 import { smsHref } from "@/lib/jobs-app/sms";
 import { businessLabel, type Business } from "@/lib/jobs-app/types";
+import { ErrorBanner } from "@/components/jobs/field-error";
 import { BackLink, JobsButton, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 
 const sections: { role: ContactRole; title: string }[] = [
@@ -42,7 +43,7 @@ export function GroupSmsScreen({ id, business }: { id: string; business: Busines
   }, [business, id]);
 
   if (!job && !error) return <Screen title="Texts"><Spinner label="Opening" /></Screen>;
-  if (!job) return <Screen title="Texts" back={<BackLink href="/jobs" />}><p role="alert">{error}</p></Screen>;
+  if (!job) return <Screen title="Texts" back={<BackLink href="/jobs" />}><ErrorBanner message={error || "That job could not be read."} /></Screen>;
 
   const brand = businessLabel(business);
   const impactLine = impact === "custom" ? customImpact : impact;
@@ -131,7 +132,7 @@ export function GroupSmsScreen({ id, business }: { id: string; business: Busines
       })}
       {primaryContacts(job.contacts).length === 0 && !job.vacant ? <p className="text-base">No tenant or owner on this job.</p> : null}
       {note ? <p className="text-base">{note}</p> : null}
-      {error ? <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
+      <ErrorBanner message={error} />
     </Screen>
   );
 }

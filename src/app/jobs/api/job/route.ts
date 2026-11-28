@@ -21,9 +21,9 @@ export async function POST(request: Request) {
   const action = typeof body?.action === "string" ? body.action : "load";
 
   if (action === "load") {
-    const job = await loadJob(business, jobId);
-    if (!job) return jobsJson({ ok: false, message: "That job could not be read." }, 404);
-    return jobsJson({ ok: true, job });
+    const loaded = await loadJob(business, jobId);
+    if (!loaded.ok) return jobsJson({ ok: false, message: loaded.message }, loaded.status);
+    return jobsJson({ ok: true, job: loaded.job });
   }
 
   if (action === "add") {
