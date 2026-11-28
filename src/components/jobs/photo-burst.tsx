@@ -20,11 +20,7 @@ export function PhotoBurst({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const [urls, setUrls] = useState<string[]>([]);
-  const [live, setLive] = useState(false);
-  const [cameraNote, setCameraNote] = useState("");
   const full = max !== undefined && files.length >= max;
 
   useEffect(() => {
@@ -35,69 +31,9 @@ export function PhotoBurst({
     };
   }, [files]);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    const stream = streamRef.current;
-    if (!live || !video || !stream) return;
-    video.srcObject = stream;
-    void video.play().catch(() => undefined);
-  }, [live]);
-
-  useEffect(() => {
-    return () => {
-      for (const track of streamRef.current?.getTracks() ?? []) track.stop();
-    };
-  }, []);
-
-  function stopCamera() {
-    for (const track of streamRef.current?.getTracks() ?? []) track.stop();
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setLive(false);
-  }
-
   function add(list: FileList | null) {
     if (!list || list.length === 0) return;
     onChange(addPhotos(files, list, max));
-    setCameraNote("");
-  }
-
-  async function startCamera() {
-    const media = navigator.mediaDevices?.getUserMedia;
-    if (!media) {
-      setCameraNote("Use Take photo or Photo Library.");
-      return;
-    }
-    try {
-      const stream = await media.call(navigator.mediaDevices, { video: { facingMode: { ideal: "environment" } }, audio: false });
-      streamRef.current = stream;
-      setLive(true);
-      setCameraNote("");
-    } catch {
-      stopCamera();
-      setCameraNote("Camera is unavailable. Use Take photo or Photo Library.");
-    }
-  }
-
-  function shutter() {
-    const video = videoRef.current;
-    if (!video || full) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const shot = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
-      onChange(addPhotos(files, [shot], max));
-    }, "image/jpeg", 0.85);
-  }
-
-  function finish() {
-    stopCamera();
-    onDone?.();
   }
 
   return (
@@ -131,31 +67,16 @@ export function PhotoBurst({
           ))}
         </ul>
       ) : null}
-      {live ? (
-        <div className="flex flex-col gap-3">
-          <video ref={videoRef} playsInline muted autoPlay className="aspect-[3/4] w-full rounded-2xl bg-black object-cover" />
-          <JobsButton type="button" onClick={shutter} disabled={disabled || full}>
-            Take photo
-          </JobsButton>
-        </div>
-      ) : (
-        <JobsButton type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={disabled || full}>
-          {files.length > 0 ? "Take another" : "Take photo"}
-        </JobsButton>
-      )}
-      {!live ? (
-        <JobsButton type="button" variant="outline" onClick={() => void startCamera()} disabled={disabled || full}>
-          Use camera
-        </JobsButton>
-      ) : null}
-      {cameraNote ? <p className="text-base text-neutral-700">{cameraNote}</p> : null}
+      <JobsButton type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={disabled || full}>
+        {files.length > 0 ? "Take another" : "Take photo"}
+      </JobsButton>
       {max !== undefined ? (
         <p className="text-base">{files.length > 0 ? `${files.length} selected, ${max} at most` : `Up to ${max} photos`}</p>
       ) : (
         <p className="text-base">{files.length > 0 ? `${files.length} selected` : "Photos are optional."}</p>
       )}
-      {onDone && (files.length > 0 || live) ? (
-        <JobsButton type="button" onClick={finish} disabled={disabled || files.length === 0}>
+      {onDone && files.length > 0 ? (
+        <JobsButton type="button" onClick={onDone} disabled={disabled || files.length === 0}>
           {doneLabel ?? "Done"}
         </JobsButton>
       ) : null}

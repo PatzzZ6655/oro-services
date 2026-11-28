@@ -24,9 +24,10 @@ test("new job and leave keep shooting, and depart has no photo step", () => {
   assert.match(burst, /accept="image\/\*"/);
   assert.match(burst, /multiple/);
   assert.match(burst, /Take another/);
+  assert.match(burst, /Take photo/);
   assert.match(burst, /Remove/);
-  assert.match(burst, /getUserMedia/);
-  assert.match(burst, /Use Take photo or Photo Library/);
+  assert.equal(burst.includes("getUserMedia"), false);
+  assert.equal(burst.includes("Use camera"), false);
   assert.match(created, /<PhotoBurst/);
   assert.match(created, /max=\{NEW_JOB_MAX_IMAGES\}/);
   assert.match(created, /onDone=\{files\.length > 0 \? continueToCheck : undefined\}/);
