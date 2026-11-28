@@ -129,6 +129,14 @@ const nextConfig: NextConfig = {
       },
       { source: "/jobs", headers: jobsPrivacy },
       { source: "/jobs/:path*", headers: jobsPrivacy },
+      {
+        source: "/jobs/photos",
+        headers: [{ key: "Permissions-Policy", value: permissionsPolicy.replace("camera=()", "camera=(self)") }],
+      },
+      {
+        source: "/jobs/photos/:path*",
+        headers: [{ key: "Permissions-Policy", value: permissionsPolicy.replace("camera=()", "camera=(self)") }],
+      },
     ];
   },
 };
