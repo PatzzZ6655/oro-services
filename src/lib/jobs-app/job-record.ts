@@ -201,40 +201,92 @@ async function notion(path: string, init: RequestInit, fetchImpl?: FetchLike): P
   const secret = token();
   if (!secret) return null;
   const call = fetchImpl ?? globalThis.fetch;
-  return call(`https://api.notion.com/v1/${path}`, { ...init, headers: headers(secret) });
+  return call(`https://api.notion.com/v1/${path}`, { ...init, headers: headers(secret), cache: "no-store" });
 }
 
-export async function loadJob(business: Business, jobId: string, fetchImpl?: FetchLike): Promise<JobRecord | null> {
+/** Both job databases show linked people on a relation named Contacts. */
+export function linkedContactIds(value: unknown): { ids: string[]; hasMore: boolean } {
+  if (!value || typeof value !== "object") return { ids: [], hasMore: false };
+  const relation = (value as { relation?: unknown }).relation;
+  const ids: string[] = [];
+  if (Array.isArray(relation)) {
+    for (const item of relation) {
+      if (!item || typeof item !== "object") continue;
+      const id = cleanJobId((item as { id?: unknown }).id);
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return { ids, hasMore: (value as { has_more?: unknown }).has_more === true };
+}
+
+function contactFromPage(item: unknown): JobContact | null {
+  if (!item || typeof item !== "object") return null;
+  const row = item as { id?: unknown; in_trash?: unknown; archived?: unknown; properties?: Record<string, unknown> };
+  if (row.in_trash === true || row.archived === true) return null;
+  const pageId = cleanJobId(typeof row.id === "string" ? row.id : "");
+  if (!pageId || !row.properties) return null;
+  return {
+    pageId,
+    name: titleText(row.properties.Name),
+    phone: normalizePhone(phoneOf(row.properties.Phone)) ?? "",
+    email: emailOf(row.properties.Email),
+    role: contactRole(selectName(row.properties.Select)),
+    googleStatus: selectName(row.properties["Google Contact Status"]),
+  };
+}
+
+export async function loadJob(business: Business, jobId: string, fetchImpl?: FetchLike): Promise<{ ok: true; job: JobRecord } | { ok: false; status: number; message: string }> {
   const id = cleanJobId(jobId);
-  if (!id || !isBusiness(business)) return null;
+  if (!id || !isBusiness(business)) return { ok: false, status: 400, message: "Choose a job." };
   const page = await notion(`pages/${id}`, { method: "GET" }, fetchImpl);
-  if (!page || !page.ok) return null;
+  if (!page || !page.ok) return { ok: false, status: 404, message: "That job could not be read." };
   const json = (await page.json().catch(() => null)) as { properties?: Record<string, unknown> } | null;
   const properties = json?.properties;
-  if (!properties) return null;
+  if (!properties) return { ok: false, status: 404, message: "That job could not be read." };
   const source = jobs[business];
-  const listed = await notion(`data_sources/${contactsDb[business].dataSource}/query`, {
-    method: "POST",
-    body: JSON.stringify({
-      page_size: 50,
-      filter: { property: contactsDb[business].relation, relation: { contains: id } },
-    }),
-  }, fetchImpl);
-  const rows = listed && listed.ok ? ((await listed.json().catch(() => null)) as { results?: unknown[] } | null)?.results ?? [] : [];
+  const linked = linkedContactIds(properties.Contacts);
+  const fromRelation: JobContact[] = [];
+  let relationFailed = false;
+  if (linked.ids.length > 0) {
+    const read = await Promise.all(linked.ids.map(async (pageId) => {
+      const contactPage = await notion(`pages/${pageId}`, { method: "GET" }, fetchImpl);
+      if (!contactPage?.ok) return "failed" as const;
+      return contactFromPage(await contactPage.json().catch(() => null));
+    }));
+    for (const item of read) {
+      if (item === "failed") relationFailed = true;
+      else if (item) fromRelation.push(item);
+    }
+  }
+  const fromQuery: JobContact[] = [];
+  let queryFailed = false;
+  if (linked.hasMore || fromRelation.length === 0) {
+    const listed = await notion(`data_sources/${contactsDb[business].dataSource}/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        page_size: 50,
+        filter: { property: contactsDb[business].relation, relation: { contains: id } },
+      }),
+    }, fetchImpl);
+    if (!listed?.ok) {
+      queryFailed = true;
+      console.error(`job contacts query ${listed?.status ?? 0}`);
+    } else {
+      const rows = ((await listed.json().catch(() => null)) as { results?: unknown[] } | null)?.results ?? [];
+      for (const item of rows) {
+        const contact = contactFromPage(item);
+        if (contact) fromQuery.push(contact);
+      }
+    }
+  }
+  if (relationFailed || (queryFailed && fromRelation.length === 0)) return { ok: false, status: 502, message: "The contacts could not be read." };
+  const seen = new Set<string>();
   const people: JobContact[] = [];
-  for (const item of rows) {
-    if (!item || typeof item !== "object") continue;
-    const row = item as { id?: unknown; properties?: Record<string, unknown> };
-    const pageId = cleanJobId(typeof row.id === "string" ? row.id : "");
-    if (!pageId || !row.properties) continue;
-    people.push({
-      pageId,
-      name: titleText(row.properties.Name),
-      phone: normalizePhone(phoneOf(row.properties.Phone)) ?? "",
-      email: emailOf(row.properties.Email),
-      role: contactRole(selectName(row.properties.Select)),
-      googleStatus: selectName(row.properties["Google Contact Status"]),
-    });
+  for (const contact of [...fromRelation, ...fromQuery]) {
+    const key = contact.pageId.replace(/-/g, "").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    people.push(contact);
   }
   const customerIds = relationIds(properties.Customer);
   let customer = "";
@@ -246,7 +298,7 @@ export async function loadJob(business: Business, jobId: string, fetchImpl?: Fet
       customer = titleText(body?.properties?.Name) || titleText(body?.properties?.Customer);
     }
   }
-  return {
+  return { ok: true, job: {
     business,
     jobId: id,
     title: titleText(properties.Job),
@@ -263,7 +315,7 @@ export async function loadJob(business: Business, jobId: string, fetchImpl?: Fet
     description: rich(properties["Job Description"]),
     customer,
     contacts: people,
-  };
+  } };
 }
 
 export function contactDisplay(contact: JobContact, address: string): string {

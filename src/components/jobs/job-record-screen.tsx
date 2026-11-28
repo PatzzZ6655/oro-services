@@ -7,6 +7,7 @@ import { contactDisplay, contactSaved, type JobContact, type JobRecord } from "@
 import { guidedNext, nextNeighbourProgress, roleLabel, contactRoles, type ContactRole } from "@/lib/jobs-app/contact-groups";
 import { mapsHref } from "@/lib/jobs-app/address";
 import { businessLabel, type Business } from "@/lib/jobs-app/types";
+import { ErrorBanner, redBorder } from "@/components/jobs/field-error";
 import { BackLink, JobsButton, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 
 const groups: { role: ContactRole; title: string }[] = [
@@ -26,6 +27,7 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
   const [email, setEmail] = useState("");
   const [pickup, setPickup] = useState("");
   const [busy, setBusy] = useState("");
+  const [failed, setFailed] = useState("");
 
   async function load() {
     const data = await postJobs<{ job: JobRecord }>("/jobs/api/job", { action: "load", business, jobId: id });
@@ -37,23 +39,28 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
     load().catch((reason: unknown) => setError(reason instanceof JobsClientError ? reason.message : "That job could not be read."));
   }, [business, id]);
 
-  async function run(action: string, extra: Record<string, unknown>, label: string) {
+  async function run(action: string, extra: Record<string, unknown>, label: string): Promise<boolean> {
     setBusy(label);
     setError("");
+    setFailed("");
     setNote("");
     try {
       const result = await postJobs<{ skipped?: boolean; sync?: string }>("/jobs/api/job", { action, business, jobId: id, ...extra });
       if (result.skipped || result.sync === "skipped") setNote("Saved here. The Make connection is not switched on yet.");
+      else if (action === "add") setNote("Contact saved.");
       await load();
+      return true;
     } catch (reason) {
       setError(reason instanceof JobsClientError ? reason.message : "The server did not reply. Try again.");
+      setFailed(action);
+      return false;
     } finally {
       setBusy("");
     }
   }
 
   if (!job && !error) return <Screen title="Job"><Spinner label="Opening" /></Screen>;
-  if (!job) return <Screen title="Job" back={<BackLink href="/jobs" />}><p role="alert">{error}</p></Screen>;
+  if (!job) return <Screen title="Job" back={<BackLink href="/jobs" />}><ErrorBanner message={error || "That job could not be read."} /></Screen>;
 
   const guide = guidedNext(job.status, job.vacant);
   const nextNeighbour = nextNeighbourProgress(job.neighbour);
@@ -105,10 +112,11 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
         );
       })}
       <form
-        className="flex flex-col gap-3"
+        className={failed === "add" ? "flex flex-col gap-3 rounded-2xl border border-red-600 p-4" : "flex flex-col gap-3"}
         onSubmit={(event) => {
           event.preventDefault();
-          void run("add", { role, name, phone, email, address: job.address }, "Saving").then(() => {
+          void run("add", { role, name, phone, email, address: job.address }, "Saving").then((saved) => {
+            if (!saved) return;
             setName("");
             setPhone("");
             setEmail("");
@@ -116,13 +124,14 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
         }}
       >
         <h2 className="text-lg font-semibold">Add contact</h2>
-        <select value={role} onChange={(event) => setRole(contactRoleValue(event.target.value))} className={fieldClass}>
+        <select value={role} onChange={(event) => setRole(contactRoleValue(event.target.value))} className={redBorder(fieldClass, failed === "add")}>
           {contactRoles.map((item) => <option key={item} value={item}>{roleLabel(item)}</option>)}
         </select>
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" className={fieldClass} />
-        <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Mobile" inputMode="tel" className={fieldClass} />
-        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email (optional)" inputMode="email" className={fieldClass} />
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" className={redBorder(fieldClass, failed === "add")} />
+        <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Mobile" inputMode="tel" className={redBorder(fieldClass, failed === "add")} />
+        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email (optional)" inputMode="email" className={redBorder(fieldClass, failed === "add")} />
         <JobsButton type="submit" disabled={Boolean(busy)}>Add</JobsButton>
+        {failed === "add" ? <ErrorBanner message={error} /> : null}
       </form>
       <section className="flex flex-col gap-3 rounded-2xl border border-black p-4">
         <label className="flex min-h-14 items-center gap-3 text-base">
@@ -147,7 +156,7 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
         Text this job
       </Link>
       {note ? <p className="text-base">{note}</p> : null}
-      {error ? <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
+      {failed !== "add" ? <ErrorBanner message={error} /> : null}
       {busy ? <p className="text-base">{busy}</p> : null}
     </Screen>
   );
