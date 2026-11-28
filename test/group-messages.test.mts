@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { contactCardName, contactRole, primaryContacts, primarySelectFilter } from "@/lib/jobs-app/contact-groups";
-import { contactCreateBody } from "@/lib/jobs-app/job-record";
+import { contactCreateBody, contactUpdateProperties } from "@/lib/jobs-app/job-record";
 import { contactSyncPayload, groupEmailPayload, keyPickupBody, keyPickupPayload, keyPickupSubject, neighbourImpactLines, neighbourIntro, ownerIntro, fieldsFor } from "@/lib/jobs-app/group-messages";
 import { smsMessageBody } from "@/lib/sms-link";
 
@@ -82,6 +82,10 @@ test("the Make payloads are additive and a new contact is not linked to the prop
   assert.match(encoded, /"Jobs"/);
   assert.equal(encoded.includes("Property"), false);
   assert.match(encoded, /Neighbour/);
+  const updated = JSON.stringify(contactUpdateProperties({ name: "Daniel", phone: "+61430016655", email: "", role: "owner" }));
+  assert.match(updated, /Owner/);
+  assert.equal(updated.includes("Property"), false);
+  assert.equal(updated.includes("Jobs"), false);
   const notes = readFileSync(new URL("../src/lib/jobs-app/job-notes-store.ts", import.meta.url), "utf8");
   assert.match(notes, /primarySelectFilter/);
   assert.equal(notes.includes("does_not_equal"), false);

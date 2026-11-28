@@ -144,6 +144,16 @@ function roleLabelFallback(role: ContactRole): string {
   return notionSelectName(role);
 }
 
+export function contactUpdateProperties(input: { name: string; phone: string; email: string; role: ContactRole }): Record<string, unknown> {
+  return {
+    Name: { title: [{ type: "text", text: { content: oneLine(input.name, 80) || roleLabelFallback(input.role) } }] },
+    Select: { select: { name: notionSelectName(input.role) } },
+    Phone: input.phone ? { phone_number: input.phone } : { phone_number: null },
+    Email: input.email.trim() ? { email: oneLine(input.email, 120) } : { email: null },
+    "Google Contact Status": { select: { name: input.phone ? "pending" : "no phone" } },
+  };
+}
+
 export function contactSaved(status: string): boolean {
   return status.trim().toLowerCase() === "saved";
 }
@@ -286,6 +296,36 @@ export async function createJobContact(
   }, fetchImpl);
   if (!sync.ok) return { ok: false, message: sync.message };
   return { ok: true, pageId, sync: sync.skipped ? "skipped" : "sent" };
+}
+
+export async function updateJobContact(
+  business: Business,
+  jobId: string,
+  input: { pageId: string; name: string; phone: string; email: string; role: ContactRole },
+  address: string,
+  fetchImpl?: FetchLike,
+): Promise<{ ok: true; sync: "skipped" | "sent" } | { ok: false; message: string }> {
+  const phone = input.phone ? normalizePhone(input.phone) : "";
+  if (input.phone && !phone) return { ok: false, message: "Enter an Australian mobile." };
+  const pageId = cleanJobId(input.pageId);
+  if (!pageId) return { ok: false, message: "That contact could not be saved." };
+  const patched = await notion(`pages/${pageId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ properties: contactUpdateProperties({ ...input, phone: phone ?? "" }) }),
+  }, fetchImpl);
+  if (!patched?.ok) return { ok: false, message: "The contact could not be saved." };
+  const sync = await syncContact({
+    business,
+    jobId,
+    pageId,
+    name: input.name,
+    phone: phone ?? "",
+    email: input.email,
+    role: notionSelectName(input.role),
+    displayName: contactCardName(input.name, address, input.role),
+  }, fetchImpl);
+  if (!sync.ok) return { ok: false, message: sync.message };
+  return { ok: true, sync: sync.skipped ? "skipped" : "sent" };
 }
 
 export async function patchJob(jobId: string, properties: Record<string, unknown>, fetchImpl?: FetchLike): Promise<boolean> {

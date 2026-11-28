@@ -92,7 +92,14 @@ export function JobRecordScreen({ id, business }: { id: string; business: Busine
             <h2 className="text-lg font-semibold">{group.title}</h2>
             {people.length === 0 ? <p className="text-base">None yet.</p> : null}
             {people.map((contact) => (
-              <ContactRow key={contact.pageId} contact={contact} address={job.address} busy={busy} onRemove={() => void run("remove", { pageId: contact.pageId }, "Removing")} />
+              <ContactRow
+                key={contact.pageId}
+                contact={contact}
+                address={job.address}
+                busy={busy}
+                onSave={(fields) => void run("edit", { pageId: contact.pageId, address: job.address, ...fields }, "Saving")}
+                onRemove={() => void run("remove", { pageId: contact.pageId }, "Removing")}
+              />
             ))}
           </section>
         );
@@ -150,15 +157,48 @@ function contactRoleValue(value: string): ContactRole {
   return contactRoles.includes(value as ContactRole) ? (value as ContactRole) : "tenant";
 }
 
-function ContactRow({ contact, address, busy, onRemove }: { contact: JobContact; address: string; busy: string; onRemove: () => void }) {
+function ContactRow({
+  contact,
+  address,
+  busy,
+  onSave,
+  onRemove,
+}: {
+  contact: JobContact;
+  address: string;
+  busy: string;
+  onSave: (fields: { role: ContactRole; name: string; phone: string; email: string }) => void;
+  onRemove: () => void;
+}) {
   const saved = contactSaved(contact.googleStatus);
+  const [editing, setEditing] = useState(false);
+  const [role, setRole] = useState<ContactRole>(contact.role);
+  const [name, setName] = useState(contact.name);
+  const [phone, setPhone] = useState(contact.phone);
+  const [email, setEmail] = useState(contact.email);
   return (
     <div className="rounded-2xl border border-black p-3">
       <p className="text-base font-semibold">{contact.name || roleLabel(contact.role)}</p>
       <p className="text-sm">{contact.phone}{contact.email ? ` · ${contact.email}` : ""}</p>
       <p className="text-sm">{saved ? "Saved in Google" : contact.googleStatus === "pending" || !contact.googleStatus ? "saving contact" : contact.googleStatus}</p>
       <p className="text-sm text-neutral-600">{contactDisplay(contact, address)}</p>
-      <button type="button" className="mt-2 min-h-11 text-base underline" disabled={Boolean(busy)} onClick={onRemove}>Remove</button>
+      {editing ? (
+        <div className="mt-3 flex flex-col gap-3">
+          <select value={role} onChange={(event) => setRole(contactRoleValue(event.target.value))} className={fieldClass}>
+            {contactRoles.map((item) => <option key={item} value={item}>{roleLabel(item)}</option>)}
+          </select>
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" className={fieldClass} />
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Mobile" inputMode="tel" className={fieldClass} />
+          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email (optional)" inputMode="email" className={fieldClass} />
+          <JobsButton type="button" disabled={Boolean(busy)} onClick={() => { onSave({ role, name, phone, email }); setEditing(false); }}>Save</JobsButton>
+          <JobsButton type="button" variant="outline" disabled={Boolean(busy)} onClick={() => setEditing(false)}>Cancel</JobsButton>
+        </div>
+      ) : (
+        <div className="mt-2 flex gap-4">
+          <button type="button" className="min-h-11 text-base underline" disabled={Boolean(busy)} onClick={() => setEditing(true)}>Edit</button>
+          <button type="button" className="min-h-11 text-base underline" disabled={Boolean(busy)} onClick={onRemove}>Remove</button>
+        </div>
+      )}
     </div>
   );
 }

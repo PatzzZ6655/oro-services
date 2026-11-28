@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { contactRole, nextNeighbourProgress, type ContactRole, type NeighbourProgress } from "@/lib/jobs-app/contact-groups";
 import { jobsJson, requireJobsUser } from "@/lib/jobs-app/guard";
-import { createJobContact, loadJob, patchJob, sendKeyPickup, sendNeighbourEmail } from "@/lib/jobs-app/job-record";
+import { createJobContact, loadJob, patchJob, sendKeyPickup, sendNeighbourEmail, updateJobContact } from "@/lib/jobs-app/job-record";
 import { isBusiness } from "@/lib/jobs-app/types";
 
 export const maxDuration = 30;
@@ -35,6 +35,18 @@ export async function POST(request: Request) {
     }, typeof body?.address === "string" ? body.address : "");
     if (!created.ok) return jobsJson({ ok: false, message: created.message }, 400);
     return jobsJson({ ok: true, pageId: created.pageId, sync: created.sync });
+  }
+
+  if (action === "edit") {
+    const updated = await updateJobContact(business, jobId, {
+      pageId: typeof body?.pageId === "string" ? body.pageId : "",
+      name: typeof body?.name === "string" ? body.name : "",
+      phone: typeof body?.phone === "string" ? body.phone : "",
+      email: typeof body?.email === "string" ? body.email : "",
+      role: roleOf(body?.role),
+    }, typeof body?.address === "string" ? body.address : "");
+    if (!updated.ok) return jobsJson({ ok: false, message: updated.message }, 400);
+    return jobsJson({ ok: true, sync: updated.sync });
   }
 
   if (action === "remove") {
