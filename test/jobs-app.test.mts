@@ -1029,6 +1029,14 @@ test("the new job screen checks the details before it creates the job", () => {
   assert.match(page, /Tenants/);
   assert.match(page, /Choose Emoro Building or Emporo Plumbing first/);
   assert.match(page, /scrollIntoView/);
+  assert.match(page, /ErrorBanner/);
+  assert.match(page, /border-red-600/);
+  const departPage = readFileSync(new URL("../src/components/jobs/depart-screen.tsx", import.meta.url), "utf8");
+  const leavePage = readFileSync(new URL("../src/components/jobs/leave-screen.tsx", import.meta.url), "utf8");
+  assert.match(departPage, /failedId/);
+  assert.match(departPage, /ErrorBanner/);
+  assert.match(leavePage, /Not confirmed/);
+  assert.match(leavePage, /ErrorBanner/);
   assert.match(page, /title="Check job"/);
   assert.match(page, /Create job/);
   assert.match(page, /CC property manager/);

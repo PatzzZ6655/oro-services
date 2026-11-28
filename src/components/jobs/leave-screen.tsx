@@ -10,6 +10,7 @@ import { KeepPage } from "@/components/jobs/keep-page";
 import { PhotoBurst } from "@/components/jobs/photo-burst";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { SmsPicker } from "@/components/jobs/sms-picker";
+import { ErrorBanner, FieldReason, Marked, redBorder } from "@/components/jobs/field-error";
 import { Alert, BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import { OPTIONAL_ITEMS, REQUIRED_ITEMS, checklistText } from "@/lib/jobs-app/checklist";
 import { invoiceDraftKey } from "@/lib/jobs-app/invoice";
@@ -45,6 +46,8 @@ export function LeaveScreen() {
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [marks, setMarks] = useState<Record<string, string>>({});
+  const [summary, setSummary] = useState("");
   const [drop, setDrop] = useState<{ kept: File[]; dropped: number } | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [result, setResult] = useState<LeaveResult | null>(null);
@@ -259,12 +262,27 @@ export function LeaveScreen() {
 
   function toggle(item: string) {
     setChecked((current) => (current.includes(item) ? current.filter((value) => value !== item) : [...current, item]));
+    setMarks((current) => {
+      if (!current[item]) return current;
+      const next = { ...current };
+      delete next[item];
+      if (Object.keys(next).length < 2) setSummary("");
+      return next;
+    });
+  }
+
+  function showMarks(next: Record<string, string>, banner = "") {
+    setError("");
+    setMarks(next);
+    setSummary(Object.keys(next).length > 1 ? banner || Object.values(next).join(" ") : "");
   }
 
   async function send(files: File[]) {
     setDrop(null);
     setBusy("Sending");
     setError("");
+    setMarks({});
+    setSummary("");
     const form = new FormData();
     form.set("business", visit?.business ?? "");
     form.set("jobId", visit?.jobId ?? "");
@@ -304,7 +322,7 @@ export function LeaveScreen() {
       const compressed = photos.length > 0 ? await compressFiles(photos, LEAVE_MAX_EDGE, LEAVE_QUALITIES) : [];
       const count = keptCount(compressed.map((file) => file.size));
       if (photos.length > 0 && count === 0) {
-        setError("The photos are too large. Choose fewer.");
+        showMarks({ photos: "The photos are too large. Choose fewer." });
         setBusy("");
         return;
       }
@@ -316,7 +334,7 @@ export function LeaveScreen() {
       await send(compressed.slice(0, count));
     } catch {
       setBusy("");
-      setError("This photo could not be compressed. Use a JPEG.");
+      showMarks({ photos: "This photo could not be compressed. Use a JPEG." });
     }
   }
 
@@ -336,7 +354,7 @@ export function LeaveScreen() {
     >
       <p className="text-lg font-semibold">{visit.title}</p>
       <p className="text-base">{visit.address}</p>
-      {error ? <Alert>{error}</Alert> : null}
+      {summary ? <ErrorBanner message={summary} /> : null}
       {busy ? <Spinner label={busy} /> : null}
 
       {step === "checklist" && !busy ? (
@@ -345,10 +363,13 @@ export function LeaveScreen() {
           <ul className="flex flex-col gap-2">
             {REQUIRED_ITEMS.map((item) => (
               <li key={item}>
-                <label className="flex min-h-14 items-center gap-3 rounded-2xl border border-black px-3">
-                  <input type="checkbox" className="h-6 w-6 accent-black" checked={selected.has(item)} onChange={() => toggle(item)} />
-                  <span className="text-base">{item}</span>
-                </label>
+                <Marked active={Object.keys(marks)[0] === item}>
+                  <label className={redBorder("flex min-h-14 items-center gap-3 rounded-2xl border border-black px-3", Boolean(marks[item]))}>
+                    <input type="checkbox" className="h-6 w-6 accent-black" checked={selected.has(item)} onChange={() => toggle(item)} />
+                    <span className="text-base">{item}</span>
+                  </label>
+                  <FieldReason message={marks[item] ?? ""} />
+                </Marked>
               </li>
             ))}
             {OPTIONAL_ITEMS.map((item) => (
@@ -366,8 +387,16 @@ export function LeaveScreen() {
           <JobsButton
             type="button"
             onClick={() => {
-              if (review.missing.length > 0) setWarn(true);
-              else setStep("outcome");
+              if (review.missing.length === 0) {
+                setMarks({});
+                setSummary("");
+                setStep("outcome");
+                return;
+              }
+              const next: Record<string, string> = {};
+              for (const item of review.missing) next[item] = "Not confirmed.";
+              showMarks(next, "These are not confirmed.");
+              setWarn(true);
             }}
           >
             Next
@@ -404,21 +433,33 @@ export function LeaveScreen() {
             Other issues found (optional, saved to Notion only, not in the SMS or the property-manager email)
             <textarea value={issues} onChange={(event) => setIssues(event.target.value)} rows={3} className={`${fieldClass} py-3`} />
           </label>
-          <PhotoBurst
-            files={photos}
-            max={LEAVE_MAX_PHOTOS}
-            doneLabel="Done"
-            disabled={Boolean(busy)}
-            onChange={(next) => {
-              setPhotos(next);
-              setPhotoCount(next.length);
-              if (next.length > 0) setPhotosCleared(false);
-            }}
-            onDone={() => undefined}
-          />
+          <Marked active={Object.keys(marks)[0] === "photos"} className="flex flex-col gap-2">
+            <div className={marks.photos ? "rounded-2xl border border-red-600 p-2" : ""}>
+              <PhotoBurst
+                files={photos}
+                max={LEAVE_MAX_PHOTOS}
+                doneLabel="Done"
+                disabled={Boolean(busy)}
+                onChange={(next) => {
+                  setPhotos(next);
+                  setPhotoCount(next.length);
+                  if (next.length > 0) setPhotosCleared(false);
+                  setMarks((current) => {
+                    if (!current.photos) return current;
+                    const rest = { ...current };
+                    delete rest.photos;
+                    return rest;
+                  });
+                }}
+                onDone={() => undefined}
+              />
+            </div>
+            <FieldReason message={marks.photos ?? ""} />
+          </Marked>
           {photos.length === 0 && photosCleared ? (
             <p>The photos were cleared when the page reloaded. Add them again if you still want them with this visit.</p>
           ) : null}
+          <ErrorBanner message={error} />
           <JobsButton type="button" onClick={() => submit(false)}>
             Submit
           </JobsButton>
@@ -443,6 +484,8 @@ export function LeaveScreen() {
                 variant="outline"
                 onClick={() => {
                   setWarn(false);
+                  setMarks({});
+                  setSummary("");
                   setStep("outcome");
                 }}
               >
