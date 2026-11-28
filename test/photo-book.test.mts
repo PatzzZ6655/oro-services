@@ -7,6 +7,7 @@ import {
   collageLayout,
   collageReady,
   emptyPhotoBook,
+  initialAreaSection,
   issuePlace,
   maxPhotoAngles,
   areaGroups,
@@ -15,6 +16,7 @@ import {
   photoFileName,
   photoFolderName,
   photoLevels,
+  photoTakenStamp,
   resolveArea,
   swapAfterPhotos,
   unshotAngles,
@@ -35,6 +37,11 @@ test("levels come first and bedrooms can be numbered", () => {
   assert.equal(areaGroups("Ground Floor")[0]?.title, "Interior");
   assert.equal(areaGroups("Exterior/Outside")[0]?.title, "Exterior");
   assert.equal(areaGroups("Exterior/Outside")[0]?.areas[0], "Porch/Verandah");
+  assert.equal(initialAreaSection("Exterior/Outside"), "Exterior");
+  assert.equal(initialAreaSection("Ground Floor"), "");
+  const taken = new Date(2026, 10, 28, 14, 30).getTime();
+  assert.equal(photoTakenStamp(new Uint8Array(), taken), "2026-11-28-1430");
+  assert.equal(photoFileName("Ground Floor", "Kitchen", "before", 0, "2026-11-28-1430"), "Ground Floor Kitchen before 1 2026-11-28-1430.jpg");
 });
 
 test("an issue keeps at most four angles and flags an unshot after", () => {
@@ -54,6 +61,15 @@ test("an issue keeps at most four angles and flags an unshot after", () => {
   if (!issue) throw new Error("missing issue");
   assert.equal(unshotAngles(issue).length, 4);
   assert.equal(collageReady(issue), false);
+  const onlyAfter = attachPhotoFile(created, { issueId: "issue-001", angleId: "angle-only", side: "after", fileId: "afteronly01" });
+  if ("error" in onlyAfter) throw new Error(onlyAfter.error);
+  assert.equal(onlyAfter.issues[0]?.angles[0]?.beforeId, "");
+  assert.equal(collageReady(onlyAfter.issues[0]!), false);
+  const pairedOne = attachPhotoFile(onlyAfter, { issueId: "issue-001", angleId: "angle-only", side: "before", fileId: "beforeonly1" });
+  if ("error" in pairedOne) throw new Error(pairedOne.error);
+  assert.equal(collageReady(pairedOne.issues[0]!), true);
+  const noNote = addPhotoIssue(emptyPhotoBook("emoro", jobId, "TEST job"), "Ground Floor", "Kitchen", "", "issue-002");
+  assert.equal("error" in noNote, false);
   const paired = attachPhotoFile(book, { issueId: "issue-001", angleId: "angle-000", side: "after", fileId: "afterfile00" });
   if ("error" in paired) throw new Error(paired.error);
   const swapped = swapAfterPhotos(paired, "issue-001", "angle-000", "angle-001");
@@ -120,6 +136,13 @@ test("the photos page is its own installable app and the camera policy is scoped
   const upload = readFileSync(new URL("../src/app/jobs/api/photos/upload/route.ts", import.meta.url), "utf8");
   const collage = readFileSync(new URL("../src/components/jobs/photo-collage.ts", import.meta.url), "utf8");
   assert.match(upload, /photoFileName/);
+  const screen = readFileSync(new URL("../src/components/jobs/photos-screen.tsx", import.meta.url), "utf8");
+  assert.match(screen, /KeepPage/);
+  assert.match(screen, /Add another angle/);
+  assert.match(screen, /Next issue/);
+  assert.match(screen, /Choose from library/);
+  assert.match(screen, /Add Before/);
+  assert.equal(screen.includes("Short note for this issue"), false);
   assert.equal(collage.includes("issuePlace"), false);
   assert.equal(collage.includes("level"), false);
 });

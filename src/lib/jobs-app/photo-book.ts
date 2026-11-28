@@ -122,10 +122,73 @@ export function issuePlace(issue: Pick<PhotoIssue, "level" | "area">): string {
   return `${issue.level} · ${issue.area}`;
 }
 
-export function photoFileName(level: string, area: string, side: "before" | "after" | "collage", index: number): string {
-  const place = photoFolderName(`${level} ${area}`).slice(0, 60);
-  if (side === "collage") return `${place} collage.jpg`;
-  return `${place} ${side} ${index + 1}.jpg`;
+export function photoFileName(level: string, area: string, side: "before" | "after" | "collage", index: number, taken = ""): string {
+  const place = photoFolderName(`${level} ${area}`).slice(0, 50);
+  const when = /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(taken) ? ` ${taken}` : "";
+  if (side === "collage") return `${place} collage${when}.jpg`;
+  return `${place} ${side} ${index + 1}${when}.jpg`;
+}
+
+export function initialAreaSection(level: string): "Interior" | "Exterior" | "" {
+  return level === "Exterior/Outside" ? "Exterior" : "";
+}
+
+/** Prefer the camera's EXIF date, then the file's last modified time. */
+export function photoTakenStamp(bytes: Uint8Array, lastModified = 0): string {
+  const exif = exifDate(bytes);
+  const date = exif ?? (lastModified > 0 ? new Date(lastModified) : null);
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const part = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}-${part(date.getHours())}${part(date.getMinutes())}`;
+}
+
+function exifDate(bytes: Uint8Array): Date | null {
+  const label = [0x45, 0x78, 0x69, 0x66, 0, 0];
+  let start = -1;
+  for (let index = 0; index < bytes.length - 16; index += 1) {
+    if (label.every((byte, offset) => bytes[index + offset] === byte)) {
+      start = index + label.length;
+      break;
+    }
+  }
+  if (start < 0 || start + 8 > bytes.length) return null;
+  const little = bytes[start] === 0x49 && bytes[start + 1] === 0x49;
+  const big = bytes[start] === 0x4d && bytes[start + 1] === 0x4d;
+  if (!little && !big) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const u16 = (offset: number) => view.getUint16(start + offset, little);
+  const u32 = (offset: number) => view.getUint32(start + offset, little);
+  if (u16(2) !== 42) return null;
+  const readText = (offset: number, length: number) => {
+    let text = "";
+    for (let index = 0; index < length; index += 1) text += String.fromCharCode(bytes[start + offset + index] ?? 0);
+    return text;
+  };
+  const readIfd = (offset: number): string => {
+    if (offset < 8 || start + offset + 2 > bytes.length) return "";
+    const count = u16(offset);
+    for (let index = 0; index < count; index += 1) {
+      const entry = offset + 2 + index * 12;
+      if (start + entry + 12 > bytes.length) break;
+      const tag = u16(entry);
+      const type = u16(entry + 2);
+      const size = u32(entry + 4);
+      const pointer = u32(entry + 8);
+      if (tag === 0x8769 && type === 4) {
+        const nested = readIfd(pointer);
+        if (nested) return nested;
+      }
+      if ((tag === 0x9003 || tag === 0x0132) && type === 2 && size >= 19) {
+        const valueAt = size > 4 ? pointer : entry + 8;
+        return readText(valueAt, 19);
+      }
+    }
+    return "";
+  };
+  const text = readIfd(u32(4));
+  const match = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(text);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6]));
 }
 
 export function emptyPhotoBook(business: Business, jobId: string, title: string): PhotoBook {
@@ -184,7 +247,6 @@ export function addPhotoIssue(book: PhotoBook, level: string, area: string, note
   const place = typeof area === "string" ? area.replace(/\s+/g, " ").trim().slice(0, 40) : "";
   if (!place || detailPresets.has(place)) return { error: "Choose an area." };
   const cleaned = note.replace(/\s+/g, " ").trim().slice(0, 140);
-  if (!cleaned) return { error: "Add a short note." };
   if (!idPattern.test(id)) return { error: "That issue could not be saved." };
   return { ...book, issues: [...book.issues, { id, level, area: place, note: cleaned, angles: [], collageId: "" }] };
 }
@@ -202,8 +264,7 @@ export function attachPhotoFile(
   }
   if (!idPattern.test(input.angleId)) return { error: "The photo could not be saved." };
   const existing = issue.angles.find((angle) => angle.id === input.angleId);
-  if (input.side === "before" && !existing && issue.angles.length >= maxPhotoAngles) return { error: "Four angles is the most for one issue." };
-  if (input.side === "after" && !existing?.beforeId) return { error: "Take the before photo first." };
+  if (!existing && issue.angles.length >= maxPhotoAngles) return { error: "Four angles is the most for one issue." };
   return {
     ...book,
     issues: book.issues.map((item) => {
@@ -211,8 +272,11 @@ export function attachPhotoFile(
       if (input.side === "before" && existing) {
         return { ...item, angles: item.angles.map((angle) => (angle.id === input.angleId ? { ...angle, beforeId: fileId } : angle)) };
       }
-      if (input.side === "before") {
+      if (input.side === "before" && !existing) {
         return { ...item, angles: [...item.angles, { id: input.angleId, beforeId: fileId, afterId: "" }] };
+      }
+      if (input.side === "after" && !existing) {
+        return { ...item, angles: [...item.angles, { id: input.angleId, beforeId: "", afterId: fileId }] };
       }
       return { ...item, angles: item.angles.map((angle) => (angle.id === input.angleId ? { ...angle, afterId: fileId } : angle)) };
     }),
@@ -245,8 +309,12 @@ export function unshotAngles(issue: PhotoIssue): PhotoAngle[] {
   return issue.angles.filter((angle) => angle.beforeId && !angle.afterId);
 }
 
+export function completePairs(issue: PhotoIssue): PhotoAngle[] {
+  return issue.angles.filter((angle) => angle.beforeId && angle.afterId);
+}
+
 export function collageReady(issue: PhotoIssue): boolean {
-  return issue.angles.length > 0 && issue.angles.every((angle) => angle.beforeId && angle.afterId);
+  return completePairs(issue).length > 0;
 }
 
 export type CollageCell = { x: number; y: number; width: number; height: number; label: "BEFORE" | "AFTER" };
