@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { JobsClientError, postJobs, postJobsForm } from "@/components/jobs/api";
 import { KeepPage } from "@/components/jobs/keep-page";
 import { PhotoBurst } from "@/components/jobs/photo-burst";
+import { SmsPicker } from "@/components/jobs/sms-picker";
 import { compressFiles } from "@/components/jobs/resize-image";
 import { BackLink, JobsButton, JobsLink, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import {
@@ -36,10 +37,11 @@ import {
   type JobTenant,
 } from "@/lib/jobs-app/new-job-text";
 import { introBody, introCcPayload, introStatusText, introSubject, introTenantLine, type IntroTenant } from "@/lib/jobs-app/intro-email";
+import { fillSmsTemplate, smsTemplates } from "@/lib/sms-templates";
 import { voucherNote } from "@/lib/jobs-app/voucher";
 import { keptCount, NEW_JOB_MAX_EDGE, NEW_JOB_MAX_IMAGES, NEW_JOB_QUALITIES } from "@/lib/jobs-app/photos";
 import type { AgencyClient } from "@/lib/jobs-app/client-match";
-import { businessLabel, isBusiness, type Business, type NewJobResult } from "@/lib/jobs-app/types";
+import { businessLabel, isBusiness, type Business, type Contact, type NewJobResult } from "@/lib/jobs-app/types";
 
 function created(value: boolean | null): string {
   if (value === true) return "New";
@@ -120,6 +122,33 @@ function typedDraft(values: {
   return readNewJobText(draft);
 }
 
+function contactingSms(result: NewJobResult, business: Business): string {
+  const template = smsTemplates.find((item) => item.id === "first-visit");
+  return fillSmsTemplate(template?.english ?? "", {
+    name: "",
+    pmName: result.pmName,
+    brand: businessLabel(business),
+    agency: result.pmAgency,
+    address: result.address,
+    day: "",
+    time: "",
+    mins: "",
+    reason: "",
+    issue: "",
+  });
+}
+
+function contactingContacts(result: NewJobResult): Contact[] {
+  const listed = result.tenants
+    .filter((row) => row.phone.trim())
+    .map((row) => ({ name: row.name, phone: row.phone, sms: "" }));
+  if (listed.length > 0) return listed;
+  return [
+    { name: result.tenant1, phone: result.phone1, sms: "" },
+    { name: result.tenant2, phone: result.phone2, sms: "" },
+  ].filter((row) => row.phone.trim());
+}
+
 export function NewJobScreen() {
   const [step, setStep] = useState<"capture" | "check">("capture");
   const [business, setBusiness] = useState<Business | null>(null);
@@ -145,7 +174,7 @@ export function NewJobScreen() {
   const pending = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<NewJobResult | null>(null);
-  const [introPhase, setIntroPhase] = useState<"preview" | "status" | "done">("preview");
+  const [introPhase, setIntroPhase] = useState<"preview" | "status" | "sms" | "done">("preview");
   const [introStatus, setIntroStatus] = useState<{ status: string; message: string; error: string } | null>(null);
   const [introBusy, setIntroBusy] = useState<"send" | "skip" | null>(null);
   const [ccPm, setCcPm] = useState(false);
@@ -414,7 +443,7 @@ export function NewJobScreen() {
       clearStoredNewJobDraft();
       clearStoredNewJobIntro();
       setIntroStatus({ status: outcome.status, message: outcome.message, error: "" });
-      setIntroPhase("status");
+      setIntroPhase(action === "send" ? "sms" : "status");
     } catch (reason) {
       if (reason instanceof JobsClientError && reason.status === 401) {
         router.push("/jobs/login");
@@ -437,6 +466,29 @@ export function NewJobScreen() {
       <KeepPage>
         <Screen title="New job">
           <Spinner label="Opening" />
+        </Screen>
+      </KeepPage>
+    );
+  }
+
+  if (result && isBusiness(business) && introPhase === "sms") {
+    return (
+      <KeepPage>
+        <Screen title="Contacting tenant" back={<BackLink href="/jobs" />}>
+          {introStatus ? <p className="text-lg font-semibold">{introStatusText(introStatus.status, introStatus.message)}</p> : null}
+          <SmsPicker
+            jobId={result.jobId}
+            contacts={contactingContacts(result)}
+            topSms={contactingSms(result, business)}
+            address={result.address}
+            jobTitle={result.jobTitle}
+            allowManual
+          />
+          {result.jobUrl ? (
+            <a href={result.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm underline">
+              Open in Notion
+            </a>
+          ) : null}
         </Screen>
       </KeepPage>
     );
