@@ -1,6 +1,7 @@
 import { SMS_GEMINI_MODEL, geminiSmsUrl } from "@/lib/sms-reply";
 import { cleanJobId } from "@/lib/jobs-app/webhooks";
 import { isBusiness, type Business } from "@/lib/jobs-app/types";
+import { primarySelectFilter } from "@/lib/jobs-app/contact-groups";
 import { listAllNotionJobs, type SmsOpenJob } from "@/lib/sms-reply-jobs";
 import {
   fallbackNote,
@@ -64,7 +65,7 @@ function relationIds(value: unknown): string[] {
     .filter((id): id is string => Boolean(id));
 }
 
-/** First tenant name on each job. Owners are skipped. */
+/** First tenant name on each job. Only Tenant, or a contact with no role. */
 export function tenantNamesFromNotion(payload: unknown, business: Business): Map<string, string> {
   const names = new Map<string, string>();
   if (!payload || typeof payload !== "object") return names;
@@ -119,7 +120,7 @@ export async function listNoteJobs(fetchImpl?: FetchLike): Promise<{ status: num
             },
             body: JSON.stringify({
               page_size: 100,
-              filter: { property: "Select", select: { does_not_equal: "Owner" } },
+              filter: primarySelectFilter(),
             }),
             cache: "no-store",
             signal: AbortSignal.timeout(20_000),

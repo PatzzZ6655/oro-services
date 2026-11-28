@@ -1,3 +1,4 @@
+import { contactRole, primarySelectFilter } from "@/lib/jobs-app/contact-groups";
 import { smsAddressesMatch } from "@/lib/sms-address";
 import { isAllowedSmsStatus, isSmsTestJob, smsIncludeTestJobs, smsJobStage, smsJobStatuses } from "@/lib/sms-job-statuses";
 import { normalizePhone } from "@/lib/jobs-app/phones";
@@ -139,7 +140,7 @@ export function tenantContactsFromNotion(payload: unknown): SmsJobContact[] {
     const properties = (item as { properties?: unknown }).properties;
     if (!properties || typeof properties !== "object") continue;
     const row = properties as Record<string, unknown>;
-    if (selectText(row.Select).toLowerCase() === "owner") continue;
+    if (contactRole(selectText(row.Select)) !== "tenant") continue;
     const phone = normalizePhone(phoneText(row.Phone));
     if (!phone || contacts.some((contact) => contact.phone === phone)) continue;
     contacts.push({ name: plainText(row.Name), phone });
@@ -160,7 +161,7 @@ export function tenantPagesFromNotion(payload: unknown): SmsTenantPage[] {
     const pageId = cleanJobId(typeof page.id === "string" ? page.id : "");
     if (!pageId || !page.properties || typeof page.properties !== "object") continue;
     const row = page.properties as Record<string, unknown>;
-    if (selectText(row.Select).toLowerCase() === "owner") continue;
+    if (contactRole(selectText(row.Select)) !== "tenant") continue;
     pages.push({ pageId, name: plainText(row.Name), phone: normalizePhone(phoneText(row.Phone)) ?? "" });
     if (pages.length >= 10) break;
   }
@@ -196,7 +197,7 @@ export function phoneLinksFromNotion(payload: unknown, business: Business): SmsP
     const properties = (item as { properties?: unknown }).properties;
     if (!properties || typeof properties !== "object") continue;
     const row = properties as Record<string, unknown>;
-    if (selectText(row.Select).toLowerCase() === "owner") continue;
+    if (contactRole(selectText(row.Select)) !== "tenant") continue;
     const phone = normalizePhone(phoneText(row.Phone));
     if (!phone) continue;
     const name = plainText(row.Name);
@@ -218,7 +219,7 @@ export function phoneQuery(business: Business, phone: string): { url: string; bo
       page_size: 20,
       filter: {
         and: [
-          { property: "Select", select: { does_not_equal: "Owner" } },
+          primarySelectFilter(),
           {
             or: [
               { property: "Phone", phone_number: { equals: phone } },
@@ -294,7 +295,7 @@ export function tenantQuery(business: Business, jobId: string): { url: string; b
       filter: {
         and: [
           { property: source.relation, relation: { contains: jobId } },
-          { property: "Select", select: { does_not_equal: "Owner" } },
+          primarySelectFilter(),
         ],
       },
       sorts: [{ timestamp: "created_time", direction: "ascending" }],
