@@ -1,4 +1,5 @@
 import { introCcPayload } from "@/lib/jobs-app/intro-email";
+import { normalisePropertyAddress } from "@/lib/jobs-app/job-place";
 import { jobPropertyAddress } from "@/lib/jobs-app/property-address";
 import {
   newJobNeedDetail,
@@ -471,7 +472,7 @@ export async function readScreenshots(form: FormData, fetchImpl?: FetchLike): Pr
     const guess = businessGuess(readValue(result.json, "businessGuess", 20, secret));
     const agency = readValue(result.json, "pmAgency", 80, secret);
     const rawAddress = readValue(result.json, "address", 300, secret);
-    const address = jobPropertyAddress(rawAddress, { agency });
+    const address = normalisePropertyAddress(jobPropertyAddress(rawAddress, { agency }));
     return {
       status: 200,
       body: {
@@ -531,7 +532,10 @@ export async function createJob(form: FormData, fetchImpl?: FetchLike): Promise<
       delete details.phone;
       Object.assign(details, tenantPayload(tenants));
     }
+    if (details.address) details.address = normalisePropertyAddress(details.address);
+    const jobTitle = fieldText(form.get("jobTitle"), 300);
     const fields: Record<string, string> = { secret: config.secret, business, ...details };
+    if (jobTitle) fields.jobTitle = jobTitle;
     if (voucher) fields.voucher = voucher;
     const result = await postForm(config.newJob, formBody(fields, images.files, "images"), call);
     const error = failure(result.status, result.json);
