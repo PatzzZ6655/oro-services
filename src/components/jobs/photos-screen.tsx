@@ -9,10 +9,15 @@ import { GhostCamera } from "@/components/jobs/photos-camera";
 import { resizeToJpeg } from "@/components/jobs/resize-image";
 import { JobsButton, Screen, Spinner, fieldClass } from "@/components/jobs/ui";
 import {
+  areaGroups,
+  areaNeedsDetail,
   collageReady,
+  issuePlace,
   maxPhotoAngles,
-  orderedAreas,
-  rememberArea,
+  photoLevels,
+  recentCustomAreas,
+  rememberChoice,
+  resolveArea,
   unshotAngles,
   type PhotoBook,
   type PhotoIssue,
@@ -21,9 +26,10 @@ import { businessLabel, type Business } from "@/lib/jobs-app/types";
 
 type ListedJob = { business: Business; jobId: string; title: string; address: string; status: string };
 type Mode = "before" | "after";
-type Step = "mode" | "job" | "area" | "before" | "after" | "camera" | "collage";
+type Step = "mode" | "job" | "level" | "area" | "before" | "after" | "camera" | "collage";
 
 const recentKey = "oro.photos.areas";
+const levelKey = "oro.photos.level";
 
 function newId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -49,8 +55,12 @@ export function PhotosScreen() {
   const [jobs, setJobs] = useState<ListedJob[] | null>(null);
   const [query, setQuery] = useState("");
   const [job, setJob] = useState<ListedJob | null>(null);
+  const [level, setLevel] = useState("");
   const [area, setArea] = useState("");
+  const [detail, setDetail] = useState("");
+  const [detailFor, setDetailFor] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const [lastLevel, setLastLevel] = useState("");
   const [book, setBook] = useState<PhotoBook | null>(null);
   const [issueId, setIssueId] = useState("");
   const [angleId, setAngleId] = useState("");
@@ -89,9 +99,10 @@ export function PhotosScreen() {
       });
       const stored = localStorage.getItem(`${recentKey}.${next.business}`);
       setRecent(stored ? (JSON.parse(stored) as string[]) : []);
+      setLastLevel(localStorage.getItem(levelKey) ?? "");
       setJob(next);
       setBook(data.book);
-      setStep("area");
+      setStep("level");
     } catch (reason) {
       fail(reason);
     } finally {
@@ -99,16 +110,42 @@ export function PhotosScreen() {
     }
   }
 
+  function chooseLevel(next: string) {
+    if (next !== "All levels") {
+      setLastLevel(next);
+      localStorage.setItem(levelKey, next);
+    }
+    setLevel(next);
+    setDetail("");
+    setDetailFor("");
+    setIssueId("");
+    setSwap("");
+    setStep("area");
+  }
+
   function chooseArea(next: string) {
     if (!job) return;
-    if (next !== "All areas") {
-      const remembered = rememberArea(recent, next);
+    if (areaNeedsDetail(next)) {
+      setDetailFor(next);
+      setDetail(next === "Other Bedrooms" ? "Bedroom 2" : "");
+      return;
+    }
+    const resolved = resolveArea(next, "");
+    finishArea(typeof resolved === "string" ? resolved : next);
+  }
+
+  function finishArea(resolved: string) {
+    if (!job) return;
+    if (resolved !== "All areas") {
+      const remembered = rememberChoice(recent, resolved);
       setRecent(remembered);
       localStorage.setItem(`${recentKey}.${job.business}`, JSON.stringify(remembered));
     }
-    setArea(next);
+    setArea(resolved);
+    setDetailFor("");
     setIssueId("");
     setSwap("");
+    setError("");
     setStep(mode === "before" ? "before" : "after");
   }
 
@@ -122,6 +159,7 @@ export function PhotosScreen() {
         business: job.business,
         jobId: job.jobId,
         title: job.title,
+        level,
         area,
         note,
         id: newId(),
@@ -254,7 +292,7 @@ export function PhotosScreen() {
   }
 
   const current = book?.issues.find((item) => item.id === issueId) ?? null;
-  const visible = book?.issues.filter((item) => area === "All areas" || item.area === area) ?? [];
+  const visible = book?.issues.filter((item) => (level === "All levels" || item.level === level) && (area === "All areas" || item.area === area)) ?? [];
   const filtered = (jobs ?? []).filter((item) => {
     const haystack = `${item.title} ${item.address}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase());
@@ -289,19 +327,55 @@ export function PhotosScreen() {
           {filtered.length === 0 ? <p className="text-base">No matching job.</p> : null}
         </div>
       ) : null}
-      {step === "area" && job ? (
+      {step === "level" ? (
         <div className="flex flex-col gap-3">
-          {mode === "after" ? <JobsButton type="button" variant="outline" onClick={() => chooseArea("All areas")}>All areas</JobsButton> : null}
-          {orderedAreas(job.business, recent).map((item) => (
-            <JobsButton key={item} type="button" variant={recent.includes(item) ? "solid" : "outline"} onClick={() => chooseArea(item)}>
-              {recent.includes(item) ? `${item} · recent` : item}
+          <h2 className="text-lg font-semibold">Level</h2>
+          {mode === "after" ? <JobsButton type="button" variant="outline" onClick={() => chooseLevel("All levels")}>All levels</JobsButton> : null}
+          {photoLevels.map((item) => (
+            <JobsButton key={item} type="button" variant={lastLevel === item ? "solid" : "outline"} onClick={() => chooseLevel(item)}>
+              {lastLevel === item ? `${item} · last used` : item}
             </JobsButton>
           ))}
+          <JobsButton type="button" variant="text" onClick={() => setStep("job")}>Back</JobsButton>
+        </div>
+      ) : null}
+      {step === "area" && job ? (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Area{level && level !== "All levels" ? ` · ${level}` : ""}</h2>
+          {mode === "after" ? <JobsButton type="button" variant="outline" onClick={() => finishArea("All areas")}>All areas</JobsButton> : null}
+          {recentCustomAreas(recent).map((item) => (
+            <JobsButton key={item} type="button" onClick={() => chooseArea(item)}>{item} · recent</JobsButton>
+          ))}
+          {areaGroups(level).map((group) => (
+            <section key={group.title} className="flex flex-col gap-3">
+              <h3 className="text-base font-semibold">{group.title}</h3>
+              {group.areas.map((item) => (
+                <JobsButton key={item} type="button" variant={recent.includes(item) ? "solid" : "outline"} onClick={() => chooseArea(item)}>
+                  {recent.includes(item) ? `${item} · recent` : item}
+                </JobsButton>
+              ))}
+            </section>
+          ))}
+          <JobsButton type="button" variant="outline" onClick={() => chooseArea("Other")}>Other…</JobsButton>
+          {detailFor ? (
+            <>
+              <input value={detail} onChange={(event) => setDetail(event.target.value)} placeholder={detailFor === "Other Bedrooms" ? "Bedroom 2" : "Name this area"} className={fieldClass} />
+              <JobsButton type="button" onClick={() => {
+                const resolved = resolveArea(detailFor, detail);
+                if (typeof resolved !== "string") {
+                  setError(resolved.error);
+                  return;
+                }
+                finishArea(resolved);
+              }}>Use {detailFor === "Other Bedrooms" ? "this bedroom" : "this area"}</JobsButton>
+            </>
+          ) : null}
+          <JobsButton type="button" variant="text" onClick={() => setStep("level")}>Back</JobsButton>
         </div>
       ) : null}
       {step === "before" && book ? (
         <BeforeStep
-          issues={book.issues.filter((item) => item.area === area)}
+          issues={book.issues.filter((item) => item.level === level && item.area === area)}
           current={current}
           note={note}
           busy={busy}
@@ -371,8 +445,9 @@ function BeforeStep({
       <ul className="flex flex-col gap-2">
         {issues.map((issue) => (
           <li key={issue.id}>
-            <button type="button" onClick={() => onSelect(issue.id)} className="min-h-14 w-full rounded-2xl border border-black px-4 text-left text-lg">
-              {issue.note}
+            <button type="button" onClick={() => onSelect(issue.id)} className="min-h-14 w-full rounded-2xl border border-black px-4 py-2 text-left">
+              <span className="block text-sm font-semibold">{issuePlace(issue)}</span>
+              <span className="block text-lg">{issue.note}</span>
             </button>
           </li>
         ))}
@@ -381,6 +456,7 @@ function BeforeStep({
       <JobsButton type="button" onClick={onCreate} disabled={Boolean(busy)}>Add issue</JobsButton>
       {current ? (
         <>
+          <p className="text-sm font-semibold">{issuePlace(current)}</p>
           <p className="text-lg font-semibold">{current.note}</p>
           <div className="grid grid-cols-2 gap-2">
             {current.angles.map((angle, index) => (
@@ -434,7 +510,7 @@ function AfterStep({
       {issues.length === 0 ? <p className="text-base">No before photos in this area yet.</p> : null}
       {issues.map((issue) => (
         <section key={issue.id} className="flex flex-col gap-2 rounded-2xl border border-black p-3">
-          <h2 className="text-lg font-semibold">{issue.area}</h2>
+          <h2 className="text-lg font-semibold">{issuePlace(issue)}</h2>
           <p className="text-base">{issue.note}</p>
           <div className="grid grid-cols-2 gap-2">
             {issue.angles.map((angle, index) => {

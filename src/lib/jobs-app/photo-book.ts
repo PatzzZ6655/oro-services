@@ -2,11 +2,44 @@ import { isBusiness, type Business } from "@/lib/jobs-app/types";
 
 export const maxPhotoAngles = 4;
 
-/** Room lists differ by company. Other is the catch-all. */
-export const photoAreas: Record<Business, readonly string[]> = {
-  emoro: ["Kitchen", "Bathroom", "Laundry", "Bedroom", "Living", "Exterior", "Roof", "Garden", "Other"],
-  emporo: ["Kitchen", "Bathroom", "Laundry", "Toilet", "Hot water", "Drainage", "Exterior", "Garden", "Other"],
-};
+export const photoLevels = ["Ground Floor", "First Floor (Upstairs)", "Second Floor", "Basement", "Exterior/Outside"] as const;
+
+/** Wet rooms first, then the rest of the house. */
+export const interiorAreas = [
+  "Bathroom",
+  "Ensuite",
+  "Toilet",
+  "Laundry",
+  "Kitchen",
+  "Master Bedroom",
+  "Other Bedrooms",
+  "Living Room",
+  "Dining",
+  "Study",
+  "Hallway",
+  "Entry/Foyer",
+  "Stairs",
+  "Walk-in Robe",
+  "Garage",
+] as const;
+
+export const exteriorAreas = [
+  "Porch/Verandah",
+  "Front Yard",
+  "Backyard",
+  "Side of House",
+  "Driveway",
+  "Balcony/Deck",
+  "Patio",
+  "Carport",
+  "Fence",
+  "Roof",
+  "Garden",
+] as const;
+
+export const photoAreaPresets = [...interiorAreas, ...exteriorAreas, "Other"] as const;
+
+const detailPresets = new Set<string>(["Other Bedrooms", "Other"]);
 
 export type PhotoAngle = {
   id: string;
@@ -16,6 +49,7 @@ export type PhotoAngle = {
 
 export type PhotoIssue = {
   id: string;
+  level: string;
   area: string;
   note: string;
   angles: PhotoAngle[];
@@ -43,15 +77,55 @@ export function photoFolderName(title: string): string {
   return cleaned || "Job";
 }
 
-export function rememberArea(recent: readonly string[], area: string): string[] {
-  const next = [area, ...recent.filter((item) => item !== area)];
+export function isPhotoLevel(value: string): boolean {
+  return (photoLevels as readonly string[]).includes(value);
+}
+
+export function areaNeedsDetail(area: string): boolean {
+  return detailPresets.has(area);
+}
+
+export function rememberChoice(recent: readonly string[], value: string): string[] {
+  const next = [value, ...recent.filter((item) => item !== value)];
   return next.slice(0, 4);
 }
 
-export function orderedAreas(business: Business, recent: readonly string[]): string[] {
-  const allowed = photoAreas[business];
-  const first = recent.filter((area) => allowed.includes(area));
-  return [...first, ...allowed.filter((area) => !first.includes(area))];
+export function recentCustomAreas(recent: readonly string[]): string[] {
+  const known = new Set<string>(photoAreaPresets);
+  return recent.filter((area) => area && !known.has(area) && area !== "All areas");
+}
+
+/** Exterior level puts the outdoor list first. Other stays off both lists. */
+export function areaGroups(level: string): { title: "Interior" | "Exterior"; areas: readonly string[] }[] {
+  const interior = { title: "Interior" as const, areas: interiorAreas };
+  const exterior = { title: "Exterior" as const, areas: exteriorAreas };
+  if (level === "Exterior/Outside") return [exterior, interior];
+  return [interior, exterior];
+}
+
+export function resolveArea(preset: string, detail: string): string | { error: string } {
+  if (preset === "Other Bedrooms") {
+    const label = detail.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!label) return { error: "Name this bedroom, for example Bedroom 2." };
+    return label;
+  }
+  if (preset === "Other") {
+    const label = detail.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!label) return { error: "Name this area." };
+    return label;
+  }
+  if (!(photoAreaPresets as readonly string[]).includes(preset) || detailPresets.has(preset)) return { error: "Choose an area." };
+  return preset;
+}
+
+export function issuePlace(issue: Pick<PhotoIssue, "level" | "area">): string {
+  return `${issue.level} · ${issue.area}`;
+}
+
+export function photoFileName(level: string, area: string, side: "before" | "after" | "collage", index: number): string {
+  const place = photoFolderName(`${level} ${area}`).slice(0, 60);
+  if (side === "collage") return `${place} collage.jpg`;
+  return `${place} ${side} ${index + 1}.jpg`;
 }
 
 export function emptyPhotoBook(business: Business, jobId: string, title: string): PhotoBook {
@@ -76,10 +150,11 @@ export function parsePhotoBook(raw: unknown, expected: { business: Business; job
   if (Array.isArray(row.issues)) {
     for (const item of row.issues) {
       if (!item || typeof item !== "object") continue;
-      const issue = item as { id?: unknown; area?: unknown; note?: unknown; angles?: unknown; collageId?: unknown };
+      const issue = item as { id?: unknown; level?: unknown; area?: unknown; note?: unknown; angles?: unknown; collageId?: unknown };
       const id = cleanId(issue.id);
-      const area = typeof issue.area === "string" ? issue.area : "";
-      if (!id || !photoAreas[expected.business].includes(area)) continue;
+      const level = typeof issue.level === "string" ? issue.level.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+      const area = typeof issue.area === "string" ? issue.area.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+      if (!id || !isPhotoLevel(level) || !area || detailPresets.has(area)) continue;
       const angles: PhotoAngle[] = [];
       if (Array.isArray(issue.angles)) {
         for (const angle of issue.angles) {
@@ -93,6 +168,7 @@ export function parsePhotoBook(raw: unknown, expected: { business: Business; job
       }
       issues.push({
         id,
+        level,
         area,
         note: typeof issue.note === "string" ? issue.note.replace(/\s+/g, " ").trim().slice(0, 140) : "",
         angles,
@@ -103,12 +179,14 @@ export function parsePhotoBook(raw: unknown, expected: { business: Business; job
   return { version: 1, business: expected.business, jobId: expected.jobId.replace(/-/g, ""), title, issues };
 }
 
-export function addPhotoIssue(book: PhotoBook, area: string, note: string, id: string): PhotoBook | { error: string } {
-  if (!photoAreas[book.business].includes(area)) return { error: "Choose an area." };
+export function addPhotoIssue(book: PhotoBook, level: string, area: string, note: string, id: string): PhotoBook | { error: string } {
+  if (!isPhotoLevel(level)) return { error: "Choose a level." };
+  const place = typeof area === "string" ? area.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+  if (!place || detailPresets.has(place)) return { error: "Choose an area." };
   const cleaned = note.replace(/\s+/g, " ").trim().slice(0, 140);
   if (!cleaned) return { error: "Add a short note." };
   if (!idPattern.test(id)) return { error: "That issue could not be saved." };
-  return { ...book, issues: [...book.issues, { id, area, note: cleaned, angles: [], collageId: "" }] };
+  return { ...book, issues: [...book.issues, { id, level, area: place, note: cleaned, angles: [], collageId: "" }] };
 }
 
 export function attachPhotoFile(

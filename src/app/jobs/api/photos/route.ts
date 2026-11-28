@@ -52,12 +52,13 @@ export async function POST(request: Request) {
   }
 
   if (action === "issue") {
+    const level = typeof body?.level === "string" ? body.level : "";
     const area = typeof body?.area === "string" ? body.area : "";
     const note = typeof body?.note === "string" ? body.note : "";
     const id = typeof body?.id === "string" ? body.id : "";
     try {
       const current = await loadPhotoBook(business, jobId, title);
-      const next = addPhotoIssue({ ...current, title: title || current.title }, area, note, id);
+      const next = addPhotoIssue({ ...current, title: title || current.title }, level, area, note, id);
       if ("error" in next) return jobsJson({ ok: false, message: next.error }, 400);
       await savePhotoBook(next);
       return jobsJson({ ok: true, book: next });

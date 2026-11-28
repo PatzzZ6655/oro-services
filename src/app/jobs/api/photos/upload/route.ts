@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { jobsJson, requireJobsUser } from "@/lib/jobs-app/guard";
+import { photoFileName } from "@/lib/jobs-app/photo-book";
 import { loadPhotoBook, photoDriveConfigured, storePhotoBytes } from "@/lib/jobs-app/photo-drive";
 import { cleanJobId } from "@/lib/jobs-app/webhooks";
 import { isBusiness } from "@/lib/jobs-app/types";
@@ -43,7 +44,10 @@ export async function POST(request: Request) {
   if (!jpeg(bytes)) return jobsJson({ ok: false, message: "Use a JPEG photo." }, 400);
   try {
     const book = await loadPhotoBook(business, jobId, title);
-    const name = side === "collage" ? `collage-${issueId}.jpg` : `${side}-${angleId}.jpg`;
+    const issue = book.issues.find((item) => item.id === issueId);
+    if (!issue) return jobsJson({ ok: false, message: "That issue is not on this job." }, 400);
+    const found = issue.angles.findIndex((angle) => angle.id === angleId);
+    const name = photoFileName(issue.level, issue.area, side, found >= 0 ? found : issue.angles.length);
     const next = await storePhotoBytes({ ...book, title: title || book.title }, { issueId, angleId, side, bytes, name });
     return jobsJson({ ok: true, book: next });
   } catch (error) {

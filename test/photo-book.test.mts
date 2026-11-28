@@ -7,26 +7,40 @@ import {
   collageLayout,
   collageReady,
   emptyPhotoBook,
+  issuePlace,
   maxPhotoAngles,
-  orderedAreas,
-  photoAreas,
+  areaGroups,
+  interiorAreas,
+  photoAreaPresets,
+  photoFileName,
   photoFolderName,
+  photoLevels,
+  resolveArea,
   swapAfterPhotos,
   unshotAngles,
 } from "@/lib/jobs-app/photo-book";
 import { storePhotoBytes } from "@/lib/jobs-app/photo-drive";
 
-test("areas differ by company and recent ones stay first", () => {
-  assert.deepEqual(photoAreas.emoro, ["Kitchen", "Bathroom", "Laundry", "Bedroom", "Living", "Exterior", "Roof", "Garden", "Other"]);
-  assert.equal(photoAreas.emporo.includes("Hot water"), true);
-  assert.equal(photoAreas.emporo.includes("Roof"), false);
-  assert.deepEqual(orderedAreas("emoro", ["Garden", "Kitchen"]).slice(0, 2), ["Garden", "Kitchen"]);
+test("levels come first and bedrooms can be numbered", () => {
+  assert.deepEqual(photoLevels, ["Ground Floor", "First Floor (Upstairs)", "Second Floor", "Basement", "Exterior/Outside"]);
+  assert.equal((photoAreaPresets as readonly string[]).includes("Bedroom"), false);
+  assert.equal(photoAreaPresets.includes("Master Bedroom"), true);
+  assert.equal(photoAreaPresets.includes("Ensuite"), true);
+  assert.equal(photoAreaPresets.includes("Living Room"), true);
+  assert.equal(photoAreaPresets.includes("Porch/Verandah"), true);
+  assert.equal(photoAreaPresets.includes("Entry/Foyer"), true);
+  assert.equal(interiorAreas[0], "Bathroom");
+  assert.equal(resolveArea("Other Bedrooms", "Bedroom 3"), "Bedroom 3");
+  assert.equal("error" in (resolveArea("Other", "  ") as { error: string }), true);
+  assert.equal(areaGroups("Ground Floor")[0]?.title, "Interior");
+  assert.equal(areaGroups("Exterior/Outside")[0]?.title, "Exterior");
+  assert.equal(areaGroups("Exterior/Outside")[0]?.areas[0], "Porch/Verandah");
 });
 
 test("an issue keeps at most four angles and flags an unshot after", () => {
   const jobId = "a".repeat(32);
   let book = emptyPhotoBook("emoro", jobId, "TEST job");
-  const created = addPhotoIssue(book, "Kitchen", "  leaking tap  ", "issue-001");
+  const created = addPhotoIssue(book, "Ground Floor", "Kitchen", "  leaking tap  ", "issue-001");
   if ("error" in created) throw new Error(created.error);
   book = created;
   for (let index = 0; index < maxPhotoAngles; index += 1) {
@@ -47,6 +61,9 @@ test("an issue keeps at most four angles and flags an unshot after", () => {
   assert.equal(swapped.issues[0]?.angles[0]?.afterId, "");
   assert.equal(swapped.issues[0]?.angles[1]?.afterId, "afterfile00");
   assert.equal(photoFolderName("TEST – shortcut buttons (Emoro)"), "TEST – shortcut buttons (Emoro)");
+  assert.equal(issuePlace({ level: "Ground Floor", area: "Kitchen" }), "Ground Floor · Kitchen");
+  assert.equal(photoFileName("Ground Floor", "Bedroom 2", "before", 0), "Ground Floor Bedroom 2 before 1.jpg");
+  assert.equal(photoFileName("First Floor (Upstairs)", "Ensuite", "collage", 0), "First Floor (Upstairs) Ensuite collage.jpg");
   const layout = collageLayout(2);
   assert.deepEqual(layout.cells.map((cell) => cell.label), ["BEFORE", "AFTER", "BEFORE", "AFTER"]);
   assert.equal(JSON.stringify(layout).includes("Test Street"), false);
@@ -64,7 +81,7 @@ test("photo uploads go to ORO Before-After and do not touch report folders", asy
   const calls: string[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
   try {
-    const book = addPhotoIssue(emptyPhotoBook("emoro", "b".repeat(32), "TEST job"), "Kitchen", "leaking tap", "issue-001");
+    const book = addPhotoIssue(emptyPhotoBook("emoro", "b".repeat(32), "TEST job"), "Ground Floor", "Kitchen", "leaking tap", "issue-001");
     if ("error" in book) throw new Error(book.error);
     await storePhotoBytes(book, { issueId: "issue-001", angleId: "angle-001", side: "before", bytes: Uint8Array.of(1, 2, 3), name: "before-angle-001.jpg" }, async (url, init) => {
       const target = String(url);
@@ -100,4 +117,9 @@ test("the photos page is its own installable app and the camera policy is scoped
   assert.match(config, /"camera=\(\)"/);
   assert.match(config, /source: "\/jobs\/photos"/);
   assert.match(config, /camera=\(self\)/);
+  const upload = readFileSync(new URL("../src/app/jobs/api/photos/upload/route.ts", import.meta.url), "utf8");
+  const collage = readFileSync(new URL("../src/components/jobs/photo-collage.ts", import.meta.url), "utf8");
+  assert.match(upload, /photoFileName/);
+  assert.equal(collage.includes("issuePlace"), false);
+  assert.equal(collage.includes("level"), false);
 });
