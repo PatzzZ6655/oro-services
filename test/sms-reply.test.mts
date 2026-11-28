@@ -120,7 +120,14 @@ test("draft text drops labels, quotes, thoughts, and a runaway reply", () => {
   assert.equal(readGeminiSms({ candidates: [{ content: { parts: [{ thought: true, text: "hidden" }] } }] }), null);
   assert.equal(parseSmsReply({ intent: "  " }).ok, false);
   assert.equal(parseSmsReply({ intent: "回他", brand: "other" }).ok, false);
-  assert.equal(parseSmsReply({ intent: "回他" }).ok, false);
+  const intentOnly = parseSmsReply({ intent: "回他" });
+  assert.equal(intentOnly.ok, true);
+  if (intentOnly.ok) {
+    assert.equal(intentOnly.value.customerMessage, "");
+    assert.match(smsReplyPrompt(intentOnly.value).user, /What Pat wants to say/);
+    assert.match(smsReplyPrompt({ ...intentOnly.value, address: "12 Test St", customerMessage: "When?" }).user, /Job address: 12 Test St/);
+    assert.match(smsReplyPrompt({ ...intentOnly.value, address: "12 Test St", customerMessage: "When?" }).user, /When\?/);
+  }
   assert.equal(parseSmsReply({ intent: "回他", image: { mimeType: "image/gif", data: "abcd" } }).ok, false);
   const pictured = parseSmsReply({ intent: "回他可以", image: { mimeType: "image/jpeg", data: "a".repeat(48) } });
   assert.equal(pictured.ok, true);
@@ -176,6 +183,17 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     assert.equal(empty.status, 400);
     assert.equal(calls.length, 0);
 
+    const driving = await ask(
+      { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
+      { intent: "告诉他我在路上" },
+    );
+    const drivingBody = (await driving.json()) as { ok: boolean; sms: string };
+    assert.equal(driving.status, 200);
+    assert.equal(drivingBody.sms, "Hi tenant, Tuesday afternoon works. Thanks.");
+    assert.equal(calls.length, 1);
+    assert.match(calls[0]?.body ?? "", /告诉他我在路上/);
+    assert.match(calls[0]?.body ?? "", /\(none pasted\)/);
+
     const written = await ask(
       { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
       { customerMessage: "Can you come Tuesday?", intent: "说明周二下午可以", brand: "emoro", customerName: "Sam" },
@@ -183,10 +201,10 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     const writtenBody = (await written.json()) as { ok: boolean; sms: string };
     assert.equal(written.status, 200);
     assert.equal(writtenBody.sms, "Hi Sam, Tuesday afternoon works. Thanks.");
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0]?.url, geminiSmsUrl());
-    assert.match(calls[0]?.body ?? "", /说明周二下午可以/);
-    assert.match(calls[0]?.body ?? "", /Emoro Building/);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1]?.url, geminiSmsUrl());
+    assert.match(calls[1]?.body ?? "", /说明周二下午可以/);
+    assert.match(calls[1]?.body ?? "", /Emoro Building/);
 
     const rewritten = await ask(
       { origin: "https://www.orosvc.com", cookie, "content-type": "application/json" },
@@ -199,10 +217,10 @@ test("the reply route requires the staff session and keeps the Gemini key out of
       },
     );
     assert.equal(rewritten.status, 200);
-    assert.match(calls[1]?.body ?? "", /Current draft/);
-    assert.match(calls[1]?.body ?? "", /更短一点/);
-    assert.match(calls[1]?.body ?? "", /inlineData/);
-    assert.equal((calls[1]?.body ?? "").includes(KEY), false);
+    assert.match(calls[2]?.body ?? "", /Current draft/);
+    assert.match(calls[2]?.body ?? "", /更短一点/);
+    assert.match(calls[2]?.body ?? "", /inlineData/);
+    assert.equal((calls[2]?.body ?? "").includes(KEY), false);
 
     delete process.env.GEMINI_SMS_API_KEY;
     const unconfigured = await ask(
@@ -212,7 +230,7 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     const unconfiguredBody = (await unconfigured.json()) as { message: string };
     assert.equal(unconfigured.status, 503);
     assert.equal(unconfiguredBody.message.includes(KEY), false);
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
     process.env.GEMINI_SMS_API_KEY = KEY;
 
     globalThis.fetch = async () => new Response("no", { status: 500 });
@@ -243,6 +261,9 @@ test("the reply route requires the staff session and keeps the Gemini key out of
     assert.match(hub, /href="\/internal\/sms-reply"/);
     assert.equal(menu.includes("sms-reply"), false);
     assert.equal(menu.includes("SMS reply"), false);
+    assert.match(form, /text-red-800/);
+    assert.match(form, /scrollIntoView/);
+    assert.equal(form.includes("Paste the customer's text or add a screenshot."), false);
     assert.match(form, /Write English/);
     assert.match(form, /Open in Messages/);
     assert.match(form, /smsBodyHref/);
