@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { smsJobSearchAfter } from "@/lib/sms-job-statuses";
 import { resizeToJpeg } from "@/components/jobs/resize-image";
@@ -104,6 +104,11 @@ export function SmsReplyForm() {
   const [revision, setRevision] = useState("");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!error) return;
+    errorRef.current?.scrollIntoView({ block: "center" });
+  }, [error]);
   const [pasteNote, setPasteNote] = useState("");
   const [phoneNote, setPhoneNote] = useState("");
   const [pending, setPending] = useState<"write" | "rewrite" | "">("");
@@ -499,10 +504,6 @@ export function SmsReplyForm() {
     } else if (draftEdited) {
       base = draft;
     }
-    if (!nextRevision && !customerMessage.trim() && !shot && !base) {
-      setError("Paste the customer's text or add a screenshot.");
-      return;
-    }
     setPending(nextRevision ? "rewrite" : "write");
     try {
       const response = await fetch("/internal/api/sms-reply", {
@@ -517,6 +518,7 @@ export function SmsReplyForm() {
           draft: nextRevision ? draft : "",
           revision: nextRevision,
           base: nextRevision ? "" : base,
+          address: fields.current.address,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; sms?: string; message?: string } | null;
@@ -1018,7 +1020,7 @@ export function SmsReplyForm() {
       </div>
 
       {error ? (
-        <p role="alert" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+        <p ref={errorRef} role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       ) : null}
